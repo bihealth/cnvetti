@@ -1,0 +1,26 @@
+{% set name = "cnvetti" %}
+{% set version = "0.3" %}
+{% set md5 = "" %}
+
+package:
+  name: {{ name }}
+  version: {{ version }}
+
+build: 0
+
+source:
+  fn: {{ name }}-{{ version }}.tar.bz2
+  url: https://github.com/bihealth/{{ name }}/download/{{ version }}/{{ name }}-{{ version }}.tar.bz2
+  md5: {{ md5 }}
+
+requirements:
+  build:
+  - htslib >=1.4
+  run:
+  - htslib >=1.4
+
+about:
+  home: https://github.com/bihealth/{{ name }}
+  license: MIT
+  license_file: LICENSE.md
+  summary: CNV calling from WGS alignments
