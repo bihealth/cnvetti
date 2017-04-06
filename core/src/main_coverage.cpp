@@ -27,7 +27,12 @@
 
 #include "cnvetti/program_options.h"
 
+#include <iostream>
+
 int mainCoverage(CnvettiCoverageOptions const & options)
 {
+    std::cerr << "Starting `cnvetti coverage`\n\n";
+    options.print(std::cerr);
+
     return 0;
 }

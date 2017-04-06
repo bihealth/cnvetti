@@ -32,37 +32,6 @@
 #include <vector>
 
 // ----------------------------------------------------------------------------
-// Class InvalidArgumentsException
-// ----------------------------------------------------------------------------
-
-class InvalidCommandLineArgumentsException : public std::runtime_error
-{
-public:
-    InvalidCommandLineArgumentsException() : std::runtime_error("")
-    {}
-};
-
-// ----------------------------------------------------------------------------
-// Enum CnvettiCommand
-// ----------------------------------------------------------------------------
-
-// Enum for describing the available commands
-
-enum class CnvettiCommand
-{
-    // Print version and exit(0)
-    VERSION,
-    // Print top-level use help and exit(0)
-    TOPLEVEL_HELP,
-    // No command given, print help and exit
-    NONE,
-    // Run "cnvetti coverage"
-    COVERAGE,
-    // Run "cnvetti summaries"
-    SUMMARIES
-};
-
-// ----------------------------------------------------------------------------
 // Class CnvettiCoverageOptions
 // ----------------------------------------------------------------------------
 
@@ -139,21 +108,3 @@ public:
 
     void print(std::ostream & out) const;
 };
-
-// ----------------------------------------------------------------------------
-// Function printTopLevelHelp()
-// ----------------------------------------------------------------------------
-
-void printTopLevelHelp(std::ostream & out);
-
-// ----------------------------------------------------------------------------
-// Function parseTopLevelCommandLine()
-// ----------------------------------------------------------------------------
-
-CnvettiCommand parseTopLevelCommandLine(int argc, char ** argv);
-
-// ----------------------------------------------------------------------------
-// Function parseCoverageCommandLine()
-// ----------------------------------------------------------------------------
-
-CnvettiCoverageOptions parseCoverageCommandLine(int argc, char ** argv);

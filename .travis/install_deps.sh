@@ -2,7 +2,7 @@
 set -exuo pipefail
 
 HTSLIB_VERSION=1.4
-TCLAP_VERSION=1.2.1
+CLI11_VERSION=0.8
 
 # Download HTSlib sources and build ---------------------------------------------------------------
 
@@ -20,19 +20,18 @@ if [[ ! -e inst-deps/lib/libhts.so.$HTSLIB_VERSION ]]; then
     popd
 fi
 
-# Download TCLAP sources and build ----------------------------------------------------------------
+# Download CLI11 sources and build ----------------------------------------------------------------
 
-if [[ ! -e inst-deps/include/tclap ]]; then
+if [[ ! -e inst-deps/include/cli11 ]]; then
     mkdir -p tmp && pushd tmp
 
-    wget https://sourceforge.net/projects/tclap/files/tclap-${TCLAP_VERSION}.tar.gz/download \
-        -O tclap-${TCLAP_VERSION}.tar.gz
-    tar xf tclap-${TCLAP_VERSION}.tar.gz
+    wget -O CLI11-0.8.tar.gz \
+        https://github.com/CLIUtils/CLI11/archive/v0.8.tar.gz
+    tar xf CLI11-${CLI11_VERSION}.tar.gz
 
-    cd tclap-${TCLAP_VERSION}
-    ./configure --prefix=$(readlink -f ../../inst-deps)
-    make
-    make install
+    cd CLI11-${CLI11_VERSION}
+    install -d ../../inst-deps/include/CLI
+    install -t $(readlink -f ../../inst-deps/include/CLI) include/CLI/*
 
     popd
 fi

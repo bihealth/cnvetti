@@ -30,12 +30,13 @@
 
 #include <iostream>
 
-#include <tclap/CmdLine.h>
+#include <CLI/CLI.hpp>
+#include <CLI/Timer.hpp>
 
 
-// Forward Declarations -------------------------------------------------------
-
-class CnvettiSummariesOptions;
+// ----------------------------------------------------------------------------
+// Forward Declarations
+// ----------------------------------------------------------------------------
 
 int mainCoverage(CnvettiCoverageOptions const & options);
 int mainSummaries(CnvettiSummariesOptions const & options);
@@ -47,30 +48,78 @@ int mainSummaries(CnvettiSummariesOptions const & options);
 
 int main(int argc, char ** argv)
 {
-    try {
-        CnvettiCommand cmd = parseTopLevelCommandLine(argc, argv);
-        switch (cmd) {
-        case CnvettiCommand::NONE:
-            std::cout
-                << "Usage: cnvetti <command> [option]\n"
-                << "Try `cnvetti --help` for more information\n";
-            return 1;
+    CLI::App app{"CNV calling from NGS data"};
 
-        case CnvettiCommand::VERSION:
+    // Global, top-level options
+    bool print_version = false;
+    int verbosity = 0;
+
+    app.add_flag("--version", print_version, "Print version and exit");
+    app.add_flag("-v,--verbose", verbosity, "Verbosity, pass N times for level N");
+
+    // Add sub command `cnvetti coverage`
+
+    CnvettiCoverageOptions covOptions;
+
+    CLI::App * covApp = app.add_subcommand(
+        "coverage", "Collect per-sample coverage information");
+
+    covApp->add_option(
+        "-r,--reference", covOptions.referencePath,
+        "Path to FAI-indexed FASTA file (required)"
+    )->required()->check(CLI::ExistingFile)->group("Input / Output");
+    covApp->add_option(
+        "-i,--input", covOptions.inputFileNames,
+        "Path to input BAM file (required)"
+    )->required()->check(CLI::ExistingFile)->group("Input / Output");
+    covApp->add_option(
+        "-o,--output", covOptions.outputFileName,
+        "Path to output VCF/BCF file (required)"
+    )->required()->check(CLI::NonexistentPath)->group("Input / Output");
+    covApp->add_option(
+        "--genome-regions", covOptions.genomeRegions,
+        "Genome regions to process"
+    )->group("Input / Output");
+    covApp->add_option(
+        "--mapability-bed", covOptions.mapabilityBedFileName,
+        "Path to mapability BED file (required)"
+    )->check(CLI::ExistingFile)->group("Input / Output");
+
+    covApp->add_option(
+        "--window-length", covOptions.windowLength,
+    "Window length to use"
+    )->group("Algorithm Parameters");
+    covApp->add_option(
+        "--min-unclipped", covOptions.minUnclipped,
+        "Minimal unclipped fraction of reads to keep, in percent"
+    )->group("Algorithm Parameters");
+
+    // Add sub command `cnvetti summaries`
+
+    CnvettiSummariesOptions sumOptions;
+
+    CLI::App * cnvettiSummaries = app.add_subcommand(
+        "summaries", "Summarise multi-sample BCF coverage file");
+
+    try {
+        app.parse(argc, argv);
+
+        if (print_version) {
             std::cout << "cnvetti " << GIT_VERSION << "\n";
             return 0;
-
-        case CnvettiCommand::TOPLEVEL_HELP:
-            printTopLevelHelp(std::cerr);
-            return 0;
-
-        case CnvettiCommand::COVERAGE:
-            return mainCoverage(parseCoverageCommandLine(argc, argv));
         }
-    } catch (TCLAP::ArgException & e) {
-        std::cerr << "ERROR: " << e.error() << " for arg " << e.argId() << "\n\n";
-        printTopLevelHelp(std::cerr);
-        return 1;
+
+        if (app.got_subcommand("coverage")) {
+            CLI::AutoTimer timer("running time");
+            mainCoverage(covOptions);
+        } else if (app.got_subcommand("summaries")) {
+            CLI::AutoTimer timer("running time");
+        } else {
+            throw CLI::CallForHelp();
+        }
+    } catch (const CLI::ParseError &e) {
+        // Will make the app exit with 0 on --help
+        return app.exit(e);
     }
 
     return 0;

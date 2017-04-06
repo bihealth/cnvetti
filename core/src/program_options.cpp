@@ -27,63 +27,36 @@
 
 #include "cnvetti/program_options.h"
 
+#include <ostream>
 #include <cstring>
 
-#include <tclap/CmdLine.h>
-
-#include "cnvetti/version.h"
-
-// ----------------------------------------------------------------------------
-// Function printTopLevelHelp()
-// ----------------------------------------------------------------------------
-
-void printTopLevelHelp(std::ostream & out)
+void CnvettiCoverageOptions::print(std::ostream & out) const
 {
     out
-        << "Program: CNVetti (CNV calling from WGS data)\n"
-        << "Version: " << GIT_VERSION << "\n"
-        << "Contact: Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>\n"
-        << "\n"
-        << "Usage:   cnvetti <command> [options]\n"
-        << "\n"
-        << "Command: coverage   Compute coverage on single BAM file\n"
-        << "         summaries  Summarize multi-sample BCF file\n"
-        << "\n"
-        << "Note: Use `bcftools merge` for merging multiple BCF files resulting from the\n"
-        << "      coverage step for the input of the `cnvetti summaries` step.\n"
+        << "options:\n"
+        << "    verbosity:             " << verbosity << "\n"
+        << "    inputFileNames:";
+
+    if (inputFileNames.empty()) {
+        out << " []\n";
+    } else {
+        out << "\n";
+        for (std::string fname : inputFileNames)
+            out << "    - '" << fname << "'\n";
+    }
+
+    out << "    genomeRegions";
+    if (genomeRegions.empty()) {
+        out << " []\n";
+    } else {
+        out << "\n";
+        for (std::string region : genomeRegions)
+            out << "    - '" << region << "'\n";
+    }
+
+    out << "    outputFileName:        '" << outputFileName << "'\n"
+        << "    mapabilityBedFileName: '" << mapabilityBedFileName << "'\n"
+        << "    windowLength:          " << windowLength << "\n"
+        << "    minUnclipped:          " << minUnclipped << " # percent\n"
         << "\n";
-}
-
-// ----------------------------------------------------------------------------
-// Function parseTopLevelCommandLine()
-// ----------------------------------------------------------------------------
-
-CnvettiCommand parseTopLevelCommandLine(int argc, char ** argv)
-{
-    if (argc < 2)
-        return CnvettiCommand::NONE;
-
-    std::string argv1(argv[1]);
-
-    if (argv1 == "--help")
-        return CnvettiCommand::TOPLEVEL_HELP;
-    else if (argv1 == "--version")
-        return CnvettiCommand::VERSION;
-    else if (argv1 == "coverage")
-        return CnvettiCommand::COVERAGE;
-    else if (argv1 == "summaries")
-        return CnvettiCommand::SUMMARIES;
-    else
-        throw TCLAP::ArgException(std::string("Invalid <command>: ") + argv1, "<command>");
-}
-
-// ----------------------------------------------------------------------------
-// Function parseCoverageCommandLine()
-// ----------------------------------------------------------------------------
-
-CnvettiCoverageOptions parseCoverageCommandLine(int argc, char ** argv)
-{
-    CnvettiCoverageOptions result;
-
-    return result;
 }
