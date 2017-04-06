@@ -1,0 +1,4 @@
+#include "cnvetti/version.h"
+
+const char * GIT_VERSION = "@VERSION@";
+const char * GIT_VERSION_SHORT = "@VERSION_SHORT@";

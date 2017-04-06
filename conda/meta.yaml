@@ -16,6 +16,7 @@ source:
 requirements:
   build:
   - htslib >=1.4
+  - cmake >=3.5
   run:
   - htslib >=1.4
 
