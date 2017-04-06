@@ -25,7 +25,9 @@
 // Author:  Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>
 // ============================================================================
 
-#pragma once
+#include "cnvetti/program_options.h"
 
-extern const char * GIT_VERSION;
-extern const char * GIT_VERSION_SHORT;
+int mainCoverage(CnvettiCoverageOptions const & options)
+{
+    return 0;
+}
