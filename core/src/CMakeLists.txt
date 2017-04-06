@@ -4,3 +4,9 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/version.cpp.in
 set(version_file "${CMAKE_CURRENT_BINARY_DIR}/version.cpp")
 
 add_executable(cnvetti main.cpp ${version_file})
+
+install(
+    TARGETS cnvetti
+    RUNTIME DESTINATION bin
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib)

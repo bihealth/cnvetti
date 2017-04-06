@@ -1,0 +1,28 @@
+language: cpp
+sudo: required
+dist: trusty
+
+cache:
+  directories:
+  - dep-inst
+
+compiler:
+- clang
+
+os:
+- linux
+
+before_install:
+- echo $LANG
+- echo $LC_ALL
+- .travis/install_deps.sh
+
+before_script:
+- .travis/build.sh
+
+script:
+- .travis/test.sh
+
+env:
+  global:
+  - LANG="en_US.UTF-8"
