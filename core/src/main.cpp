@@ -60,6 +60,8 @@ int main(int argc, char ** argv)
     // Add sub command `cnvetti coverage`
 
     CnvettiCoverageOptions covOptions;
+    covOptions.argc = argc;
+    covOptions.argv = argv;
 
     CLI::App * covApp = app.add_subcommand(
         "coverage", "Collect per-sample coverage information");
@@ -75,7 +77,7 @@ int main(int argc, char ** argv)
     covApp->add_option(
         "-o,--output", covOptions.outputFileName,
         "Path to output VCF/BCF file (required)"
-    )->required()->check(CLI::NonexistentPath)->group("Input / Output");
+    )->required()/*->check(CLI::NonexistentPath)*/->group("Input / Output");
     covApp->add_option(
         "--genome-regions", covOptions.genomeRegions,
         "Genome regions to process"
@@ -97,6 +99,8 @@ int main(int argc, char ** argv)
     // Add sub command `cnvetti summaries`
 
     CnvettiSummariesOptions sumOptions;
+    sumOptions.argc = argc;
+    sumOptions.argv = argv;
 
     CLI::App * cnvettiSummaries = app.add_subcommand(
         "summaries", "Summarise multi-sample BCF coverage file");

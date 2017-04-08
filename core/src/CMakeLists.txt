@@ -3,6 +3,8 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/version.cpp.in
                 ${CMAKE_CURRENT_BINARY_DIR}/version.cpp)
 set(version_file "${CMAKE_CURRENT_BINARY_DIR}/version.cpp")
 
+find_library(HTS_LIBRARY NAMES hts)
+
 add_executable(
     cnvetti
     main.cpp
@@ -10,6 +12,8 @@ add_executable(
     main_coverage.cpp
     main_summaries.cpp
     ${version_file})
+
+target_link_libraries(cnvetti ${HTS_LIBRARY})
 
 target_compile_features(
     cnvetti

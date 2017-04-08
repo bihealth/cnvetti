@@ -64,7 +64,11 @@ public:
     // Minimal unclipped fraction of reads to consider, in percent.
     int minUnclipped;
 
-    CnvettiCoverageOptions() : verbosity(1), windowLength(1000), minUnclipped(80)
+    // argc and argv from command line
+    int argc;
+    char ** argv;
+
+    CnvettiCoverageOptions() : verbosity(1), windowLength(1000), minUnclipped(80), argc(0), argv(nullptr)
     {}
 
     void print(std::ostream & out) const;
@@ -103,7 +107,11 @@ public:
     // Minimal unclipped fraction of reads to consider, in percent.
     int minUnclipped;
 
-    CnvettiSummariesOptions() : verbosity(1), windowLength(1000), minUnclipped(80)
+    // argc and argv from command line
+    int argc;
+    char ** argv;
+
+    CnvettiSummariesOptions() : verbosity(1), windowLength(1000), minUnclipped(80), argc(0), argv(nullptr)
     {}
 
     void print(std::ostream & out) const;
