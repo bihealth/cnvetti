@@ -36,6 +36,7 @@
 #include <string>
 #include <sstream>
 
+#include <htslib/bgzf.h>
 #include <htslib/faidx.h>
 #include <htslib/regidx.h>
 #include <htslib/sam.h>
@@ -423,6 +424,14 @@ void CnvettiCoverageApp::run()
     printStatisticsToVCF();
 
     if (options.verbosity >= 1)
+        std::cerr << "\nWRITE INDEX\n\n";
+    if (vcfFileOut->format.compression == bgzf)
+    {
+        if (bgzf_index_dump(vcfFileOut->fp.bgzf, options.outputFileName.c_str(), ".tbi") != 0)
+            std::cerr << "ERROR: Writing index to " << options.outputFileName << ".tbi failed!\n";
+    }
+
+    if (options.verbosity >= 1)
         std::cerr << "\nDone. Have a nice day!\n";
 }
 
@@ -551,6 +560,8 @@ void CnvettiCoverageApp::openFiles()
     hts_set_threads(vcfFileOut.get(), options.numIOThreads);
     vcfFileOut->format.format = openFormat;
     vcfFileOut->format.compression = openCompression;
+    if (vcfFileOut->format.compression == bgzf)
+        bgzf_index_build_init(vcfFileOut->fp.bgzf);
 
     // Construct output VCF header
     vcfHeader = std::shared_ptr<bcf_hdr_t>(bcf_hdr_init("w"), bcf_hdr_destroy);
