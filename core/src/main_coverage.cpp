@@ -43,6 +43,7 @@
 #include <htslib/vcf.h>
 #include <sys/stat.h>
 
+#include "cnvetti/contig_selection.h"
 #include "cnvetti/program_options.h"
 #include "cnvetti/version.h"
 
@@ -618,8 +619,17 @@ void CnvettiCoverageApp::processChromosomes()
 {
     for (int rID = 0; rID < bamHeadersIn[0].get()->n_targets; ++rID)
     {
+        std::string contigName(bamHeadersIn[0].get()->target_name[rID]);
         if (options.verbosity >= 1)
-            std::cerr << bamHeadersIn[0].get()->target_name[rID] << " ...\n";
+            if (contigWhitelisted(contigName))
+            {
+                std::cerr << "Processing " << contigName << " ...\n";
+            }
+            else
+            {
+                std::cerr << "Skipping " << contigName << " (not white-listed)\n";
+                continue;
+            }
 
         ChromosomeBinCounter worker(
             options.inputFileNames, bamFilesIn, bamHeadersIn, rgToSampleID, rID, options);

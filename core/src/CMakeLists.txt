@@ -11,6 +11,7 @@ add_executable(
     program_options.cpp
     main_coverage.cpp
     main_summaries.cpp
+    contig_selection.cpp
     ${version_file})
 
 target_link_libraries(cnvetti ${HTS_LIBRARY})
