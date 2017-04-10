@@ -27,44 +27,10 @@
 
 #pragma once
 
-#include <memory>
-#include <vector>
+#include <string>
 
-// ---------------------------------------------------------------------------
-// Forward Declarations
-// ---------------------------------------------------------------------------
-
-class HistoStatsHandlerImpl;
-
-// ---------------------------------------------------------------------------
-// Enum StatsMetric
-// ---------------------------------------------------------------------------
-
-enum class StatsMetric
+inline bool hasSuffix(std::string const & str, std::string const & suffix)
 {
-    COV = 0,
-    COV0 = 1,
-    RC = 2,
-    RC0 = 3,
-    MAX = 3
-};
-
-// ---------------------------------------------------------------------------
-// Class HistoStatsHandler
-// ---------------------------------------------------------------------------
-
-class HistoStatsHandler
-{
-public:
-    HistoStatsHandler(unsigned sampleCount);
-    ~HistoStatsHandler();
-
-    void registerValue(unsigned sampleID, StatsMetric metric, int gcContent, int value);
-
-    double getMedian(unsigned sampleID, StatsMetric metric, int gcContent) const;
-
-    int getNumWindows(int gcContent) const;
-
-private:
-    std::unique_ptr<HistoStatsHandlerImpl> impl;
-};
+    return str.size() >= suffix.size() &&
+           str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
+}

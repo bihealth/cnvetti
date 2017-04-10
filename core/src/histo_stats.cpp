@@ -103,6 +103,16 @@ public:
             return static_cast<double>(a + b) / 2.0;
     }
 
+    int getNumWindows(int gcContent) const
+    {
+        int result = 0;
+        std::map<int, int> const & histo = histograms.at(
+            0).at(static_cast<int>(StatsMetric::COV)).at(gcContent);
+        for (auto const & pair : histo)
+            result += pair.second;
+        return result;
+    }
+
 private:
     // histograms[sampleID][metric][gcContent][value] = count
     std::vector<
@@ -135,4 +145,9 @@ double HistoStatsHandler::getMedian(
     unsigned sampleID, StatsMetric metric, int gcContent) const
 {
     return impl->getMedian(sampleID, metric, gcContent);
+}
+
+int HistoStatsHandler::getNumWindows(int gcContent) const
+{
+    return impl->getNumWindows(gcContent);
 }

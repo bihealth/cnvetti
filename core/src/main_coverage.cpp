@@ -47,8 +47,8 @@
 #include "cnvetti/contig_selection.h"
 #include "cnvetti/histo_stats.h"
 #include "cnvetti/program_options.h"
+#include "cnvetti/utils.h"
 #include "cnvetti/version.h"
-
 
 namespace {  // anonymous namespace
 
@@ -399,8 +399,8 @@ void CnvettiCoverageApp::run()
 {
     if (options.verbosity >= 1)
     {
-        std::cerr << "CNV Lense\n"
-                  << "=========\n\n";
+        std::cerr << "cnvetti coverage\n"
+                  << "================\n\n";
         options.print(std::cerr);
     }
 
@@ -458,12 +458,6 @@ void CnvettiCoverageApp::parseGenomicRegions()
                 return (std::make_pair(lhs.rID, lhs.beginPos) <
                     std::make_pair(rhs.rID, rhs.beginPos));
             });
-}
-
-bool hasSuffix(std::string const & str, std::string const & suffix)
-{
-    return str.size() >= suffix.size() &&
-           str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
 }
 
 void CnvettiCoverageApp::openFiles()
@@ -606,6 +600,8 @@ void CnvettiCoverageApp::openFiles()
     bcf_hdr_printf(vcfHeader.get(),
         "##INFO=<ID=GAP,Number=0,Type=Flag,Description=\"Window overlaps with N in reference (gap)\">");
     bcf_hdr_printf(vcfHeader.get(),
+        "##INFO=<ID=GCWINDOWS,Number=1,Type=Integer,Description=\"Number of windows with same GC content\">");
+    bcf_hdr_printf(vcfHeader.get(),
         "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">");
     bcf_hdr_printf(vcfHeader.get(),
         "##FORMAT=<ID=COV,Number=1,Type=Float,Description=\"Average coverage with non-q0 reads\">");
@@ -699,7 +695,7 @@ void CnvettiCoverageApp::processGenomicRegions()
                 printBinsToVcf(worker->getBins(), prevRID);
             worker.reset(new ChromosomeBinCounter(
                 options.inputFileNames, bamFilesIn, bamHeadersIn, rgToSampleID, region.rID,
-                options ));
+                options));
         }
 
         if (options.verbosity >= 1)
@@ -826,6 +822,8 @@ void CnvettiCoverageApp::printStatisticsToVCF()
         // INFO fields
         float valGCContent = gcContent;
         bcf_update_info_float(vcfHeader.get(), record, "GC", &valGCContent, 1);
+        int32_t valGCWindows = statsHandler->getNumWindows(gcContent);
+        bcf_update_info_int32(vcfHeader.get(), record, "GCWINDOWS", &valGCWindows, 1);
 
         // FORMAT field
         // Easy access to sample names
