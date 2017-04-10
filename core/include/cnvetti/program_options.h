@@ -79,11 +79,12 @@ public:
     void print(std::ostream & out) const;
 };
 
+
 // ----------------------------------------------------------------------------
-// Class CnvettiSummariesOptions
+// Class CnvettiNormalizeOptions
 // ----------------------------------------------------------------------------
 
-// Program options for summarising merged results of `convetti coverage`
+// Program options for the normalization of `cnvetti coverage` results
 
 class CnvettiSummariesOptions
 {
@@ -91,10 +92,7 @@ public:
     // Verbosity: 0 - quiet, 1 - normal, 2 - verbose, 3 - very verbose.
     int verbosity;
 
-    // Path to reference.
-    std::string referencePath;
-
-    // Paths to input file names, at least one.
+    // Path to input file name
     std::vector<std::string> inputFileNames;
 
     // Genomic regions to process
