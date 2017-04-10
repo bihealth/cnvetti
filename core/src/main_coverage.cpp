@@ -44,6 +44,7 @@
 #include <sys/stat.h>
 
 #include "cnvetti/contig_selection.h"
+#include "cnvetti/histo_stats.h"
 #include "cnvetti/program_options.h"
 #include "cnvetti/version.h"
 
@@ -113,7 +114,7 @@ GenomicRegion parseGenomicRegion(std::string const & str)
     }
     if (sContig.empty() || sBegin.empty() || sEnd.empty())
         throw std::runtime_error(std::string("Invalid region: ") + str);
-    return GenomicRegion(sContig, atoi(sBegin.c_str()), atoi(sEnd.c_str()));
+    return GenomicRegion(sContig, atoi(sBegin.c_str()) - 1, atoi(sEnd.c_str()));
 }
 
 // ---------------------------------------------------------------------------
@@ -354,8 +355,14 @@ private:
     // Process the input files genomic region--wise.
     void processGenomicRegions();
 
-    // Print bins to Vcf file.
+    // Print bins to VCF file.
     void printBinsToVcf(std::vector<std::vector<ChromosomeBin>> const & bins, int rID);
+
+    // Print statistics to VCF file at the very end
+    void printStatisticsToVCF();
+
+    // On-the fly computation of per-GC content medians for each sample
+    std::unique_ptr<HistoStatsHandler> statsHandler;
 
     // Return flag for whether overlaps with an N
     std::vector<bool> getHasGap(int rID) const;
@@ -397,22 +404,26 @@ void CnvettiCoverageApp::run()
     }
 
     if (options.verbosity >= 1)
-        std::cerr << "OPENING INPUT FILES\n\n";
+        std::cerr << "\nOPENING INPUT FILES\n\n";
     openFiles();
 
     if (options.verbosity >= 1)
-        std::cerr << "PARSING GENOMIC REGIONS\n\n";
+        std::cerr << "\nPARSING GENOMIC REGIONS\n\n";
     parseGenomicRegions();
 
     if (options.verbosity >= 1)
-        std::cerr << "PROCESSING\n\n";
+        std::cerr << "\nPROCESSING\n\n";
     if (genomicRegions.empty())
         processChromosomes();
     else
         processGenomicRegions();
 
     if (options.verbosity >= 1)
-        std::cerr << "Done. Have a nice day!\n";
+        std::cerr << "\nWRITE STATISTICS\n\n";
+    printStatisticsToVCF();
+
+    if (options.verbosity >= 1)
+        std::cerr << "\nDone. Have a nice day!\n";
 }
 
 void CnvettiCoverageApp::parseGenomicRegions()
@@ -455,6 +466,7 @@ void CnvettiCoverageApp::openFiles()
         bamFilesIn.push_back(std::shared_ptr<samFile>(
             sam_open(fileName.c_str(), "r"),
             hts_close));
+        hts_set_threads(bamFilesIn.back().get(), options.numIOThreads);
         bamHeadersIn.push_back(
             std::shared_ptr<bam_hdr_t>(bam_hdr_read(bamFilesIn.back().get()->fp.bgzf),
             bam_hdr_destroy));
@@ -512,6 +524,9 @@ void CnvettiCoverageApp::openFiles()
         }
     }
 
+    // Allocate memory for statistics computation
+    statsHandler.reset(new HistoStatsHandler(sampleToID.size()));
+
     // Check reference names.
     checkFiles();
 
@@ -533,6 +548,7 @@ void CnvettiCoverageApp::openFiles()
     vcfFileOut = std::shared_ptr<vcfFile>(
         hts_open(options.outputFileName.c_str(), openMode.c_str()),
         hts_close);
+    hts_set_threads(vcfFileOut.get(), options.numIOThreads);
     vcfFileOut->format.format = openFormat;
     vcfFileOut->format.compression = openCompression;
 
@@ -560,8 +576,15 @@ void CnvettiCoverageApp::openFiles()
     for (unsigned i = 0; i < bamHeadersIn[0].get()->n_targets; ++i)
         bcf_hdr_printf(vcfHeader.get(), "##contig=<ID=%s,length=%d>",
                        bamHeadersIn[0].get()->target_name[i], bamHeadersIn[0].get()->target_len[i]);
+    // Add fake sequence that has per-sample medians
+    bcf_hdr_printf(
+        vcfHeader.get(),
+        ("##contig=<ID=__cnvetti_stats,length=1,"
+         "Description=\"Pseudo-sequence for storing CNVetti statistics\">"));
 
-    // Write out INFO, FORMAT, and ALT fields
+    // Write out FILTER, INFO, FORMAT, and ALT fields
+    bcf_hdr_printf(vcfHeader.get(),
+        "##FILTER=<ID=CNVETTI_STATS,Description=\"Pseudo-entry for CNVettig statistics\">");
     bcf_hdr_printf(vcfHeader.get(),
         "##INFO=<ID=END,Number=1,Type=Integer,Description=\"Window end\">");
     bcf_hdr_printf(vcfHeader.get(),
@@ -577,11 +600,13 @@ void CnvettiCoverageApp::openFiles()
     bcf_hdr_printf(vcfHeader.get(),
         "##FORMAT=<ID=COV0,Number=1,Type=Float,Description=\"Average coverage with q0 reads\">");
     bcf_hdr_printf(vcfHeader.get(),
-        "##FORMAT=<ID=RC,Number=1,Type=Integer,Description=\"Number of aligning non-q0 reads\">");
+        "##FORMAT=<ID=RC,Number=1,Type=Float,Description=\"Number of aligning non-q0 reads\">");
     bcf_hdr_printf(vcfHeader.get(),
-        "##FORMAT=<ID=RC0,Number=1,Type=Integer,Description=\"Number of aligning q0 reads\">");
+        "##FORMAT=<ID=RC0,Number=1,Type=Float,Description=\"Number of aligning q0 reads\">");
     bcf_hdr_printf(vcfHeader.get(),
-        "##FORMAT=<ID=COUNT,Description=\"Window for read counting\">");
+        "##ALT=<ID=COUNT,Description=\"Window for read counting\">");
+    bcf_hdr_printf(vcfHeader.get(),
+        "##ALT=<ID=STATS,Description=\"Pseudo-entry for CNVettig statistics\">");
 
     std::string cmdLine = options.argv[1];
     for (int i = 2; i < options.argc; ++i) {
@@ -621,6 +646,7 @@ void CnvettiCoverageApp::processChromosomes()
     {
         std::string contigName(bamHeadersIn[0].get()->target_name[rID]);
         if (options.verbosity >= 1)
+        {
             if (contigWhitelisted(contigName))
             {
                 std::cerr << "Processing " << contigName << " ...\n";
@@ -630,6 +656,7 @@ void CnvettiCoverageApp::processChromosomes()
                 std::cerr << "Skipping " << contigName << " (not white-listed)\n";
                 continue;
             }
+        }
 
         ChromosomeBinCounter worker(
             options.inputFileNames, bamFilesIn, bamHeadersIn, rgToSampleID, rID, options);
@@ -660,7 +687,7 @@ void CnvettiCoverageApp::processGenomicRegions()
                 printBinsToVcf(worker->getBins(), prevRID);
             worker.reset(new ChromosomeBinCounter(
                 options.inputFileNames, bamFilesIn, bamHeadersIn, rgToSampleID, region.rID,
-                options));
+                options ));
         }
 
         if (options.verbosity >= 1)
@@ -690,9 +717,6 @@ void CnvettiCoverageApp::printBinsToVcf(std::vector<std::vector<ChromosomeBin>> 
     std::vector<bool> const hasGap(getHasGap(rID));
     std::vector<double> const mapability(getMapability(rID));
 
-    std::stringstream ss;
-    ss.precision(2);
-
     unsigned numWindows = bins[0].size();
     for (unsigned windowID = 0; windowID < numWindows; ++windowID)
     {
@@ -714,7 +738,7 @@ void CnvettiCoverageApp::printBinsToVcf(std::vector<std::vector<ChromosomeBin>> 
             float valMapability = mapability[windowID];
             bcf_update_info_float(vcfHeader.get(), record, "MAPABILITY", &valMapability, 1);
         }
-        if (hasGap[windowID])
+        if (!hasGap[windowID])
             bcf_update_info_flag(vcfHeader.get(), record, "GAP", "", 1);
 
         // FORMAT and variant call information
@@ -731,25 +755,98 @@ void CnvettiCoverageApp::printBinsToVcf(std::vector<std::vector<ChromosomeBin>> 
         // COV
         std::vector<float> cov(sampleNames.size(), 0.0);
         for (unsigned i = 0; i < sampleNames.size(); ++i)
+        {
             cov[i] = bins[i][windowID].coverage(options.windowLength);
+            if (!hasGap[windowID])  // ignore if overlapping with gap
+                statsHandler->registerValue(i, StatsMetric::COV, int(round(valGCContent)), cov[i]);
+        }
         bcf_update_format_float(vcfHeader.get(), record, "COV", &cov[0], cov.size());
 
         // COV0
         std::vector<float> covQ0(sampleNames.size(), 0.0);
         for (unsigned i = 0; i < sampleNames.size(); ++i)
+        {
             covQ0[i] = bins[i][windowID].coverageQ0(options.windowLength);
+            if (!hasGap[windowID])  // ignore if overlapping with gap
+                statsHandler->registerValue(i, StatsMetric::COV0, int(round(valGCContent)), covQ0[i]);
+        }
         bcf_update_format_float(vcfHeader.get(), record, "COV0", &covQ0[0], covQ0.size());
 
         // RC
         std::vector<int32_t> rc(sampleNames.size(), 0);
         for (unsigned i = 0; i < sampleNames.size(); ++i)
+        {
             rc[i] = bins[i][windowID].numFirstReads;
-        bcf_update_format_float(vcfHeader.get(), record, "RC", &rc[0], rc.size());
+            if (!hasGap[windowID])  // ignore if overlapping with gap
+                statsHandler->registerValue(i, StatsMetric::RC, int(round(valGCContent)), rc[i]);
+        }
+        bcf_update_format_int32(vcfHeader.get(), record, "RC", &rc[0], rc.size());
 
         // RC0
         std::vector<int32_t> rc0(sampleNames.size(), 0);
         for (unsigned i = 0; i < sampleNames.size(); ++i)
+        {
             rc0[i] = bins[i][windowID].numQ0FirstReads;
+            if (!hasGap[windowID])  // ignore if overlapping with gap
+                statsHandler->registerValue(i, StatsMetric::RC0, int(round(valGCContent)), rc0[i]);
+        }
+        bcf_update_format_int32(vcfHeader.get(), record, "RC0", &rc0[0], rc.size());
+
+        bcf_write(vcfFileOut.get(), vcfHeader.get(), record);
+    }
+}
+
+void CnvettiCoverageApp::printStatisticsToVCF()
+{
+    bam_hdr_t const * const hdr = bamHeadersIn[0].get();
+    int const rID = hdr->n_targets;
+
+    for (int gcContent = 0; gcContent <= 100; ++gcContent)
+    {
+        std::unique_ptr<bcf1_t, void (&)(bcf1_t*)> recordPtr(bcf_init(), bcf_destroy);
+        bcf1_t * record = recordPtr.get();
+
+        // CHROM, POS, REF, ALT
+        record->rid = rID;
+        record->pos = 0;
+        bcf_update_alleles_str(vcfHeader.get(), record, "N,<STATS>");
+
+        // INFO fields
+        float valGCContent = gcContent;
+        bcf_update_info_float(vcfHeader.get(), record, "GC", &valGCContent, 1);
+
+        // FORMAT field
+        // Easy access to sample names
+        std::vector<std::string> sampleNames(sampleToID.size());
+        for (auto pair : sampleToID)
+            sampleNames[pair.second] = pair.first;
+
+        // GT
+        std::vector<int32_t> gts(2 * sampleNames.size(), bcf_gt_missing);
+        bcf_update_genotypes(vcfHeader.get(), record, &gts[0], gts.size());
+
+        // COV
+        std::vector<float> cov(sampleNames.size(), 0.0);
+        for (unsigned i = 0; i < sampleNames.size(); ++i)
+            cov[i] = statsHandler->getMedian(i, StatsMetric::COV, gcContent);
+        bcf_update_format_float(vcfHeader.get(), record, "COV", &cov[0], cov.size());
+
+        // COV0
+        std::vector<float> covQ0(sampleNames.size(), 0.0);
+        for (unsigned i = 0; i < sampleNames.size(); ++i)
+            covQ0[i] = statsHandler->getMedian(i, StatsMetric::COV0, gcContent);
+        bcf_update_format_float(vcfHeader.get(), record, "COV0", &covQ0[0], covQ0.size());
+
+        // RC
+        std::vector<float> rc(sampleNames.size(), 0);
+        for (unsigned i = 0; i < sampleNames.size(); ++i)
+            rc[i] = statsHandler->getMedian(i, StatsMetric::RC, gcContent);
+        bcf_update_format_float(vcfHeader.get(), record, "RC", &rc[0], rc.size());
+
+        // RC0
+        std::vector<float> rc0(sampleNames.size(), 0);
+        for (unsigned i = 0; i < sampleNames.size(); ++i)
+            rc0[i] = statsHandler->getMedian(i, StatsMetric::RC0, gcContent);
         bcf_update_format_float(vcfHeader.get(), record, "RC0", &rc0[0], rc.size());
 
         bcf_write(vcfFileOut.get(), vcfHeader.get(), record);

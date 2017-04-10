@@ -86,6 +86,10 @@ int main(int argc, char ** argv)
         "--mapability-bed", covOptions.mapabilityBedFileName,
         "Path to mapability BED file (required)"
     )->check(CLI::ExistingFile)->group("Input / Output");
+    covApp->add_option(
+        "--num-io-threads", covOptions.numIOThreads,
+        "Number of threads to use for de-/compression in I/O"
+    )->group("Input / Output");
 
     covApp->add_option(
         "--window-length", covOptions.windowLength,

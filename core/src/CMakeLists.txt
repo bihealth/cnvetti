@@ -12,6 +12,7 @@ add_executable(
     main_coverage.cpp
     main_summaries.cpp
     contig_selection.cpp
+    histo_stats.cpp
     ${version_file})
 
 target_link_libraries(cnvetti ${HTS_LIBRARY})

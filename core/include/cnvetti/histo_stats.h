@@ -25,39 +25,44 @@
 // Author:  Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>
 // ============================================================================
 
-#include "cnvetti/program_options.h"
+#pragma once
 
-#include <ostream>
-#include <cstring>
+#include <memory>
+#include <vector>
 
-void CnvettiCoverageOptions::print(std::ostream & out) const
+// ---------------------------------------------------------------------------
+// Forward Declarations
+// ---------------------------------------------------------------------------
+
+class HistoStatsHandlerImpl;
+
+// ---------------------------------------------------------------------------
+// Enum StatsMetric
+// ---------------------------------------------------------------------------
+
+enum class StatsMetric
 {
-    out
-        << "options:\n"
-        << "    verbosity:             " << verbosity << "\n"
-        << "    inputFileNames:";
+    COV = 0,
+    COV0 = 1,
+    RC = 2,
+    RC0 = 3,
+    MAX = 3
+};
 
-    if (inputFileNames.empty()) {
-        out << " []\n";
-    } else {
-        out << "\n";
-        for (std::string fname : inputFileNames)
-            out << "    - '" << fname << "'\n";
-    }
+// ---------------------------------------------------------------------------
+// Class HistoStatsHandler
+// ---------------------------------------------------------------------------
 
-    out << "    genomeRegions";
-    if (genomeRegions.empty()) {
-        out << " []\n";
-    } else {
-        out << "\n";
-        for (std::string region : genomeRegions)
-            out << "    - '" << region << "'\n";
-    }
+class HistoStatsHandler
+{
+public:
+    HistoStatsHandler(unsigned sampleCount);
+    ~HistoStatsHandler();
 
-    out << "    outputFileName:        '" << outputFileName << "'\n"
-        << "    mapabilityBedFileName: '" << mapabilityBedFileName << "'\n"
-        << "    windowLength:          " << windowLength << "\n"
-        << "    minUnclipped:          " << minUnclipped << " # percent\n"
-        << "    numIOThreads:          " << numIOThreads << "\n"
-        << "\n";
-}
+    void registerValue(unsigned sampleID, StatsMetric metric, int gcContent, int value);
+
+    double getMedian(unsigned sampleID, StatsMetric metric, int gcContent) const;
+
+private:
+    std::unique_ptr<HistoStatsHandlerImpl> impl;
+};

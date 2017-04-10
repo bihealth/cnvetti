@@ -58,6 +58,9 @@ public:
     // Path to tabix-indexed, bgzip-ed mapability file.
     std::string mapabilityBedFileName;
 
+    // Number of threads to use for decompression/compression on I/O
+    int numIOThreads;
+
     // Length of the windows in bp.
     int windowLength;
 
@@ -68,7 +71,9 @@ public:
     int argc;
     char ** argv;
 
-    CnvettiCoverageOptions() : verbosity(1), windowLength(1000), minUnclipped(80), argc(0), argv(nullptr)
+    CnvettiCoverageOptions() :
+        verbosity(1), numIOThreads(1), windowLength(1000), minUnclipped(80),
+        argc(0), argv(nullptr)
     {}
 
     void print(std::ostream & out) const;
