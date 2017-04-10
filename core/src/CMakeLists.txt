@@ -10,7 +10,7 @@ add_executable(
     main.cpp
     program_options.cpp
     main_coverage.cpp
-    main_summaries.cpp
+    main_normalize.cpp
     contig_selection.cpp
     histo_stats.cpp
     ${version_file})

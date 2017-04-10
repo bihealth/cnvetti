@@ -61,3 +61,15 @@ void CnvettiCoverageOptions::print(std::ostream & out) const
         << "    numIOThreads:          " << numIOThreads << "\n"
         << "\n";
 }
+
+
+void CnvettiNormalizeOptions::print(std::ostream & out) const
+{
+    out
+        << "options:\n"
+        << "    verbosity:      " << verbosity << "\n"
+        << "    inputFileName:  '" << inputFileName << "'\n"
+        << "    outputFileName: '" << outputFileName << "'\n"
+        << "    numIOThreads:          " << numIOThreads << "\n"
+        << "\n";
+}

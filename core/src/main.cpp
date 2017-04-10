@@ -39,7 +39,7 @@
 // ----------------------------------------------------------------------------
 
 int mainCoverage(CnvettiCoverageOptions const & options);
-int mainSummaries(CnvettiSummariesOptions const & options);
+int mainNormalize(CnvettiNormalizeOptions const & options);
 
 
 // ----------------------------------------------------------------------------
@@ -77,7 +77,7 @@ int main(int argc, char ** argv)
     covApp->add_option(
         "-o,--output", covOptions.outputFileName,
         "Path to output VCF/BCF file (required)"
-    )->required()/*->check(CLI::NonexistentPath)*/->group("Input / Output");
+    )->required()->group("Input / Output");
     covApp->add_option(
         "--genome-regions", covOptions.genomeRegions,
         "Genome regions to process"
@@ -100,14 +100,26 @@ int main(int argc, char ** argv)
         "Minimal unclipped fraction of reads to keep, in percent"
     )->group("Algorithm Parameters");
 
-    // Add sub command `cnvetti summaries`
+    // Add sub command `cnvetti normalize`
 
-    CnvettiSummariesOptions sumOptions;
-    sumOptions.argc = argc;
-    sumOptions.argv = argv;
+    CnvettiNormalizeOptions normOptions;
+    normOptions.argc = argc;
+    normOptions.argv = argv;
 
-    CLI::App * cnvettiSummaries = app.add_subcommand(
-        "summaries", "Summarise multi-sample BCF coverage file");
+    CLI::App * cnvettiNormalize = app.add_subcommand(
+        "normalize", "Perform per-sample normalization on cnvetti coverage output");
+    cnvettiNormalize->add_option(
+        "-i,--input", normOptions.inputFileName,
+        "Path to input BAM file (required)"
+    )->required()->check(CLI::ExistingFile)->group("Input / Output");
+    cnvettiNormalize->add_option(
+        "-o,--output", normOptions.outputFileName,
+        "Path to output VCF/BCF file (required)"
+    )->required()->group("Input / Output");
+    cnvettiNormalize->add_option(
+        "--num-io-threads", normOptions.numIOThreads,
+        "Number of threads to use for de-/compression in I/O"
+    )->group("Input / Output");
 
     try {
         app.parse(argc, argv);
@@ -120,8 +132,9 @@ int main(int argc, char ** argv)
         if (app.got_subcommand("coverage")) {
             CLI::AutoTimer timer("running time");
             mainCoverage(covOptions);
-        } else if (app.got_subcommand("summaries")) {
+        } else if (app.got_subcommand("normalize")) {
             CLI::AutoTimer timer("running time");
+            mainNormalize(normOptions);
         } else {
             throw CLI::CallForHelp();
         }

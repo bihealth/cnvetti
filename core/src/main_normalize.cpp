@@ -27,7 +27,7 @@
 
 #include "cnvetti/program_options.h"
 
-int mainSummaries(CnvettiSummariesOptions const & options)
+int mainNormalize(CnvettiNormalizeOptions const & options)
 {
     return 0;
 }

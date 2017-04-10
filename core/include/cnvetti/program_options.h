@@ -86,35 +86,26 @@ public:
 
 // Program options for the normalization of `cnvetti coverage` results
 
-class CnvettiSummariesOptions
+class CnvettiNormalizeOptions
 {
 public:
     // Verbosity: 0 - quiet, 1 - normal, 2 - verbose, 3 - very verbose.
     int verbosity;
 
     // Path to input file name
-    std::vector<std::string> inputFileNames;
-
-    // Genomic regions to process
-    std::vector<std::string> genomeRegions;
+    std::string inputFileName;
 
     // Path to output file.
     std::string outputFileName;
 
-    // Path to tabix-indexed, bgzip-ed mapability file.
-    std::string mapabilityBedFileName;
-
-    // Length of the windows in bp.
-    int windowLength;
-
-    // Minimal unclipped fraction of reads to consider, in percent.
-    int minUnclipped;
+    // Number of threads to use for decompression/compression on I/O
+    int numIOThreads;
 
     // argc and argv from command line
     int argc;
     char ** argv;
 
-    CnvettiSummariesOptions() : verbosity(1), windowLength(1000), minUnclipped(80), argc(0), argv(nullptr)
+    CnvettiNormalizeOptions() : verbosity(1), argc(0), argv(nullptr), numIOThreads(1)
     {}
 
     void print(std::ostream & out) const;
