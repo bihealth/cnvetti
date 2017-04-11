@@ -749,7 +749,7 @@ void CnvettiCoverageApp::printBinsToVcf(std::vector<std::vector<ChromosomeBin>> 
             float valMapability = mapability[windowID];
             bcf_update_info_float(vcfHeader.get(), record, "MAPABILITY", &valMapability, 1);
         }
-        if (!hasGap[windowID])
+        if (hasGap[windowID])
             bcf_update_info_flag(vcfHeader.get(), record, "GAP", "", 1);
 
         // FORMAT and variant call information

@@ -175,12 +175,31 @@ public:
     // Number of threads to use for decompression/compression on I/O
     int numIOThreads;
 
+    // Metric to base the segmentation on
+    std::string metric;
+
+    // Minimal mapability in window
+    double minMapability;
+
+    // Minimal GC content in window
+    double minGC;
+
+    // Maximal GC content in window
+    double maxGC;
+
+    // Maximal normalized IQR of normalized read count
+    double maxIqrRC;
+
+    // Maximal normalized IQR of normalized coverage
+    double maxIqrCov;
+
     // argc and argv from command line
     int argc;
     char ** argv;
 
     CnvettiSegmentOptions() :
-        verbosity(1), argc(0), argv(nullptr), numIOThreads(1)
+        verbosity(1), argc(0), argv(nullptr), numIOThreads(1), metric("COV0"),
+        minMapability(0.99), minGC(20), maxGC(70), maxIqrRC(0.25), maxIqrCov(0.2)
     {}
 
     void print(std::ostream & out) const;

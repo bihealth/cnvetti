@@ -25,8 +25,6 @@
 // Author:  Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>
 // ============================================================================
 
-#include "cnvetti/program_options.h"
-
 #include <algorithm>
 #include <iostream>
 #include <map>
@@ -181,7 +179,7 @@ void CnvettiSegmentApp::openFiles()
         cmdLine += " ";
         cmdLine += options.argv[i];
     }
-    bcf_hdr_printf(vcfHeaderOut, "##cnvetti_backgroundCommand=%s", cmdLine.c_str());
+    bcf_hdr_printf(vcfHeaderOut, "##cnvetti_segmentCommand=%s", cmdLine.c_str());
 
     bcf_hdr_write(vcfFileOutPtr.get(), vcfHeaderOut);
 }
@@ -250,20 +248,97 @@ void CnvettiSegmentApp::processRegion(std::string const & contig, int beginPos, 
     if (bcf_sr_seek(vcfReaderPtr.get(), contig.c_str(), 0) != 0)
         throw std::runtime_error("Could not seek to beginning of region!");
 
+    std::vector<int> pos;
+    std::vector<std::vector<double>> values;
+    values.resize(bcf_hdr_nsamples(vcfHeaderIn));
+
+    float * valsPtr = nullptr;
+    int32_t sizeVals = 0;
+
     while (bcf_sr_next_line(vcfReaderPtr.get()))
     {
         bcf1_t * line = bcf_sr_get_line(vcfReaderPtr.get(), 0);
 
-        if (bcf_translate(vcfHeaderOut, vcfHeaderIn, line))
-           throw std::runtime_error("Could not translate from old to new header");
+        // Weed out the noisy windows
+        float gcContent, mapability, iqrRc0, iqrCov0;
 
-        bcf_write(vcfFileOutPtr.get(), vcfHeaderOut, line);
+        float * ptrTmp = nullptr;
+        int32_t sizeTmp = 0;
+        if (bcf_get_info_float(vcfHeaderIn, line, "GC", &ptrTmp, &sizeTmp) != 1)
+        {
+            free(ptrTmp);
+            throw std::runtime_error("Could not get value of INFO/GC");
+        }
+        else
+        {
+            gcContent = *ptrTmp;
+        }
+        if (bcf_get_info_float(vcfHeaderIn, line, "MAPABILITY", &ptrTmp, &sizeTmp) != 1)
+        {
+            free(ptrTmp);
+            throw std::runtime_error("Could not get value of INFO/MAPABILITY");
+        }
+        else
+        {
+            mapability = *ptrTmp;
+        }
+        if (bcf_get_info_float(vcfHeaderIn, line, "IQR_RC0", &ptrTmp, &sizeTmp) != 1)
+        {
+            free(ptrTmp);
+            throw std::runtime_error("Could not get value of INFO/IQR_RC0");
+        }
+        else
+        {
+            iqrRc0 = *ptrTmp;
+        }
+        if (bcf_get_info_float(vcfHeaderIn, line, "IQR_COV0", &ptrTmp, &sizeTmp) != 1)
+        {
+            free(ptrTmp);
+            throw std::runtime_error("Could not get value of INFO/IQR_COV0");
+        }
+        else
+        {
+            iqrCov0 = *ptrTmp;
+        }
+        free(ptrTmp);
+        int32_t * ptrFlagTmp = nullptr;
+        sizeTmp = 0;
+        bool isGap = false;
+        if (bcf_get_info_flag(vcfHeaderIn, line, "GAP", &ptrFlagTmp, &sizeTmp))
+            isGap = true;
+        free(ptrFlagTmp);
+
+        if (bcf_has_filter(vcfHeaderIn, line, const_cast<char *>("FEW_GCWINDOWS")) == 1 ||
+                isGap ||
+                gcContent < options.minGC ||
+                gcContent > options.maxGC ||
+                mapability < options.minMapability ||
+                iqrRc0 > options.maxIqrRC ||
+                iqrCov0 > options.maxIqrCov)
+            continue;  // Skip noisy window
+
+        // Extract the metric values
+        if (!bcf_get_format_float(vcfHeaderIn, line, options.metric.c_str(), &valsPtr, &sizeVals))
+        {
+            free(valsPtr);
+            throw std::runtime_error(std::string("Could not get value of FORMAT/") + options.metric);
+        }
+
+        pos.push_back(line->pos);
+        for (int i = 0; i < sizeVals; ++i)
+            values[i].push_back(valsPtr[i]);
     }
+
+    if (options.verbosity >= 1)
+        std::cerr << "# windows: " << pos.size() << "\n";
+
+    free(valsPtr);
 }
 
 }  // anonymous namespace
 
-int mainBackground(CnvettiSegmentOptions const & options)
+
+int mainSegment(CnvettiSegmentOptions const & options)
 {
     CnvettiSegmentApp app(options);
     app.run();

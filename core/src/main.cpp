@@ -41,7 +41,7 @@
 int mainCoverage(CnvettiCoverageOptions const & options);
 int mainNormalize(CnvettiNormalizeOptions const & options);
 int mainBackground(CnvettiBackgroundOptions const & options);
-int mainSegment(CnvettiBackgroundOptions const & options);
+int mainSegment(CnvettiSegmentOptions const & options);
 
 // ----------------------------------------------------------------------------
 // Function main()
@@ -168,6 +168,34 @@ int main(int argc, char ** argv)
         "Number of threads to use for de-/compression in I/O"
     )->group("Input / Output");
 
+    cnvettiSegment->add_option(
+        "--metric", segOptions.metric,
+        "Metric to use for segmentation (allowed: COV, COV0, RC, RC0; default: COV0)"
+    )->group("Segmentation Algorithm")->check([](std::string const & val) {
+            std::vector<std::string> const ALLOWED_METRICS { "COV", "COV0", "RC", "RC0" };
+            return std::find(ALLOWED_METRICS.begin(), ALLOWED_METRICS.end(), val) != ALLOWED_METRICS.end();
+    });
+    cnvettiSegment->add_option(
+        "--min-mapability", segOptions.minMapability,
+        "Minimal mapability value of windows to consider"
+    )->group("Segmentation Algorithm");
+    cnvettiSegment->add_option(
+        "--min-gc", segOptions.minGC,
+        "Minimal GC value of windows to consider"
+    )->group("Segmentation Algorithm");
+    cnvettiSegment->add_option(
+        "--max-gc", segOptions.maxGC,
+        "Maxmial GC value of windows to consider"
+    )->group("Segmentation Algorithm");
+    cnvettiSegment->add_option(
+        "--max-iqr-rc", segOptions.maxIqrRC,
+        "Minimal read count IQR of windows to consider"
+    )->group("Segmentation Algorithm");
+    cnvettiSegment->add_option(
+        "--max-iqr-cov", segOptions.maxIqrCov,
+        "Maximal coverage IQR of windows to consider"
+    )->group("Segmentation Algorithm");
+
     try {
         app.parse(argc, argv);
 
@@ -185,6 +213,9 @@ int main(int argc, char ** argv)
         } else if (app.got_subcommand("background")) {
             CLI::AutoTimer timer("running time");
             mainBackground(bgOptions);
+        } else if (app.got_subcommand("segment")) {
+            CLI::AutoTimer timer("running time");
+            mainSegment(segOptions);
         } else {
             throw CLI::CallForHelp();
         }

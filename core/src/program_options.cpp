@@ -107,5 +107,11 @@ void CnvettiSegmentOptions::print(std::ostream & out) const
         << "    verbosity:        " << verbosity << "\n"
         << "    inputFileName:   '" << inputFileName << "'\n"
         << "    outputFileName:  '" << outputFileName << "'\n"
+        << "    metric:          '" << metric << "'\n"
+        << "    minMapability:    " << "\n"
+        << "    minGC:            " << minGC << "\n"
+        << "    maxGC:            " << maxGC << "\n"
+        << "    maxIqrRC:         " << maxIqrRC << "\n"
+        << "    maxIqrCov:        " << maxIqrCov << "\n"
         << "\n";
 }
