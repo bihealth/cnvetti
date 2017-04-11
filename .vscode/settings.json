@@ -28,6 +28,14 @@
         "tuple": "cpp",
         "utility": "cpp",
         "cmath": "cpp",
-        "sstream": "cpp"
+        "sstream": "cpp",
+        "strstream": "cpp",
+        "chrono": "cpp",
+        "complex": "cpp",
+        "ctime": "cpp",
+        "fstream": "cpp",
+        "iomanip": "cpp",
+        "ratio": "cpp",
+        "thread": "cpp"
     }
 }

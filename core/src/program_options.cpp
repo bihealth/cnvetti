@@ -67,9 +67,10 @@ void CnvettiNormalizeOptions::print(std::ostream & out) const
 {
     out
         << "options:\n"
-        << "    verbosity:      " << verbosity << "\n"
-        << "    inputFileName:  '" << inputFileName << "'\n"
-        << "    outputFileName: '" << outputFileName << "'\n"
+        << "    verbosity:       " << verbosity << "\n"
+        << "    inputFileName:   '" << inputFileName << "'\n"
+        << "    outputFileName:  '" << outputFileName << "'\n"
         << "    numIOThreads:          " << numIOThreads << "\n"
+        << "    minGCWindowCount: " << minGCWindowCount << "\n"
         << "\n";
 }

@@ -98,6 +98,9 @@ public:
     // Path to output file.
     std::string outputFileName;
 
+    // Skip any GC content with fewer than this number of windows
+    int minGCWindowCount;
+
     // Number of threads to use for decompression/compression on I/O
     int numIOThreads;
 
@@ -105,7 +108,8 @@ public:
     int argc;
     char ** argv;
 
-    CnvettiNormalizeOptions() : verbosity(1), argc(0), argv(nullptr), numIOThreads(1)
+    CnvettiNormalizeOptions() :
+        verbosity(1), argc(0), argv(nullptr), minGCWindowCount(100), numIOThreads(1)
     {}
 
     void print(std::ostream & out) const;
