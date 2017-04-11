@@ -8,3 +8,4 @@ export LD_LIBRARY_PATH=$(readlink -f inst-deps)/lib
 ./inst/bin/cnvetti coverage --help
 ./inst/bin/cnvetti normalize --help
 ./inst/bin/cnvetti background --help
+./inst/bin/cnvetti segment --help

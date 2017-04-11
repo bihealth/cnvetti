@@ -41,6 +41,7 @@
 int mainCoverage(CnvettiCoverageOptions const & options);
 int mainNormalize(CnvettiNormalizeOptions const & options);
 int mainBackground(CnvettiBackgroundOptions const & options);
+int mainSegment(CnvettiBackgroundOptions const & options);
 
 // ----------------------------------------------------------------------------
 // Function main()
@@ -144,6 +145,27 @@ int main(int argc, char ** argv)
     cnvettiBackground->add_flag(
         "--write-samples", bgOptions.writeSamples,
         "Write out samples, if omitted only INFO fields will be written"
+    )->group("Input / Output");
+
+    // Add sub command `cnvetti segment`
+
+    CnvettiSegmentOptions segOptions;
+    segOptions.argc = argc;
+    segOptions.argv = argv;
+
+    CLI::App * cnvettiSegment = app.add_subcommand(
+        "segment", "Perform segmentation from normalized coverage and background");
+    cnvettiSegment->add_option(
+        "-i,--input", segOptions.inputFileName,
+        "Path to input VCF/BCF file (cnvettig background and 1+ sample(s); required)"
+    )->required()->check(CLI::ExistingFile)->group("Input / Output");
+    cnvettiSegment->add_option(
+        "-o,--output", segOptions.outputFileName,
+        "Path to output VCF/BCF file (required)"
+    )->required()->group("Input / Output");
+    cnvettiSegment->add_option(
+        "--num-io-threads", segOptions.numIOThreads,
+        "Number of threads to use for de-/compression in I/O"
     )->group("Input / Output");
 
     try {

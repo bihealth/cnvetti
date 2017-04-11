@@ -92,9 +92,20 @@ void CnvettiBackgroundOptions::print(std::ostream & out) const
 {
     out
         << "options:\n"
-        << "    verbosity:       " << verbosity << "\n"
+        << "    verbosity:        " << verbosity << "\n"
         << "    inputFileName:   '" << inputFileName << "'\n"
         << "    outputFileName:  '" << outputFileName << "'\n"
         << "    writeSamples:     " << trueFalse(writeSamples) << "\n"
+        << "\n";
+}
+
+
+void CnvettiSegmentOptions::print(std::ostream & out) const
+{
+    out
+        << "options:\n"
+        << "    verbosity:        " << verbosity << "\n"
+        << "    inputFileName:   '" << inputFileName << "'\n"
+        << "    outputFileName:  '" << outputFileName << "'\n"
         << "\n";
 }

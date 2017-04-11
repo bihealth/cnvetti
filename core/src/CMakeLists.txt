@@ -12,6 +12,7 @@ add_executable(
     main_background.cpp
     main_coverage.cpp
     main_normalize.cpp
+    main_segment.cpp
     histo_stats.cpp
     program_options.cpp
     ${version_file})

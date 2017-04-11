@@ -151,3 +151,37 @@ public:
 
     void print(std::ostream & out) const;
 };
+
+
+// ----------------------------------------------------------------------------
+// Class CnvettiSegmentOptions
+// ----------------------------------------------------------------------------
+
+// Program options for segmentation based on the normalized coverage of
+// individuals with a given background
+
+class CnvettiSegmentOptions
+{
+public:
+    // Verbosity: 0 - quiet, 1 - normal, 2 - verbose, 3 - very verbose.
+    int verbosity;
+
+    // Path to input file
+    std::string inputFileName;
+
+    // Path to output file
+    std::string outputFileName;
+
+    // Number of threads to use for decompression/compression on I/O
+    int numIOThreads;
+
+    // argc and argv from command line
+    int argc;
+    char ** argv;
+
+    CnvettiSegmentOptions() :
+        verbosity(1), argc(0), argv(nullptr), numIOThreads(1)
+    {}
+
+    void print(std::ostream & out) const;
+};
