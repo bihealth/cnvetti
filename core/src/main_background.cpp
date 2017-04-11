@@ -274,7 +274,7 @@ void CnvettiBackgroundApp::processRegion(std::string const & contig, int beginPo
                 throw std::runtime_error(std::string("Could not get value of FORMAT/") + name);
             }
 
-            size_t lo, hi;
+            double index, h, lo, hi;
 
             std::sort(valsPtr, valsPtr + sizeVals);
             vals.clear();
@@ -284,10 +284,11 @@ void CnvettiBackgroundApp::processRegion(std::string const & contig, int beginPo
             summaries[name][0] = valsPtr[0];
 
             // Q1
-            if ((sizeVals / 2) % 2 == 1)
-                summaries[name][1] = vals.at(sizeVals / 4);
-            else
-                summaries[name][1] = (vals.at(sizeVals / 4) + vals.at(((sizeVals / 2) + 1) / 2)) / 2.0;
+            index = (sizeVals - 1) * 0.25;
+            lo = floor(index);
+            hi = ceil(index);
+            h = index - lo;
+            summaries[name][1] = (1 - h) * vals.at(size_t(lo)) + h * vals.at(size_t(hi));
 
             // Q2
             if (sizeVals % 2 == 1)
@@ -295,10 +296,12 @@ void CnvettiBackgroundApp::processRegion(std::string const & contig, int beginPo
             else
                 summaries[name][2] = (vals.at(sizeVals / 2) + vals.at((sizeVals + 1) / 2)) / 2.0;
 
-            if ((sizeVals - sizeVals / 2) % 2 == 1)
-                summaries[name][1] = vals.at(sizeVals - 1 - sizeVals / 4);
-            else
-                summaries[name][1] = (vals.at(sizeVals - 1 - sizeVals / 4) + vals.at(sizeVals - 1 - ((sizeVals / 2) + 1) / 2)) / 2.0;
+            // Q3
+            index = (sizeVals - 1) * 0.75;
+            lo = floor(index);
+            hi = ceil(index);
+            h = index - lo;
+            summaries[name][3] = (1 - h) * vals.at(size_t(lo)) + h * vals.at(size_t(hi));
 
             // Q4
             summaries[name][4] = vals.at(sizeVals - 1);
