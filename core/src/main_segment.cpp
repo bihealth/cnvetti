@@ -65,6 +65,8 @@ private:
     void processChromosomes();
     // Process a region
     void processRegion(std::string const & contig, int beginPos, int endPos);
+    // Perform segmentation for one sample
+    void doSegmentation(std::vector<int> const & pos, std::vector<float> & values) const;
 
     CnvettiSegmentOptions const & options;
 
@@ -235,6 +237,7 @@ void CnvettiSegmentApp::processChromosomes()
     }
 }
 
+// TODO: this needs a lot of cleanup!
 void CnvettiSegmentApp::processRegion(std::string const & contig, int beginPos, int endPos)
 {
     if (options.verbosity >= 1)
@@ -249,7 +252,7 @@ void CnvettiSegmentApp::processRegion(std::string const & contig, int beginPos, 
         throw std::runtime_error("Could not seek to beginning of region!");
 
     std::vector<int> pos;
-    std::vector<std::vector<double>> values;
+    std::vector<std::vector<float>> values;
     values.resize(bcf_hdr_nsamples(vcfHeaderIn));
 
     float * valsPtr = nullptr;
@@ -332,7 +335,106 @@ void CnvettiSegmentApp::processRegion(std::string const & contig, int beginPos, 
     if (options.verbosity >= 1)
         std::cerr << "# windows: " << pos.size() << "\n";
 
+    for (auto & measurements : values)
+        doSegmentation(pos, measurements);
+
+    if (bcf_sr_seek(vcfReaderPtr.get(), contig.c_str(), 0) != 0)
+        throw std::runtime_error("Could not seek to beginning of region!");
+
+    int idx = 0;
+    while (bcf_sr_next_line(vcfReaderPtr.get()))
+    {
+        bcf1_t * line = bcf_sr_get_line(vcfReaderPtr.get(), 0);
+
+        // Weed out the noisy windows
+        float gcContent, mapability, iqrRc0, iqrCov0;
+
+        float * ptrTmp = nullptr;
+        int32_t sizeTmp = 0;
+        if (bcf_get_info_float(vcfHeaderIn, line, "GC", &ptrTmp, &sizeTmp) != 1)
+        {
+            free(ptrTmp);
+            throw std::runtime_error("Could not get value of INFO/GC");
+        }
+        else
+        {
+            gcContent = *ptrTmp;
+        }
+        if (bcf_get_info_float(vcfHeaderIn, line, "MAPABILITY", &ptrTmp, &sizeTmp) != 1)
+        {
+            free(ptrTmp);
+            throw std::runtime_error("Could not get value of INFO/MAPABILITY");
+        }
+        else
+        {
+            mapability = *ptrTmp;
+        }
+        if (bcf_get_info_float(vcfHeaderIn, line, "IQR_RC0", &ptrTmp, &sizeTmp) != 1)
+        {
+            free(ptrTmp);
+            throw std::runtime_error("Could not get value of INFO/IQR_RC0");
+        }
+        else
+        {
+            iqrRc0 = *ptrTmp;
+        }
+        if (bcf_get_info_float(vcfHeaderIn, line, "IQR_COV0", &ptrTmp, &sizeTmp) != 1)
+        {
+            free(ptrTmp);
+            throw std::runtime_error("Could not get value of INFO/IQR_COV0");
+        }
+        else
+        {
+            iqrCov0 = *ptrTmp;
+        }
+        free(ptrTmp);
+        int32_t * ptrFlagTmp = nullptr;
+        sizeTmp = 0;
+        bool isGap = false;
+        if (bcf_get_info_flag(vcfHeaderIn, line, "GAP", &ptrFlagTmp, &sizeTmp))
+            isGap = true;
+        free(ptrFlagTmp);
+
+        if (bcf_has_filter(vcfHeaderIn, line, const_cast<char *>("FEW_GCWINDOWS")) == 1 ||
+                isGap ||
+                gcContent < options.minGC ||
+                gcContent > options.maxGC ||
+                mapability < options.minMapability ||
+                iqrRc0 > options.maxIqrRC ||
+                iqrCov0 > options.maxIqrCov)
+            continue;  // Skip noisy window
+
+        // Remove all metrics except for the one to segment (cannot mark for remove an update
+        // at the same time).
+        if (options.metric != "COV")
+            bcf_update_format_float(vcfHeaderIn, line, "COV", NULL, 0);
+        if (options.metric != "COV0")
+            bcf_update_format_float(vcfHeaderIn, line, "COV0", NULL, 0);
+        if (options.metric != "RC")
+            bcf_update_format_float(vcfHeaderIn, line, "RC", NULL, 0);
+        if (options.metric != "RC0")
+            bcf_update_format_float(vcfHeaderIn, line, "RC0", NULL, 0);
+
+        // Write out segment values
+        std::vector<float> outVals(values.size(), 0.0);
+        for (size_t i = 0; i < outVals.size(); ++i)
+            outVals[i] = values[i][idx];
+        if (bcf_update_format_float(
+                vcfHeaderIn, line, options.metric.c_str(), &outVals[0], outVals.size()) != 0)
+            throw std::runtime_error("Could not write out segmented value");
+
+        if (bcf_translate(vcfHeaderOut, vcfHeaderIn, line))
+            throw std::runtime_error("Could not translate from old to new header");
+        bcf_write(vcfFileOutPtr.get(), vcfHeaderOut, line);
+        ++idx;
+    }
+
     free(valsPtr);
+}
+
+void CnvettiSegmentApp::doSegmentation(std::vector<int> const & pos, std::vector<float> & values) const
+{
+    std::fill(values.begin(), values.end(), -1);
 }
 
 }  // anonymous namespace
