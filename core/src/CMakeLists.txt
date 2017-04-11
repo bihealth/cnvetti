@@ -7,12 +7,13 @@ find_library(HTS_LIBRARY NAMES hts)
 
 add_executable(
     cnvetti
+    contig_selection.cpp
     main.cpp
-    program_options.cpp
+    main_background.cpp
     main_coverage.cpp
     main_normalize.cpp
-    contig_selection.cpp
     histo_stats.cpp
+    program_options.cpp
     ${version_file})
 
 target_link_libraries(cnvetti ${HTS_LIBRARY})

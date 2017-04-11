@@ -40,7 +40,7 @@
 
 int mainCoverage(CnvettiCoverageOptions const & options);
 int mainNormalize(CnvettiNormalizeOptions const & options);
-
+int mainBackground(CnvettiBackgroundOptions const & options);
 
 // ----------------------------------------------------------------------------
 // Function main()
@@ -110,7 +110,7 @@ int main(int argc, char ** argv)
         "normalize", "Perform per-sample normalization on cnvetti coverage output");
     cnvettiNormalize->add_option(
         "-i,--input", normOptions.inputFileName,
-        "Path to input BAM file (required)"
+        "Path to input VCF/BCF file (from cnvetti coverage; required)"
     )->required()->check(CLI::ExistingFile)->group("Input / Output");
     cnvettiNormalize->add_option(
         "-o,--output", normOptions.outputFileName,
@@ -119,6 +119,31 @@ int main(int argc, char ** argv)
     cnvettiNormalize->add_option(
         "--num-io-threads", normOptions.numIOThreads,
         "Number of threads to use for de-/compression in I/O"
+    )->group("Input / Output");
+
+    // Add sub command `cnvetti background`
+
+    CnvettiBackgroundOptions bgOptions;
+    bgOptions.argc = argc;
+    bgOptions.argv = argv;
+
+    CLI::App * cnvettiBackground = app.add_subcommand(
+        "background", "Build background from cross-cohort normalized data");
+    cnvettiBackground->add_option(
+        "-i,--input", bgOptions.inputFileName,
+        "Path to input VCF/BCF file (from cnvetti normalize; required)"
+    )->required()->check(CLI::ExistingFile)->group("Input / Output");
+    cnvettiBackground->add_option(
+        "-o,--output", bgOptions.outputFileName,
+        "Path to output VCF/BCF file (required)"
+    )->required()->group("Input / Output");
+    cnvettiBackground->add_option(
+        "--num-io-threads", bgOptions.numIOThreads,
+        "Number of threads to use for de-/compression in I/O"
+    )->group("Input / Output");
+    cnvettiBackground->add_flag(
+        "--write-samples", bgOptions.writeSamples,
+        "Write out samples, if omitted only INFO fields will be written"
     )->group("Input / Output");
 
     try {
@@ -135,6 +160,9 @@ int main(int argc, char ** argv)
         } else if (app.got_subcommand("normalize")) {
             CLI::AutoTimer timer("running time");
             mainNormalize(normOptions);
+        } else if (app.got_subcommand("background")) {
+            CLI::AutoTimer timer("running time");
+            mainBackground(bgOptions);
         } else {
             throw CLI::CallForHelp();
         }

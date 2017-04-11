@@ -30,6 +30,18 @@
 #include <ostream>
 #include <cstring>
 
+namespace {  // anonymous
+
+char const * trueFalse(bool b) {
+    if (b)
+        return "true";
+    else
+        return "false";
+}
+
+}  // anonymous namespace
+
+
 void CnvettiCoverageOptions::print(std::ostream & out) const
 {
     out
@@ -67,10 +79,22 @@ void CnvettiNormalizeOptions::print(std::ostream & out) const
 {
     out
         << "options:\n"
+        << "    verbosity:        " << verbosity << "\n"
+        << "    inputFileName:   '" << inputFileName << "'\n"
+        << "    outputFileName:  '" << outputFileName << "'\n"
+        << "    numIOThreads:     " << numIOThreads << "\n"
+        << "    minGCWindowCount: " << minGCWindowCount << "\n"
+        << "\n";
+}
+
+
+void CnvettiBackgroundOptions::print(std::ostream & out) const
+{
+    out
+        << "options:\n"
         << "    verbosity:       " << verbosity << "\n"
         << "    inputFileName:   '" << inputFileName << "'\n"
         << "    outputFileName:  '" << outputFileName << "'\n"
-        << "    numIOThreads:          " << numIOThreads << "\n"
-        << "    minGCWindowCount: " << minGCWindowCount << "\n"
+        << "    writeSamples:     " << trueFalse(writeSamples) << "\n"
         << "\n";
 }

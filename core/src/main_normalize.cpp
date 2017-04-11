@@ -36,7 +36,6 @@
 
 #include <htslib/tbx.h>
 #include <htslib/vcf.h>
-#include <htslib/bgzf.h>
 #include <htslib/tbx.h>
 #include <htslib/synced_bcf_reader.h>
 

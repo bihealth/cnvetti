@@ -114,3 +114,40 @@ public:
 
     void print(std::ostream & out) const;
 };
+
+
+// ----------------------------------------------------------------------------
+// Class CnvettiBackgroundOptions
+// ----------------------------------------------------------------------------
+
+// Program options for computing background from multiple `cnvetti normalize`
+// results combined with `bcftools merge`
+
+class CnvettiBackgroundOptions
+{
+public:
+    // Verbosity: 0 - quiet, 1 - normal, 2 - verbose, 3 - very verbose.
+    int verbosity;
+
+    // Path to input file name
+    std::string inputFileName;
+
+    // Path to output file.
+    std::string outputFileName;
+
+    // Write out samples with additional INFO values
+    bool writeSamples;
+
+    // Number of threads to use for decompression/compression on I/O
+    int numIOThreads;
+
+    // argc and argv from command line
+    int argc;
+    char ** argv;
+
+    CnvettiBackgroundOptions() :
+        verbosity(1), argc(0), argv(nullptr), writeSamples(false), numIOThreads(1)
+    {}
+
+    void print(std::ostream & out) const;
+};
