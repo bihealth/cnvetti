@@ -195,6 +195,10 @@ int main(int argc, char ** argv)
         "--max-iqr-cov", segOptions.maxIqrCov,
         "Maximal coverage IQR of windows to consider"
     )->group("Segmentation Algorithm");
+    cnvettiSegment->add_option(
+        "--haar-breaks-fqdr-q", segOptions.haarBreaksFqdrQ,
+        "Breaks FQDR q value for Haar wavelet--based segmentation"
+    )->group("Segmentation Algorithm");
 
     try {
         app.parse(argc, argv);

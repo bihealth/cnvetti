@@ -193,13 +193,17 @@ public:
     // Maximal normalized IQR of normalized coverage
     double maxIqrCov;
 
+    // FQDR q parameter
+    double haarBreaksFqdrQ;
+
     // argc and argv from command line
     int argc;
     char ** argv;
 
     CnvettiSegmentOptions() :
         verbosity(1), argc(0), argv(nullptr), numIOThreads(1), metric("COV0"),
-        minMapability(0.99), minGC(20), maxGC(70), maxIqrRC(0.25), maxIqrCov(0.2)
+        minMapability(0.99), minGC(20), maxGC(70), maxIqrRC(0.25), maxIqrCov(0.2),
+        haarBreaksFqdrQ(1e-3)
     {}
 
     void print(std::ostream & out) const;

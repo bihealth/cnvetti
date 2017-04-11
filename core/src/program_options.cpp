@@ -113,5 +113,6 @@ void CnvettiSegmentOptions::print(std::ostream & out) const
         << "    maxGC:            " << maxGC << "\n"
         << "    maxIqrRC:         " << maxIqrRC << "\n"
         << "    maxIqrCov:        " << maxIqrCov << "\n"
+        << "    haarBreaksFqdrQ:  " << haarBreaksFqdrQ << "\n"
         << "\n";
 }

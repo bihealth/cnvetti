@@ -15,6 +15,7 @@ add_executable(
     main_segment.cpp
     histo_stats.cpp
     program_options.cpp
+    segmentation_haar.cpp
     ${version_file})
 
 target_link_libraries(cnvetti ${HTS_LIBRARY})

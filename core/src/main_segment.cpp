@@ -26,6 +26,7 @@
 // ============================================================================
 
 #include <algorithm>
+#include <cmath>
 #include <iostream>
 #include <map>
 #include <memory>
@@ -39,6 +40,7 @@
 #include "cnvetti/program_options.h"
 #include "cnvetti/version.h"
 #include "cnvetti/utils.h"
+#include "cnvetti/segmentation.h"
 
 namespace {  // anonymous namespace
 
@@ -335,8 +337,12 @@ void CnvettiSegmentApp::processRegion(std::string const & contig, int beginPos, 
     if (options.verbosity >= 1)
         std::cerr << "# windows: " << pos.size() << "\n";
 
+    int sampleID = 0;
     for (auto & measurements : values)
+    {
+        std::cerr << "Segmenting sample " << vcfHeaderIn->samples[sampleID++] << "\n";
         doSegmentation(pos, measurements);
+    }
 
     if (bcf_sr_seek(vcfReaderPtr.get(), contig.c_str(), 0) != 0)
         throw std::runtime_error("Could not seek to beginning of region!");
@@ -432,9 +438,11 @@ void CnvettiSegmentApp::processRegion(std::string const & contig, int beginPos, 
     free(valsPtr);
 }
 
-void CnvettiSegmentApp::doSegmentation(std::vector<int> const & pos, std::vector<float> & values) const
+void CnvettiSegmentApp::doSegmentation(std::vector<int> const & pos, std::vector<float> & vals) const
 {
-    std::fill(values.begin(), values.end(), -1);
+    std::transform(vals.begin(), vals.end(), vals.begin(), log2);  // log2-transform values
+    seg_haar(vals, options.haarBreaksFqdrQ);
+    std::transform(vals.begin(), vals.end(), vals.begin(), exp2);  // transform back
 }
 
 }  // anonymous namespace
