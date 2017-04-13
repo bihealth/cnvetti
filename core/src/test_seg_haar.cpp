@@ -27,7 +27,7 @@
 
 #include "cnvetti/segmentation.h"
 
-int const SEED = 42;
+int const SEED = 41;
 
 int main(int argc, char ** argv)
 {
@@ -39,8 +39,12 @@ int main(int argc, char ** argv)
     if (argc >= 2)
         noise = atof(argv[1]);
     std::normal_distribution<> d(0.0, noise);
+    std::vector<float> noiseVals;
     for (auto & x : origVals)
-        x += d(gen);
+    {
+        noiseVals.push_back(d(gen));
+        x += noiseVals.back();
+    }
 
     float breaksFdrQ = 1e-3;
     if (argc >= 3)
@@ -68,9 +72,11 @@ int main(int argc, char ** argv)
 
     std::vector<float> segVals = replaceWithSegmentMedians(origVals, breakpoints);
 
+    std::cout << "pos\tvalue\tnoise\tsegmented\n";
     int pos = 0;
-    for (auto it = origVals.begin(), it2 = segVals.begin(); it != origVals.end(); ++it, ++it2, ++pos)
-        std::cout << pos << '\t' << *it << '\t' << *it2 << '\n';
+    for (auto it = origVals.begin(), it2 = noiseVals.begin(), it3 = segVals.begin();
+         it != origVals.end(); ++it, ++it2, ++it3, ++pos)
+        std::cout << pos << '\t' << *it << '\t' << *it2 << '\t' << *it3 << '\n';
 
     return 0;
 }

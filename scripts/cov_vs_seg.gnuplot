@@ -37,4 +37,4 @@ set key bottom right
 
 plot \
     "out.txt" using 1:2 title "raw signal" with points, \
-    "out.txt" using 1:3 title "segmented" with points
+    "out.txt" using 1:4 title "segmented" with points

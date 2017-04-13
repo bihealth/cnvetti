@@ -47,6 +47,7 @@ std::vector<float> replaceWithSegmentMedians(
     std::vector<size_t> const & breakpoints);
 
 
+// TODO: Implement me!
 // Segmentation refinement based on shifting breakpoints to reduce overall
 // segment error.
 std::vector<size_t> refineSegmentationShiftBreakpoints(
@@ -60,3 +61,10 @@ std::vector<size_t> refineSegmentationDeleteBreakpoints(
     std::vector<float> const & values,
     std::vector<size_t> breakpoints,
     float mergeDelta = 0.01);
+
+
+// TODO: Implement me!
+// Return indices of outliers in the data
+std::vector<size_t> chiSquareOutliers(
+    std::vector<float> const & values,
+    float outlierThreshold);
