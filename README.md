@@ -5,4 +5,5 @@
 [![Build Status](https://travis-ci.org/bihealth/cnvetti.svg?branch=master)](https://travis-ci.org/bihealth/cnvetti)
 
 - Author: Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>
-- License: MIT
+- License: GPL v3
+    - HaarSeg implementation based on HaarSeg.c by Erez Ben-Yaacov (GPL v3)

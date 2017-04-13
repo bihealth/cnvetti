@@ -1,25 +1,21 @@
 // ============================================================================
 //                                 CNVetti
 // ============================================================================
-// Copyright 2016-2017 Berlin Institute for Health
+// Copyright (C) 2016-2017 Berlin Institute for Health
 //
-// Permission is hereby granted, free of charge, to any person obtaining a
-// copy of this softwareand associated documentation files (the "Software"),
-// to deal in the Software without restriction, including without limitation
-// the rights to use, copy, modify, merge, publish, distribute, sublicense,
-// and/or sell copies of the Software, and to permit persons to whom the
-// Software is furnished to do so, subject to the following conditions:
+// This program is free software; you can redistribute it and/or modify it
+// under the terms of the GNU General Public License as published by the Free
+// Software Foundation; either version 3 of the License, at (at your option)
+// any later version.
 //
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
+// This program is distributed in the hope that it will be useful, but WITHOUT
+// ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+// FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+// more details.
 //
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-// THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-// DEALINGS IN THE SOFTWARE.
+// You should have received a copy of the GNU General Public License along
+// with this program; if not, write to the Free Software Foundation, Inc.,
+// 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
 //
 // ============================================================================
 // Author:  Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>
@@ -53,71 +49,6 @@
 
 namespace {  // anonymous namespace
 
-// ---------------------------------------------------------------------------
-// Struct GenomicRegion
-// ---------------------------------------------------------------------------
-
-struct GenomicRegion
-{
-    std::string contig;
-    int beginPos;
-    int endPos;
-    int rID;
-
-    GenomicRegion() = default;
-
-    GenomicRegion(std::string const & contig, int beginPos, int endPos) :
-        contig(contig), beginPos(beginPos), endPos(endPos), rID(-1)
-    {}
-
-    GenomicRegion(std::string const & contig, int beginPos, int endPos, int rID) :
-        contig(contig), beginPos(beginPos), endPos(endPos), rID(rID)
-    {}
-
-    std::string toString() const
-    {
-        std::stringstream ss;
-        ss << contig << ":" << (beginPos + 1) << "-" << endPos;
-        return ss.str();
-    }
-};
-
-GenomicRegion parseGenomicRegion(std::string const & str)
-{
-    std::string sContig, sBegin, sEnd;
-    enum { CONTIG, BEGIN, END } state = CONTIG;
-    for (char c : str) {
-        switch (state) {
-            case CONTIG:
-                if (c != ':')
-                    sContig.push_back(c);
-                else
-                    state = BEGIN;
-                break;
-            case BEGIN:
-                if (c == '-')
-                    state = END;
-                else if (c == ',')
-                    continue;  // ignore
-                else if (isdigit(c))
-                    sBegin.push_back(c);
-                else
-                        throw std::runtime_error(std::string("Invalid region: ") + str);
-                break;
-            case END:
-                if (c == ',')
-                    continue;  // ignore
-                else if (isdigit(c))
-                    sEnd.push_back(c);
-                else
-                        throw std::runtime_error(std::string("Invalid region: ") + str);
-                break;
-        }
-    }
-    if (sContig.empty() || sBegin.empty() || sEnd.empty())
-        throw std::runtime_error(std::string("Invalid region: ") + str);
-    return GenomicRegion(sContig, atoi(sBegin.c_str()) - 1, atoi(sEnd.c_str()));
-}
 
 // ---------------------------------------------------------------------------
 // Class ChromosomeBin
@@ -609,11 +540,11 @@ void CnvettiCoverageApp::openFiles()
     bcf_hdr_printf(vcfHeader.get(),
         "##FORMAT=<ID=COV,Number=1,Type=Float,Description=\"Average coverage with non-q0 reads\">");
     bcf_hdr_printf(vcfHeader.get(),
-        "##FORMAT=<ID=COV0,Number=1,Type=Float,Description=\"Average coverage with q0 reads\">");
+        "##FORMAT=<ID=COV0,Number=1,Type=Float,Description=\"Average coverage with q0+non-q0 reads\">");
     bcf_hdr_printf(vcfHeader.get(),
         "##FORMAT=<ID=RC,Number=1,Type=Float,Description=\"Number of aligning non-q0 reads\">");
     bcf_hdr_printf(vcfHeader.get(),
-        "##FORMAT=<ID=RC0,Number=1,Type=Float,Description=\"Number of aligning q0 reads\">");
+        "##FORMAT=<ID=RC0,Number=1,Type=Float,Description=\"Number of aligning q0+non-q0 reads\">");
     bcf_hdr_printf(vcfHeader.get(),
         "##ALT=<ID=COUNT,Description=\"Window for read counting\">");
     bcf_hdr_printf(vcfHeader.get(),
@@ -769,7 +700,7 @@ void CnvettiCoverageApp::printBinsToVcf(std::vector<std::vector<ChromosomeBin>> 
         {
             cov[i] = bins[i][windowID].coverage(options.windowLength);
             if (!hasGap[windowID])  // ignore if overlapping with gap
-                statsHandler->registerValue(i, StatsMetric::COV, int(round(valGCContent)), cov[i]);
+                statsHandler->registerValue(i, StatsMetric::COV, valGCContent, cov[i]);
         }
         bcf_update_format_float(vcfHeader.get(), record, "COV", &cov[0], cov.size());
 
@@ -777,9 +708,9 @@ void CnvettiCoverageApp::printBinsToVcf(std::vector<std::vector<ChromosomeBin>> 
         std::vector<float> covQ0(sampleNames.size(), 0.0);
         for (unsigned i = 0; i < sampleNames.size(); ++i)
         {
-            covQ0[i] = bins[i][windowID].coverageQ0(options.windowLength);
+            covQ0[i] = bins[i][windowID].coverageQ0(options.windowLength) + cov[i];
             if (!hasGap[windowID])  // ignore if overlapping with gap
-                statsHandler->registerValue(i, StatsMetric::COV0, int(round(valGCContent)), covQ0[i]);
+                statsHandler->registerValue(i, StatsMetric::COV0, valGCContent, covQ0[i]);
         }
         bcf_update_format_float(vcfHeader.get(), record, "COV0", &covQ0[0], covQ0.size());
 
@@ -789,7 +720,7 @@ void CnvettiCoverageApp::printBinsToVcf(std::vector<std::vector<ChromosomeBin>> 
         {
             rc[i] = bins[i][windowID].numFirstReads;
             if (!hasGap[windowID])  // ignore if overlapping with gap
-                statsHandler->registerValue(i, StatsMetric::RC, int(round(valGCContent)), rc[i]);
+                statsHandler->registerValue(i, StatsMetric::RC, valGCContent, rc[i]);
         }
         bcf_update_format_int32(vcfHeader.get(), record, "RC", &rc[0], rc.size());
 
@@ -797,9 +728,9 @@ void CnvettiCoverageApp::printBinsToVcf(std::vector<std::vector<ChromosomeBin>> 
         std::vector<int32_t> rc0(sampleNames.size(), 0);
         for (unsigned i = 0; i < sampleNames.size(); ++i)
         {
-            rc0[i] = bins[i][windowID].numQ0FirstReads;
+            rc0[i] = bins[i][windowID].numQ0FirstReads + rc[i];
             if (!hasGap[windowID])  // ignore if overlapping with gap
-                statsHandler->registerValue(i, StatsMetric::RC0, int(round(valGCContent)), rc0[i]);
+                statsHandler->registerValue(i, StatsMetric::RC0, valGCContent, rc0[i]);
         }
         bcf_update_format_int32(vcfHeader.get(), record, "RC0", &rc0[0], rc.size());
 

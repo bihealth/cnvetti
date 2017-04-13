@@ -1,25 +1,21 @@
 // ============================================================================
 //                                 CNVetti
 // ============================================================================
-// Copyright 2016-2017 Berlin Institute for Health
+// Copyright (C) 2016-2017 Berlin Institute for Health
 //
-// Permission is hereby granted, free of charge, to any person obtaining a
-// copy of this softwareand associated documentation files (the "Software"),
-// to deal in the Software without restriction, including without limitation
-// the rights to use, copy, modify, merge, publish, distribute, sublicense,
-// and/or sell copies of the Software, and to permit persons to whom the
-// Software is furnished to do so, subject to the following conditions:
+// This program is free software; you can redistribute it and/or modify it
+// under the terms of the GNU General Public License as published by the Free
+// Software Foundation; either version 3 of the License, at (at your option)
+// any later version.
 //
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
+// This program is distributed in the hope that it will be useful, but WITHOUT
+// ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+// FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+// more details.
 //
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-// THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-// DEALINGS IN THE SOFTWARE.
+// You should have received a copy of the GNU General Public License along
+// with this program; if not, write to the Free Software Foundation, Inc.,
+// 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
 //
 // ============================================================================
 // Author:  Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>
@@ -44,6 +40,10 @@
 
 namespace {  // anonymous namespace
 
+// Epsilon to add normalized metric to prevent -nan through log2()
+float const PSEUDO_EPSILON = 1e-10;
+
+
 // ---------------------------------------------------------------------------
 // Class CnvettiSegmentApp
 // ---------------------------------------------------------------------------
@@ -63,14 +63,24 @@ private:
     void openFiles();
     // Check that the opened files look correct
     void checkFiles();
+
+    // Parse genomic regions if any
+    void parseGenomicRegions();
+
+    // Parse genomic regions
+    void processGenomicRegions();
     // Perform chromosome-wise processing
     void processChromosomes();
     // Process a region
     void processRegion(std::string const & contig, int beginPos, int endPos);
     // Perform segmentation for one sample
-    void doSegmentation(std::vector<int> const & pos, std::vector<float> & values) const;
+    std::vector<float> doSegmentation(
+        std::vector<int> const & pos, std::vector<float> & values) const;
 
     CnvettiSegmentOptions const & options;
+
+    // Genomic regions to process
+    std::vector<GenomicRegion> genomicRegions;
 
     std::shared_ptr<bcf_srs_t> vcfReaderPtr;
     std::shared_ptr<vcfFile> vcfFileOutPtr;
@@ -78,7 +88,6 @@ private:
     bcf_hdr_t * vcfHeaderIn;
     bcf_hdr_t * vcfHeaderOut;
 };
-
 
 void CnvettiSegmentApp::run()
 {
@@ -94,11 +103,57 @@ void CnvettiSegmentApp::run()
     openFiles();
 
     if (options.verbosity >= 1)
+        std::cerr << "\nPARSING GENOMIC REGIONS\n\n";
+    parseGenomicRegions();
+
+    if (options.verbosity >= 1)
         std::cerr << "\nPROCESSING\n\n";
-    processChromosomes();
+    if (genomicRegions.empty())
+        processChromosomes();
+    else
+        processGenomicRegions();
 
     if (options.verbosity >= 1)
         std::cerr << "\nDone. Have a nice day!\n";
+}
+
+void CnvettiSegmentApp::parseGenomicRegions()
+{
+    for (auto const & regionString : options.genomeRegions)
+    {
+        GenomicRegion region = parseGenomicRegion(regionString);
+
+        // Look up numeric ID
+        int contigID = 0;
+        for (int i = 0; i < vcfHeaderIn->nhrec && region.rID == -1; ++i)
+        {
+            bcf_hrec_t * hrec = vcfHeaderIn->hrec[i];
+            if (hrec->type == BCF_HL_CTG)
+            {
+                for (int j = 0; j < hrec->nkeys; ++j)
+                {
+                    if (strcmp("ID", hrec->keys[j]) == 0 && region.contig == hrec->vals[j])
+                    {
+                        region.rID = contigID;
+                        break;
+                    }
+                }
+                ++contigID;
+            }
+        }
+        if (region.rID == -1)
+            throw std::runtime_error(
+                std::string("Contig/chromosome ") + region.contig + " not see in BAM file");
+
+        // Add to genomic regions
+        genomicRegions.push_back(region);
+    }
+
+    std::sort(genomicRegions.begin(), genomicRegions.end(),
+            [](GenomicRegion const & lhs, GenomicRegion const & rhs) {
+                return (std::make_pair(lhs.rID, lhs.beginPos) <
+                    std::make_pair(rhs.rID, rhs.beginPos));
+            });
 }
 
 void CnvettiSegmentApp::openFiles()
@@ -168,6 +223,9 @@ void CnvettiSegmentApp::openFiles()
     bcf_hdr_printf(vcfHeaderOut,
         ("##ALT=<ID=CNV,Type=String,Number=1,Description="
          "\"Value for ALT field for describing CNV called by CNVetti\">"));
+    bcf_hdr_printf(vcfHeaderOut,
+        ("##FORMAT=<ID=SEG,Type=Float,Number=1,Description="
+         "\"Segment value\">"));
     bcf_hdr_printf(vcfHeaderOut,
         ("##FORMAT=<ID=CN,Type=Integer,Number=1,Description="
          "\"Discrete copy number data\">"));
@@ -239,6 +297,15 @@ void CnvettiSegmentApp::processChromosomes()
     }
 }
 
+void CnvettiSegmentApp::processGenomicRegions()
+{
+    for (auto const region : genomicRegions)
+        processRegion(region.contig, region.beginPos, region.endPos);
+
+    if (options.verbosity >= 1)
+        std::cerr << " DONE\n";
+}
+
 // TODO: this needs a lot of cleanup!
 void CnvettiSegmentApp::processRegion(std::string const & contig, int beginPos, int endPos)
 {
@@ -250,8 +317,11 @@ void CnvettiSegmentApp::processRegion(std::string const & contig, int beginPos, 
             std::cerr << "Processing " << contig << "\n";
     }
 
-    if (bcf_sr_seek(vcfReaderPtr.get(), contig.c_str(), 0) != 0)
-        throw std::runtime_error("Could not seek to beginning of region!");
+    if (bcf_sr_seek(vcfReaderPtr.get(), contig.c_str(), beginPos) != 0)
+    {
+        std::cerr << "WARNING: could not seek to beginning of " << contig << ":" << beginPos << "-" << endPos << "\n";
+        return;
+    }
 
     std::vector<int> pos;
     std::vector<std::vector<float>> values;
@@ -263,6 +333,8 @@ void CnvettiSegmentApp::processRegion(std::string const & contig, int beginPos, 
     while (bcf_sr_next_line(vcfReaderPtr.get()))
     {
         bcf1_t * line = bcf_sr_get_line(vcfReaderPtr.get(), 0);
+        if (!(beginPos == 0 && endPos == 0) && line->pos >= endPos)
+            break;
 
         // Weed out the noisy windows
         float gcContent, mapability, iqrRc0, iqrCov0;
@@ -338,19 +410,23 @@ void CnvettiSegmentApp::processRegion(std::string const & contig, int beginPos, 
         std::cerr << "# windows: " << pos.size() << "\n";
 
     int sampleID = 0;
+    std::vector<std::vector<float>> segmented(values.size());
     for (auto & measurements : values)
     {
-        std::cerr << "Segmenting sample " << vcfHeaderIn->samples[sampleID++] << "\n";
-        doSegmentation(pos, measurements);
+        std::cerr << "Segmenting sample " << vcfHeaderIn->samples[sampleID] << "\n";
+        segmented[sampleID] = doSegmentation(pos, measurements);
+        ++sampleID;
     }
 
-    if (bcf_sr_seek(vcfReaderPtr.get(), contig.c_str(), 0) != 0)
+    if (bcf_sr_seek(vcfReaderPtr.get(), contig.c_str(), beginPos) != 0)
         throw std::runtime_error("Could not seek to beginning of region!");
 
     int idx = 0;
     while (bcf_sr_next_line(vcfReaderPtr.get()))
     {
         bcf1_t * line = bcf_sr_get_line(vcfReaderPtr.get(), 0);
+        if (!(beginPos == 0 && endPos == 0) && line->pos >= endPos)
+            break;
 
         // Weed out the noisy windows
         float gcContent, mapability, iqrRc0, iqrCov0;
@@ -410,27 +486,19 @@ void CnvettiSegmentApp::processRegion(std::string const & contig, int beginPos, 
                 iqrCov0 > options.maxIqrCov)
             continue;  // Skip noisy window
 
-        // Remove all metrics except for the one to segment (cannot mark for remove an update
-        // at the same time).
-        if (options.metric != "COV")
-            bcf_update_format_float(vcfHeaderIn, line, "COV", NULL, 0);
-        if (options.metric != "COV0")
-            bcf_update_format_float(vcfHeaderIn, line, "COV0", NULL, 0);
-        if (options.metric != "RC")
-            bcf_update_format_float(vcfHeaderIn, line, "RC", NULL, 0);
-        if (options.metric != "RC0")
-            bcf_update_format_float(vcfHeaderIn, line, "RC0", NULL, 0);
-
-        // Write out segment values
-        std::vector<float> outVals(values.size(), 0.0);
-        for (size_t i = 0; i < outVals.size(); ++i)
-            outVals[i] = values[i][idx];
-        if (bcf_update_format_float(
-                vcfHeaderIn, line, options.metric.c_str(), &outVals[0], outVals.size()) != 0)
-            throw std::runtime_error("Could not write out segmented value");
-
+        // Translate record from input to output file header
         if (bcf_translate(vcfHeaderOut, vcfHeaderIn, line))
             throw std::runtime_error("Could not translate from old to new header");
+
+        // Put segmentation values into record to write
+        std::vector<float> outVals(segmented.size(), 0.0);
+        for (size_t i = 0; i < outVals.size(); ++i)
+            outVals[i] = segmented[i][idx];
+        if (bcf_update_format_float(
+                vcfHeaderOut, line, "SEG", &outVals[0], outVals.size()) != 0)
+            throw std::runtime_error("Could not write out segmented value");
+
+        // Write out the record
         bcf_write(vcfFileOutPtr.get(), vcfHeaderOut, line);
         ++idx;
     }
@@ -438,11 +506,21 @@ void CnvettiSegmentApp::processRegion(std::string const & contig, int beginPos, 
     free(valsPtr);
 }
 
-void CnvettiSegmentApp::doSegmentation(std::vector<int> const & pos, std::vector<float> & vals) const
+std::vector<float> CnvettiSegmentApp::doSegmentation(
+    std::vector<int> const & pos, std::vector<float> & vals) const
 {
+    std::transform(vals.begin(), vals.end(), vals.begin(),
+                   [](float x) { return x + PSEUDO_EPSILON; });
     std::transform(vals.begin(), vals.end(), vals.begin(), log2);  // log2-transform values
-    seg_haar(vals, options.haarBreaksFqdrQ);
-    std::transform(vals.begin(), vals.end(), vals.begin(), exp2);  // transform back
+
+    std::vector<float> segmented = segmentHaarSeg(
+        vals, options.haarSegBreaksFdrQ, nullptr, nullptr, options.haarSegLmin,
+        options.haarSegLmax);
+
+    std::transform(segmented.begin(), segmented.end(), segmented.begin(), exp2);  // transform back
+    std::transform(segmented.begin(), segmented.end(), segmented.begin(),
+                   [](float x) { return x - PSEUDO_EPSILON; });
+    return segmented;
 }
 
 }  // anonymous namespace

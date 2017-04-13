@@ -1,25 +1,21 @@
 // ============================================================================
 //                                 CNVetti
 // ============================================================================
-// Copyright 2016-2017 Berlin Institute for Health
+// Copyright (C) 2016-2017 Berlin Institute for Health
 //
-// Permission is hereby granted, free of charge, to any person obtaining a
-// copy of this softwareand associated documentation files (the "Software"),
-// to deal in the Software without restriction, including without limitation
-// the rights to use, copy, modify, merge, publish, distribute, sublicense,
-// and/or sell copies of the Software, and to permit persons to whom the
-// Software is furnished to do so, subject to the following conditions:
+// This program is free software; you can redistribute it and/or modify it
+// under the terms of the GNU General Public License as published by the Free
+// Software Foundation; either version 3 of the License, at (at your option)
+// any later version.
 //
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
+// This program is distributed in the hope that it will be useful, but WITHOUT
+// ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+// FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+// more details.
 //
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-// THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-// DEALINGS IN THE SOFTWARE.
+// You should have received a copy of the GNU General Public License along
+// with this program; if not, write to the Free Software Foundation, Inc.,
+// 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
 //
 // ============================================================================
 // Author:  Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>
@@ -98,7 +94,7 @@ public:
     // Path to output file.
     std::string outputFileName;
 
-    // Skip any GC content with fewer than this number of windows
+    // Flag windows with GC content for which there are fewer than this number of windows
     int minGCWindowCount;
 
     // Number of threads to use for decompression/compression on I/O
@@ -172,6 +168,9 @@ public:
     // Path to output file
     std::string outputFileName;
 
+    // Genomic regions to process
+    std::vector<std::string> genomeRegions;
+
     // Number of threads to use for decompression/compression on I/O
     int numIOThreads;
 
@@ -193,8 +192,16 @@ public:
     // Maximal normalized IQR of normalized coverage
     double maxIqrCov;
 
-    // FQDR q parameter
-    double haarBreaksFqdrQ;
+    // Parameters for HaarSeg algorithm -----------------------------------------------------------
+
+    // The L_MIN parameter for HaarSeg, should be ceil(log2(k))
+    int haarSegLmin;
+
+    // The L_MAX parameter for HaarSeg, should be large enough
+    int haarSegLmax;
+
+    // FDR parameter Q
+    double haarSegBreaksFdrQ;
 
     // argc and argv from command line
     int argc;
@@ -203,7 +210,7 @@ public:
     CnvettiSegmentOptions() :
         verbosity(1), argc(0), argv(nullptr), numIOThreads(1), metric("COV0"),
         minMapability(0.99), minGC(20), maxGC(70), maxIqrRC(0.25), maxIqrCov(0.2),
-        haarBreaksFqdrQ(1e-3)
+        haarSegBreaksFdrQ(1e-3), haarSegLmin(1), haarSegLmax(5)
     {}
 
     void print(std::ostream & out) const;

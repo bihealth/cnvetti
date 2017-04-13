@@ -36,6 +36,7 @@
         "fstream": "cpp",
         "iomanip": "cpp",
         "ratio": "cpp",
-        "thread": "cpp"
+        "thread": "cpp",
+        "valarray": "cpp"
     }
 }

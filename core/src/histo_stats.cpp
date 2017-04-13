@@ -1,25 +1,21 @@
 // ============================================================================
 //                                 CNVetti
 // ============================================================================
-// Copyright 2016-2017 Berlin Institute for Health
+// Copyright (C) 2016-2017 Berlin Institute for Health
 //
-// Permission is hereby granted, free of charge, to any person obtaining a
-// copy of this softwareand associated documentation files (the "Software"),
-// to deal in the Software without restriction, including without limitation
-// the rights to use, copy, modify, merge, publish, distribute, sublicense,
-// and/or sell copies of the Software, and to permit persons to whom the
-// Software is furnished to do so, subject to the following conditions:
+// This program is free software; you can redistribute it and/or modify it
+// under the terms of the GNU General Public License as published by the Free
+// Software Foundation; either version 3 of the License, at (at your option)
+// any later version.
 //
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
+// This program is distributed in the hope that it will be useful, but WITHOUT
+// ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+// FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+// more details.
 //
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-// THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-// DEALINGS IN THE SOFTWARE.
+// You should have received a copy of the GNU General Public License along
+// with this program; if not, write to the Free Software Foundation, Inc.,
+// 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
 //
 // ============================================================================
 // Author:  Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>
@@ -27,6 +23,7 @@
 
 #include "cnvetti/histo_stats.h"
 
+#include <cmath>
 #include <map>
 #include <vector>
 
@@ -50,9 +47,10 @@ public:
     }
 
     void registerValue(
-        unsigned sampleID, StatsMetric metric, int gcContent, int value)
+        unsigned sampleID, StatsMetric metric, int gcContent, double value)
     {
-        histograms.at(sampleID).at(static_cast<int>(metric)).at(gcContent)[value] += 1;
+        histograms.at(sampleID).at(static_cast<int>(metric)).at(gcContent)[
+            int(round(value * factor))] += 1;
     }
 
     double getMedian(unsigned sampleID, StatsMetric metric, int gcContent) const
@@ -100,7 +98,7 @@ public:
         if (a == -1 && b == -1)
             return 0.0;
         else
-            return static_cast<double>(a + b) / 2.0;
+            return static_cast<double>(a + b) / 2.0 / factor;
     }
 
     int getNumWindows(int gcContent) const
@@ -122,6 +120,9 @@ private:
             >
         >
     > histograms;
+
+    // Factor to use for rounding (number of significant figures)
+    int factor { 100 };
 };
 
 
@@ -136,7 +137,7 @@ HistoStatsHandler::HistoStatsHandler(unsigned sampleCount) :
 HistoStatsHandler::~HistoStatsHandler() = default;
 
 void HistoStatsHandler::registerValue(
-    unsigned sampleID, StatsMetric metric, int gcContent, int value)
+    unsigned sampleID, StatsMetric metric, int gcContent, double value)
 {
     impl->registerValue(sampleID, metric, gcContent, value);
 }
