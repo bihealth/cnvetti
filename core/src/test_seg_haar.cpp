@@ -53,13 +53,20 @@ int main(int argc, char ** argv)
     if (argc >= 5)
         lMax = atoi(argv[4]);
 
-    std::vector<float> segVals = segmentHaarSeg(origVals, breaksFdrQ, NULL, NULL, lMin, lMax);
+    float denoise = 0;
+    if (argc >= 6)
+        denoise = atof(argv[5]);
 
-    std::cerr
-        << "noise = " << noise << "\n"
-        << "breaks FDR Q = " << breaksFdrQ << "\n"
-        << "lMin = " << lMin << "\n"
-        << "lMax = " << lMax << "\n";
+    std::vector<size_t> breakpoints = segmentHaarSeg(origVals, breaksFdrQ, NULL, NULL, lMin, lMax);
+
+    if (denoise != 0)
+    {
+        std::cerr << "DENOISING DATA\n";
+        breakpoints = refineSegmentationShiftBreakpoints(origVals, breakpoints);
+        breakpoints = refineSegmentationDeleteBreakpoints(origVals, breakpoints, 0.01);
+    }
+
+    std::vector<float> segVals = replaceWithSegmentMedians(origVals, breakpoints);
 
     int pos = 0;
     for (auto it = origVals.begin(), it2 = segVals.begin(); it != origVals.end(); ++it, ++it2, ++pos)

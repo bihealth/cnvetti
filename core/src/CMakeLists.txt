@@ -19,6 +19,7 @@ add_executable(
     histo_stats.cpp
     program_options.cpp
     segmentation_haar.cpp
+    segmentation_utils.cpp
     utils.cpp
     ${version_file})
 
@@ -27,7 +28,8 @@ target_link_libraries(cnvetti ${HTS_LIBRARY} ${ARMADILLO_LIBRARIES})
 add_executable(
     test_seg_haar
     test_seg_haar.cpp
-    segmentation_haar.cpp)
+    segmentation_haar.cpp
+    segmentation_utils.cpp)
 
 target_compile_features(
     cnvetti

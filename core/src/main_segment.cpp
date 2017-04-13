@@ -513,9 +513,10 @@ std::vector<float> CnvettiSegmentApp::doSegmentation(
                    [](float x) { return x + PSEUDO_EPSILON; });
     std::transform(vals.begin(), vals.end(), vals.begin(), log2);  // log2-transform values
 
-    std::vector<float> segmented = segmentHaarSeg(
+    std::vector<size_t> breakpoints = segmentHaarSeg(
         vals, options.haarSegBreaksFdrQ, nullptr, nullptr, options.haarSegLmin,
         options.haarSegLmax);
+    std::vector<float> segmented = replaceWithSegmentMedians(vals, breakpoints);
 
     std::transform(segmented.begin(), segmented.end(), segmented.begin(), exp2);  // transform back
     std::transform(segmented.begin(), segmented.end(), segmented.begin(),

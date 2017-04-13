@@ -57,7 +57,7 @@ arma::fvec haarConvolution(
 {
     int const signalSize = signal.n_elem;
     bool const haveWeight = (weight.n_elem != 0u);
-    if (DEBUG)
+    if (DEBUG > 1)
         std::cerr << signalSize << " ~~ " << signal << "\n";
     arma::fvec result(signalSize, arma::fill::zeros);  // prepare all-zero result
 
@@ -186,50 +186,29 @@ std::vector<unsigned long long> findLocalPeaks(arma::fvec const & signal)
 
 // Perform merging of breakpoints as described in HaarSeg paper
 std::vector<size_t> mergeBreakpoints(
-    std::vector<size_t> const & previousBreakpoints,
+    std::vector<size_t> const & prevBreakpoints,
     arma::uvec const & newBreakpoints,
     size_t windowSize)
 {
     if (newBreakpoints.is_empty())
-        return previousBreakpoints;
+        return prevBreakpoints;
 
     // Merge all addon items outside a window around each base item
     std::vector<size_t> result;
-    size_t newBreakpointIdx = 0;
-    for (size_t prevBreakpoint : previousBreakpoints)
+
+    auto itNew = newBreakpoints.begin();
+    for (auto itPrev = prevBreakpoints.begin(); itPrev != prevBreakpoints.end(); ++itPrev)
     {
-        while (newBreakpointIdx < newBreakpoints.size())
+        for (/*nop*/; (itNew != newBreakpoints.end()) && (*itNew <= *itPrev + windowSize); ++itNew)
         {
-            int const newBreakpoint = newBreakpoints[newBreakpointIdx];
-            if (newBreakpoint < prevBreakpoint - windowSize)
-            {
-                result.push_back(newBreakpoint);
-                newBreakpointIdx += 1;
-            }
-            else if ((prevBreakpoint - windowSize <= newBreakpoint) &&
-                     (newBreakpoint <= prevBreakpoint + windowSize))
-            {
-                newBreakpointIdx += 1;
-            }
-            else
-            {
-                break;
-            }
+            if (*itNew + windowSize < *itPrev)
+                result.push_back(*itNew);
         }
-        result.push_back(prevBreakpoint);
+        result.push_back(*itPrev);
     }
 
-    // Append the remaining addon items beyond the last previous breakpoint's window
-    if (!previousBreakpoints.empty())
-    {
-        size_t const lastPos = previousBreakpoints.back() + windowSize;
-        while (newBreakpointIdx < newBreakpoints.n_elem &&
-               newBreakpoints[newBreakpointIdx] <= lastPos)
-            newBreakpointIdx += 1;
-    }
-    if (newBreakpointIdx < newBreakpoints.n_elem)
-        std::copy(newBreakpoints.begin(), newBreakpoints.end(),
-                  std::back_inserter(result));
+    for (/*nop*/; itNew != newBreakpoints.end(); ++itNew)
+        result.push_back(*itNew);
 
     // Sort breakpoints by position and return
     std::sort(result.begin(), result.end());
@@ -393,7 +372,7 @@ void performNsvCompensation(SigmaEstimates & sigmaEst, arma::fvec & convRes, int
 }  // anonymous namespace
 
 
-std::vector<float> segmentHaarSeg(
+std::vector<size_t> segmentHaarSeg(
     std::vector<float> & vals,
     float breaksFdrQ,
     std::vector<float> const * qualsPtr,
@@ -422,7 +401,7 @@ std::vector<float> segmentHaarSeg(
         // Perform Haar convolution and find local peaks
         arma::fvec convRes = haarConvolution(fvals, quals, stepHalfSize);
         arma::uvec const localPeaks = findLocalPeaks(convRes);
-        if (DEBUG)
+        if (DEBUG > 1)
             std::cerr << "Found " << localPeaks.n_elem << " peaks at level " << level << "\n";
 
         // Perform compenstation of non-stationary variance if raw values have been given
@@ -436,9 +415,16 @@ std::vector<float> segmentHaarSeg(
         arma::fvec localPeaksConvRes(convRes.elem(localPeaks));
         arma::uvec addonPeaks(localPeaks.elem(find(abs(localPeaksConvRes) >= T)));
         breakpoints = mergeBreakpoints(breakpoints, addonPeaks, (1 << (level - 1)));
+        if (DEBUG > 0)
+        {
+            std::cerr << "level " << level << "\n\nbreakpoints\n";
+            for (int bp : breakpoints)
+                std::cerr << bp << "\n";
+            std::cerr << "\n";
+        }
     }
 
-    if (DEBUG)
+    if (DEBUG > 1)
     {
         std::cerr
             << "Found " << breakpoints.size() << " breakpoints \n"
@@ -452,20 +438,5 @@ std::vector<float> segmentHaarSeg(
     breakpoints.insert(breakpoints.begin(), 0u);
     breakpoints.push_back(vals.size());
 
-    // Replace segment values by their medians
-    std::vector<float> result;
-    for (int i = 0; i + 1 < breakpoints.size(); ++i)
-    {
-        if (DEBUG)
-            std::cerr
-                << "breakpoints = [" << breakpoints[i] << ", "
-                << breakpoints[i + 1] - 1 << ")\n";
-        if (breakpoints[i] < breakpoints[i + 1])
-            std::fill_n(
-                std::back_inserter(result),
-                breakpoints[i + 1] - breakpoints[i],
-                median(fvals.rows(breakpoints[i], breakpoints[i + 1] - 1)));
-    }
-
-    return result;
+    return breakpoints;
 }

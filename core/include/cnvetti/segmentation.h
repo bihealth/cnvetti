@@ -24,9 +24,14 @@
 #pragma once
 
 #include <vector>
+#include <cstddef>
+
 
 // HaarSeq segmentation algorithm
-std::vector<float> segmentHaarSeg(
+//
+// Single outliers that have a chi square value > outlierThresh are ignored
+// for breakpoint computation
+std::vector<size_t> segmentHaarSeg(
     std::vector<float> & vals,
     float breaksFdrQ,
     std::vector<float> const * quals = nullptr,
@@ -34,3 +39,24 @@ std::vector<float> segmentHaarSeg(
     int haarStartLevel = 1,
     int haarEndLevel = 5
 );
+
+
+// Replace values by segment medians
+std::vector<float> replaceWithSegmentMedians(
+    std::vector<float> const & values,
+    std::vector<size_t> const & breakpoints);
+
+
+// Segmentation refinement based on shifting breakpoints to reduce overall
+// segment error.
+std::vector<size_t> refineSegmentationShiftBreakpoints(
+    std::vector<float> const & values,
+    std::vector<size_t> const & breakpoints);
+
+
+// Segmentation refinement based on deleting breakpoints, affected segments'
+// total error must be less than the given mergeDelta times original error
+std::vector<size_t> refineSegmentationDeleteBreakpoints(
+    std::vector<float> const & values,
+    std::vector<size_t> breakpoints,
+    float mergeDelta = 0.01);
