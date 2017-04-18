@@ -64,6 +64,7 @@ void CnvettiCoverageOptions::print(std::ostream & out) const
 
     out << "    outputFileName:        '" << outputFileName << "'\n"
         << "    mapabilityBedFileName: '" << mapabilityBedFileName << "'\n"
+        << "    computeBinStdevs:      " << trueFalse(computeBinStdevs) << "\n"
         << "    windowLength:          " << windowLength << "\n"
         << "    minUnclipped:          " << minUnclipped << " # percent\n"
         << "    numIOThreads:          " << numIOThreads << "\n"

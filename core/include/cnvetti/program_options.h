@@ -63,13 +63,16 @@ public:
     // Minimal unclipped fraction of reads to consider, in percent.
     int minUnclipped;
 
+    // Whether or not to compute bin stdev values
+    bool computeBinStdevs;
+
     // argc and argv from command line
     int argc;
     char ** argv;
 
     CnvettiCoverageOptions() :
-        verbosity(1), numIOThreads(1), windowLength(1000), minUnclipped(80),
-        argc(0), argv(nullptr)
+        verbosity(1), numIOThreads(1), windowLength(500), minUnclipped(80),
+        computeBinStdevs(false), argc(0), argv(nullptr)
     {}
 
     void print(std::ostream & out) const;

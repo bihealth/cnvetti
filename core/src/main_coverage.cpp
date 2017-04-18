@@ -79,6 +79,56 @@ public:
             return 1.0 * numQ0Bases / numBases;
     }
 
+    // Mark bin as done (triggers stdev computation)
+    void markAsDone(unsigned windowLength)
+    {
+        stdev = 0;
+        stdevQ0 = 0;
+
+        if (!covDetail.get())
+            covDetail.reset(new std::vector<double>());
+        if (!covDetailQ0.get())
+            covDetailQ0.reset(new std::vector<double>());
+
+        covDetail->resize(windowLength, 0);
+        covDetailQ0->resize(windowLength, 0);
+
+        for (unsigned i = 0; i < windowLength; ++i)
+        {
+            double const x = coverage(windowLength) - (*covDetail)[i];
+            stdev += x * x;
+
+            double const x0 = (coverage(windowLength) + coverageQ0(windowLength)) - (
+                (*covDetail)[i] + (*covDetailQ0)[i]);
+            stdevQ0 += x0 * x0;
+        }
+
+        stdev = sqrt(stdev / (windowLength - 1);
+        stdevQ0 = sqrt(stdevQ0 / (windowLength - 1));
+
+        // Clear memory
+        covDetail = nullptr;
+        covDetailQ0 = nullptr;
+    }
+
+    // Register detail coverage for non-Q0 reads
+    void registerDetailCoverage(unsigned binPos)
+    {
+        if (!covDetail.get())
+            covDetail.reset(new std::vector<double>());
+        covDetail->resize(std::max((unsigned)covDetail->size(), binPos + 1));
+        (*covDetail)[binPos] += 1;
+    }
+
+    // Register detail coverage for Q0 reads
+    void registerDetailCoverageQ0(unsigned binPos)
+    {
+        if (!covDetailQ0.get())
+            covDetailQ0.reset(new std::vector<double>());
+        covDetailQ0->resize(std::max((unsigned)covDetailQ0->size(), binPos + 1));
+        (*covDetailQ0)[binPos] += 1;
+    }
+
     // total number of bases
     uint32_t numBases { 0 };
     // total number of bases from q0 reads (multi-reads)
@@ -87,6 +137,16 @@ public:
     uint32_t numFirstReads { 0 };
     // number of aligning q0 "first" reads
     uint32_t numQ0FirstReads { 0 };
+
+    // standard deviation (non-Q0 reads) computed on "markAsDone"
+    double stdev { 0.0 };
+    // standard deviation (non-Q0 and Q0 reads), computed on "markAsDone"
+    double stdevQ0 { 0.0 };
+
+    // coverage (non-Q0 reads) at each position inside the bin
+    std::shared_ptr<std::vector<double>> covDetail;
+    // coverage (non-Q0 and Q0 reads) at each position inside the bin
+    std::shared_ptr<std::vector<double>> covDetailQ0;
 };
 
 // ---------------------------------------------------------------------------
@@ -104,13 +164,17 @@ public:
                          std::map<std::string, int> const & rgToSampleID,
                          int rID,
                          CnvettiCoverageOptions const & options) :
-        rgToSampleID(rgToSampleID), numSamples(0), bamFileNames(bamFileNames), bamFilesIn(bamFilesIn),
+        rgToSampleID(rgToSampleID), numSamples(0), doneUpToWindow(0),
+        bamFileNames(bamFileNames), bamFilesIn(bamFilesIn),
         bamHeadersIn(bamHeadersIn), rID(rID), options(options)
     {
         init();
     }
 
     void run(GenomicRegion const & region);
+
+    // Ran after processing last region on chromosome
+    void finalize();
 
     std::vector<std::vector<ChromosomeBin>> const & getBins()
     { return bins; }
@@ -128,6 +192,10 @@ private:
     // Increment counters in bins.
     void incrementCounters(std::vector<ChromosomeBin> & bins, int beginPos, int endPos, bool isQ0Read);
 
+    // Mark chromosome bins up to the given window ID as done (triggers stdev computation and frees
+    // memory required for stdev computation)
+    void markBinsDone(int windowID);
+
     // bins[rgID][binsID]
     std::vector<std::vector<ChromosomeBin>> bins;
 
@@ -135,6 +203,9 @@ private:
     std::map<std::string, int> rgToSampleID;
     // Number of samples
     unsigned numSamples;
+
+    // Windows up to this ID (exclusive) are marked as done
+    unsigned doneUpToWindow;
 
     // External state given to the ChromosomeBinCounter.
     std::vector<std::string> & bamFileNames;
@@ -160,6 +231,15 @@ void ChromosomeBinCounter::run(GenomicRegion const & region)
 {
     for (unsigned fileID = 0; fileID < bamFilesIn.size(); ++fileID)
         processRegion(bins, region, fileID);
+}
+
+void ChromosomeBinCounter::finalize()
+{
+    if (options.computeBinStdevs)
+    {
+        uint32_t const chromLen = bamHeadersIn[0].get()->target_len[rID];
+        markBinsDone(chromLen / options.windowLength);
+    }
 }
 
 void ChromosomeBinCounter::processRegion(std::vector<std::vector<ChromosomeBin>> & bins,
@@ -244,6 +324,9 @@ void ChromosomeBinCounter::processRegion(std::vector<std::vector<ChromosomeBin>>
             else
                 bins[rgID][pos].numFirstReads += 1;
         }
+
+        if (beginPos / options.windowLength > 0u && options.computeBinStdevs)
+            markBinsDone(beginPos / options.windowLength);
     }
 }
 
@@ -252,12 +335,33 @@ void ChromosomeBinCounter::incrementCounters(std::vector<ChromosomeBin> & bins, 
 {
     if (options.verbosity >= 3)
         std::cerr << "incrementCounters(bins, " << beginPos << ", " << endPos << ", " << isQ0Read << ")\n";
-    for (int pos = beginPos; pos < endPos; ++pos)
-        bins[pos / options.windowLength].numBases += 1;
     if (isQ0Read)
+    {
         for (int pos = beginPos; pos < endPos; ++pos)
+        {
+            if (options.computeBinStdevs)
+                bins[pos / options.windowLength].registerDetailCoverageQ0(pos % options.windowLength);
             bins[pos / options.windowLength].numQ0Bases += 1;
+        }
+    }
+    else
+    {
+        for (int pos = beginPos; pos < endPos; ++pos)
+        {
+            if (options.computeBinStdevs)
+                bins[pos / options.windowLength].registerDetailCoverage(pos % options.windowLength);
+            bins[pos / options.windowLength].numBases += 1;
+        }
+    }
 }
+
+void ChromosomeBinCounter::markBinsDone(int windowID)
+{
+    for (/*nop*/; doneUpToWindow < windowID && doneUpToWindow < bins[0].size(); ++doneUpToWindow)
+        for (auto & rgBins : bins)
+            rgBins[doneUpToWindow].markAsDone(options.windowLength);
+}
+
 
 // ---------------------------------------------------------------------------
 // Class CnvettiCoverageApp
@@ -542,6 +646,10 @@ void CnvettiCoverageApp::openFiles()
     bcf_hdr_printf(vcfHeader.get(),
         "##FORMAT=<ID=COV0,Number=1,Type=Float,Description=\"Average coverage with q0+non-q0 reads\">");
     bcf_hdr_printf(vcfHeader.get(),
+        "##FORMAT=<ID=WINSD,Number=1,Type=Float,Description=\"Per-window coverage SD (non-q0 reads)\">");
+    bcf_hdr_printf(vcfHeader.get(),
+        "##FORMAT=<ID=WINSD0,Number=1,Type=Float,Description=\"Per-window coverage SD (q0+non-q0 reads)\">");
+    bcf_hdr_printf(vcfHeader.get(),
         "##FORMAT=<ID=RC,Number=1,Type=Float,Description=\"Number of aligning non-q0 reads\">");
     bcf_hdr_printf(vcfHeader.get(),
         "##FORMAT=<ID=RC0,Number=1,Type=Float,Description=\"Number of aligning q0+non-q0 reads\">");
@@ -626,7 +734,10 @@ void CnvettiCoverageApp::processGenomicRegions()
         if (region.rID != prevRID)
         {
             if (prevRID != INVALID_REFID)
+            {
+                worker->finalize();
                 printBinsToVcf(worker->getBins(), prevRID);
+            }
             worker.reset(new ChromosomeBinCounter(
                 options.inputFileNames, bamFilesIn, bamHeadersIn, rgToSampleID, region.rID,
                 options));
@@ -648,7 +759,10 @@ void CnvettiCoverageApp::processGenomicRegions()
     }
 
     if (prevRID != INVALID_REFID)
+    {
+        worker->finalize();
         printBinsToVcf(worker->getBins(), prevRID);
+    }
     if (options.verbosity >= 1)
         std::cerr << " DONE\n";
 }
@@ -713,6 +827,26 @@ void CnvettiCoverageApp::printBinsToVcf(std::vector<std::vector<ChromosomeBin>> 
                 statsHandler->registerValue(i, StatsMetric::COV0, valGCContent, covQ0[i]);
         }
         bcf_update_format_float(vcfHeader.get(), record, "COV0", &covQ0[0], covQ0.size());
+
+        // WINSD
+        std::vector<float> winsd(sampleNames.size(), 0.0);
+        for (unsigned i = 0; i < sampleNames.size(); ++i)
+        {
+            winsd[i] = bins[i][windowID].stdev;
+            if (!hasGap[windowID])  // ignore if overlapping with gap
+                statsHandler->registerValue(i, StatsMetric::WINSD, valGCContent, winsd[i]);
+        }
+        bcf_update_format_float(vcfHeader.get(), record, "WINSD", &winsd[0], winsd.size());
+
+        // WINSD0
+        std::vector<float> winsdQ0(sampleNames.size(), 0.0);
+        for (unsigned i = 0; i < sampleNames.size(); ++i)
+        {
+            winsdQ0[i] = bins[i][windowID].stdevQ0;
+            if (!hasGap[windowID])  // ignore if overlapping with gap
+                statsHandler->registerValue(i, StatsMetric::WINSD0, valGCContent, winsdQ0[i]);
+        }
+        bcf_update_format_float(vcfHeader.get(), record, "WINSD0", &winsdQ0[0], winsdQ0.size());
 
         // RC
         std::vector<int32_t> rc(sampleNames.size(), 0);
@@ -785,6 +919,18 @@ void CnvettiCoverageApp::printStatisticsToVCF()
         for (unsigned i = 0; i < sampleNames.size(); ++i)
             covQ0[i] = statsHandler->getMedian(i, StatsMetric::COV0, gcContent);
         bcf_update_format_float(vcfHeader.get(), record, "COV0", &covQ0[0], covQ0.size());
+
+        // WINSD
+        std::vector<float> winsd(sampleNames.size(), 0.0);
+        for (unsigned i = 0; i < sampleNames.size(); ++i)
+            winsd[i] = statsHandler->getMedian(i, StatsMetric::WINSD, gcContent);
+        bcf_update_format_float(vcfHeader.get(), record, "WINSD", &winsd[0], winsd.size());
+
+        // WINSD0
+        std::vector<float> winsdQ0(sampleNames.size(), 0.0);
+        for (unsigned i = 0; i < sampleNames.size(); ++i)
+            winsdQ0[i] = statsHandler->getMedian(i, StatsMetric::WINSD0, gcContent);
+        bcf_update_format_float(vcfHeader.get(), record, "WINSD0", &winsdQ0[0], winsdQ0.size());
 
         // RC
         std::vector<float> rc(sampleNames.size(), 0);

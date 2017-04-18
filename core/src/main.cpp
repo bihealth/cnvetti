@@ -88,9 +88,13 @@ int main(int argc, char ** argv)
         "Number of threads to use for de-/compression in I/O"
     )->group("Input / Output");
 
+    covApp->add_flag(
+        "--compute-bin-stdevs", covOptions.computeBinStdevs,
+        "Whether or not to compute per-bin stdevs in coverage"
+    )->group("Algorithm Parameters");
     covApp->add_option(
         "--window-length", covOptions.windowLength,
-    "Window length to use"
+        "Window length to use"
     )->group("Algorithm Parameters");
     covApp->add_option(
         "--min-unclipped", covOptions.minUnclipped,

@@ -448,6 +448,44 @@ void CnvettiNormalizeApp::processRegion(std::string const & contig, int beginPos
             free(values);
         }
 
+        // Normalize WINSD
+        {
+            float * values = nullptr;
+            int sizeVals = 0;
+            int res = bcf_get_format_float(vcfHeaderOut, line, "WINSD", &values, &sizeVals);
+            if (!res)
+            {
+                free(values);
+                throw std::runtime_error("Could not get FORMAT/WINSD value");
+            }
+            for (int sampleID = 0; sampleID < bcf_hdr_nsamples(vcfHeaderOut); ++sampleID)
+                if (medianStats[sampleID][gcContent].cov)
+                    values[sampleID] /= medianStats[sampleID][gcContent].cov;
+                else
+                    values[sampleID] = 0;
+            bcf_update_format_float(vcfHeaderOut, line, "WINSD", values, sizeVals);
+            free(values);
+        }
+
+        // Normalize WINSD0
+        {
+            float * values = nullptr;
+            int sizeVals = 0;
+            int res = bcf_get_format_float(vcfHeaderOut, line, "WINSD0", &values, &sizeVals);
+            if (!res)
+            {
+                free(values);
+                throw std::runtime_error("Could not get FORMAT/WINSD0 value");
+            }
+            for (int sampleID = 0; sampleID < bcf_hdr_nsamples(vcfHeaderOut); ++sampleID)
+                if (medianStats[sampleID][gcContent].cov0)
+                    values[sampleID] /= medianStats[sampleID][gcContent].cov0;
+                else
+                    values[sampleID] = 0;
+            bcf_update_format_float(vcfHeaderOut, line, "WINSD0", values, sizeVals);
+            free(values);
+        }
+
         // Normalize RC
         {
             float * values = nullptr;
