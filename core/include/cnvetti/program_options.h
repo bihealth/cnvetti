@@ -213,7 +213,7 @@ public:
     CnvettiSegmentOptions() :
         verbosity(1), argc(0), argv(nullptr), numIOThreads(1), metric("COV0"),
         minMapability(0.99), minGC(20), maxGC(70), maxIqrRC(0.25), maxIqrCov(0.2),
-        haarSegBreaksFdrQ(1e-3), haarSegLmin(1), haarSegLmax(5)
+        haarSegBreaksFdrQ(1e-7), haarSegLmin(1), haarSegLmax(5)
     {}
 
     void print(std::ostream & out) const;

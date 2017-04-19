@@ -383,6 +383,8 @@ void CnvettiNormalizeApp::processRegion(std::string const & contig, int beginPos
     while (bcf_sr_next_line(vcfReaderPtr.get()))
     {
         bcf1_t * line = bcf_sr_get_line(vcfReaderPtr.get(), 0);
+        if (contig != vcfReaderPtr.get()->regions->seq_names[line->rid])
+            break;  // on different contig
         if (bcf_translate(vcfHeaderOut, vcfHeaderIn, line))
             throw std::runtime_error("Could not translate from old to new header");
 

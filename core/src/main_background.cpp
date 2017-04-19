@@ -263,6 +263,8 @@ void CnvettiBackgroundApp::processRegion(std::string const & contig, int beginPo
     while (bcf_sr_next_line(vcfReaderPtr.get()))
     {
         bcf1_t * line = bcf_sr_get_line(vcfReaderPtr.get(), 0);
+        if (contig != vcfReaderPtr.get()->regions->seq_names[line->rid])
+            break;  // on different contig
 
         for (std::string const & name : STATS_NAMES)
         {

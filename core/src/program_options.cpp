@@ -115,7 +115,7 @@ void CnvettiSegmentOptions::print(std::ostream & out) const
     }
 
     out << "    metric:            '" << metric << "'\n"
-        << "    minMapability:     " << "\n"
+        << "    minMapability:     " << minMapability << "\n"
         << "    minGC:             " << minGC << "\n"
         << "    maxGC:             " << maxGC << "\n"
         << "    maxIqrRC:          " << maxIqrRC << "\n"

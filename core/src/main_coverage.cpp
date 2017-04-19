@@ -103,7 +103,7 @@ public:
             stdevQ0 += x0 * x0;
         }
 
-        stdev = sqrt(stdev / (windowLength - 1);
+        stdev = sqrt(stdev / (windowLength - 1));
         stdevQ0 = sqrt(stdevQ0 / (windowLength - 1));
 
         // Clear memory

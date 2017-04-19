@@ -37,6 +37,8 @@ std::vector<float> replaceWithSegmentMedians(
 {
     // Replace segment values by their medians
     std::vector<float> result;
+    if (values.empty())
+        return result;
 
     arma::fvec fvals(values);
 

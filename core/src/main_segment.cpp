@@ -333,6 +333,8 @@ void CnvettiSegmentApp::processRegion(std::string const & contig, int beginPos, 
     while (bcf_sr_next_line(vcfReaderPtr.get()))
     {
         bcf1_t * line = bcf_sr_get_line(vcfReaderPtr.get(), 0);
+        if (contig != vcfReaderPtr.get()->regions->seq_names[line->rid])
+            break;  // on different contig
         if (!(beginPos == 0 && endPos == 0) && line->pos >= endPos)
             break;
 
@@ -406,6 +408,9 @@ void CnvettiSegmentApp::processRegion(std::string const & contig, int beginPos, 
             values[i].push_back(valsPtr[i]);
     }
 
+    if (pos.empty())
+        return;  // contig not in BCF file
+
     if (options.verbosity >= 1)
         std::cerr << "# windows: " << pos.size() << "\n";
 
@@ -425,6 +430,8 @@ void CnvettiSegmentApp::processRegion(std::string const & contig, int beginPos, 
     while (bcf_sr_next_line(vcfReaderPtr.get()))
     {
         bcf1_t * line = bcf_sr_get_line(vcfReaderPtr.get(), 0);
+        if (contig != vcfReaderPtr.get()->regions->seq_names[line->rid])
+            break;  // on different contig
         if (!(beginPos == 0 && endPos == 0) && line->pos >= endPos)
             break;
 

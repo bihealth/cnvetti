@@ -201,7 +201,7 @@ int main(int argc, char ** argv)
     )->group("Segmentation Algorithm");
     cnvettiSegment->add_option(
         "--haar-seg-breaks-fdr-q", segOptions.haarSegBreaksFdrQ,
-        "Breaks FQDR q value for Haar wavelet--based segmentation"
+        "FDR q value for Haar wavelet--based segmentation"
     )->group("Segmentation Algorithm");
 
     try {
