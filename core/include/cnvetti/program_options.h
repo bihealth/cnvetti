@@ -116,6 +116,46 @@ public:
 
 
 // ----------------------------------------------------------------------------
+// Class CnvettiRatioOptions
+// ----------------------------------------------------------------------------
+
+// Program options for the computation of ratios from the `cnvetti normalize`
+// results.
+
+class CnvettiRatioOptions
+{
+public:
+    // Verbosity: 0 - quiet, 1 - normal, 2 - verbose, 3 - very verbose.
+    int verbosity;
+
+    // Path to input file name
+    std::string inputFileName;
+
+    // Path to output file.
+    std::string outputFileName;
+
+    // Name of the matched tumor sample.
+    std::string tumorSample;
+
+    // Name of the matched normal sample.
+    std::string normalSample;
+
+    // Number of threads to use for decompression/compression on I/O
+    int numIOThreads;
+
+    // argc and argv from command line
+    int argc;
+    char ** argv;
+
+    CnvettiRatioOptions() :
+        verbosity(1), numIOThreads(1), argc(0), argv(nullptr)
+    {}
+
+    void print(std::ostream & out) const;
+};
+
+
+// ----------------------------------------------------------------------------
 // Class CnvettiBackgroundOptions
 // ----------------------------------------------------------------------------
 

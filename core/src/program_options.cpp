@@ -85,6 +85,20 @@ void CnvettiNormalizeOptions::print(std::ostream & out) const
 }
 
 
+void CnvettiRatioOptions::print(std::ostream & out) const
+{
+    out
+        << "options:\n"
+        << "    verbosity:        " << verbosity << "\n"
+        << "    inputFileName:   '" << inputFileName << "'\n"
+        << "    outputFileName:  '" << outputFileName << "'\n"
+        << "    numIOThreads:     " << numIOThreads << "\n"
+        << "    tumorSample:      " << tumorSample << "\n"
+        << "    normalSample:      " << normalSample << "\n"
+        << "\n";
+}
+
+
 void CnvettiBackgroundOptions::print(std::ostream & out) const
 {
     out

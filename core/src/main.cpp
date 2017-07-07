@@ -36,6 +36,7 @@
 
 int mainCoverage(CnvettiCoverageOptions const & options);
 int mainNormalize(CnvettiNormalizeOptions const & options);
+int mainNormalize(CnvettiRatioOptions const & options);
 int mainBackground(CnvettiBackgroundOptions const & options);
 int mainSegment(CnvettiSegmentOptions const & options);
 
@@ -119,6 +120,36 @@ int main(int argc, char ** argv)
     )->required()->group("Input / Output");
     cnvettiNormalize->add_option(
         "--num-io-threads", normOptions.numIOThreads,
+        "Number of threads to use for de-/compression in I/O"
+    )->group("Input / Output");
+
+    // Add sub command `cnvetti ratio`
+
+    CnvettiNormalizeOptions ratioOptions;
+    ratioOptions.argc = argc;
+    ratioOptions.argv = argv;
+
+    CLI::App * cnvettiRatio = app.add_subcommand(
+        "ratio", ("Compute ratios from cnvetti normalize output (for cancer matched cancer "
+                  "samples)"));
+    cnvettiRatio->add_option(
+        "-i,--input", ratioOptions.inputFileName,
+        "Path to input VCF/BCF file (from cnvetti normalize; required)"
+    )->required()->check(CLI::ExistingFile)->group("Input / Output");
+    cnvettiRatio->add_option(
+        "-o,--output", ratioOptions.outputFileName,
+        "Path to output VCF/BCF file (required)"
+    )->required()->group("Input / Output");
+    cnvettiRatio->add_option(
+        "-n,--normal-sample", ratioOptions.outputFileName,
+        "Name of the matched normal sample in BCF file"
+    )->required()->group("Input / Output");
+    cnvettiRatio->add_option(
+        "-t,--tumor-sample", ratioOptions.outputFileName,
+        "Name of the matched tumor sample in BCF file"
+    )->required()->group("Input / Output");
+    cnvettiRatio->add_option(
+        "--num-io-threads", ratioOptions.numIOThreads,
         "Number of threads to use for de-/compression in I/O"
     )->group("Input / Output");
 
