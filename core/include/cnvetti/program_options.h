@@ -140,7 +140,7 @@ public:
     // Name of the matched normal sample.
     std::string normalSample;
 
-    // Number of threads to use for decompression/compression on I/O
+    // Number of threads to use for decompression/compression on I/O.
     int numIOThreads;
 
     // argc and argv from command line
@@ -246,6 +246,9 @@ public:
     // FDR parameter Q
     double haarSegBreaksFdrQ;
 
+    // Whether to use the background or not.
+    bool useBackground;
+
     // argc and argv from command line
     int argc;
     char ** argv;
@@ -253,7 +256,7 @@ public:
     CnvettiSegmentOptions() :
         verbosity(1), argc(0), argv(nullptr), numIOThreads(1), metric("COV0"),
         minMapability(0.99), minGC(20), maxGC(70), maxIqrRC(0.25), maxIqrCov(0.2),
-        haarSegBreaksFdrQ(1e-7), haarSegLmin(1), haarSegLmax(5)
+        haarSegBreaksFdrQ(1e-7), haarSegLmin(1), haarSegLmax(5), useBackground(false)
     {}
 
     void print(std::ostream & out) const;

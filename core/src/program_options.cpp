@@ -137,5 +137,6 @@ void CnvettiSegmentOptions::print(std::ostream & out) const
         << "    haarSegBreaksFdrQ: " << haarSegBreaksFdrQ << "\n"
         << "    haarSegLmin:       " << haarSegLmin << "\n"
         << "    haarSegLmax:       " << haarSegLmax << "\n"
+        << "    useBackground:     " << useBackground << "\n"
         << "\n";
 }

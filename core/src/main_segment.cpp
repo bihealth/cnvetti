@@ -361,23 +361,26 @@ void CnvettiSegmentApp::processRegion(std::string const & contig, int beginPos, 
         {
             mapability = *ptrTmp;
         }
-        if (bcf_get_info_float(vcfHeaderIn, line, "IQR_RC0", &ptrTmp, &sizeTmp) != 1)
+        if (options.useBackground)
         {
-            free(ptrTmp);
-            throw std::runtime_error("Could not get value of INFO/IQR_RC0");
-        }
-        else
-        {
-            iqrRc0 = *ptrTmp;
-        }
-        if (bcf_get_info_float(vcfHeaderIn, line, "IQR_COV0", &ptrTmp, &sizeTmp) != 1)
-        {
-            free(ptrTmp);
-            throw std::runtime_error("Could not get value of INFO/IQR_COV0");
-        }
-        else
-        {
-            iqrCov0 = *ptrTmp;
+            if (bcf_get_info_float(vcfHeaderIn, line, "IQR_RC0", &ptrTmp, &sizeTmp) != 1)
+            {
+                free(ptrTmp);
+                throw std::runtime_error("Could not get value of INFO/IQR_RC0");
+            }
+            else
+            {
+                iqrRc0 = *ptrTmp;
+            }
+            if (bcf_get_info_float(vcfHeaderIn, line, "IQR_COV0", &ptrTmp, &sizeTmp) != 1)
+            {
+                free(ptrTmp);
+                throw std::runtime_error("Could not get value of INFO/IQR_COV0");
+            }
+            else
+            {
+                iqrCov0 = *ptrTmp;
+            }
         }
         free(ptrTmp);
         int32_t * ptrFlagTmp = nullptr;
@@ -392,9 +395,11 @@ void CnvettiSegmentApp::processRegion(std::string const & contig, int beginPos, 
                 gcContent < options.minGC ||
                 gcContent > options.maxGC ||
                 mapability < options.minMapability ||
-                iqrRc0 > options.maxIqrRC ||
-                iqrCov0 > options.maxIqrCov)
+                (options.useBackground &&
+                 (iqrRc0 > options.maxIqrRC ||
+                  iqrCov0 > options.maxIqrCov))) {
             continue;  // Skip noisy window
+        }
 
         // Extract the metric values
         if (!bcf_get_format_float(vcfHeaderIn, line, options.metric.c_str(), &valsPtr, &sizeVals))
@@ -458,23 +463,26 @@ void CnvettiSegmentApp::processRegion(std::string const & contig, int beginPos, 
         {
             mapability = *ptrTmp;
         }
-        if (bcf_get_info_float(vcfHeaderIn, line, "IQR_RC0", &ptrTmp, &sizeTmp) != 1)
+        if (options.useBackground)
         {
-            free(ptrTmp);
-            throw std::runtime_error("Could not get value of INFO/IQR_RC0");
-        }
-        else
-        {
-            iqrRc0 = *ptrTmp;
-        }
-        if (bcf_get_info_float(vcfHeaderIn, line, "IQR_COV0", &ptrTmp, &sizeTmp) != 1)
-        {
-            free(ptrTmp);
-            throw std::runtime_error("Could not get value of INFO/IQR_COV0");
-        }
-        else
-        {
-            iqrCov0 = *ptrTmp;
+            if (bcf_get_info_float(vcfHeaderIn, line, "IQR_RC0", &ptrTmp, &sizeTmp) != 1)
+            {
+                free(ptrTmp);
+                throw std::runtime_error("Could not get value of INFO/IQR_RC0");
+            }
+            else
+            {
+                iqrRc0 = *ptrTmp;
+            }
+            if (bcf_get_info_float(vcfHeaderIn, line, "IQR_COV0", &ptrTmp, &sizeTmp) != 1)
+            {
+                free(ptrTmp);
+                throw std::runtime_error("Could not get value of INFO/IQR_COV0");
+            }
+            else
+            {
+                iqrCov0 = *ptrTmp;
+            }
         }
         free(ptrTmp);
         int32_t * ptrFlagTmp = nullptr;
@@ -490,8 +498,11 @@ void CnvettiSegmentApp::processRegion(std::string const & contig, int beginPos, 
                 gcContent > options.maxGC ||
                 mapability < options.minMapability ||
                 iqrRc0 > options.maxIqrRC ||
-                iqrCov0 > options.maxIqrCov)
+                (options.useBackground &&
+                 (iqrRc0 > options.maxIqrRC ||
+                  iqrCov0 > options.maxIqrCov))) {
             continue;  // Skip noisy window
+        }
 
         // Translate record from input to output file header
         if (bcf_translate(vcfHeaderOut, vcfHeaderIn, line))
