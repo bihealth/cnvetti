@@ -36,7 +36,7 @@
 
 int mainCoverage(CnvettiCoverageOptions const & options);
 int mainNormalize(CnvettiNormalizeOptions const & options);
-int mainNormalize(CnvettiRatioOptions const & options);
+int mainRatio(CnvettiRatioOptions const & options);
 int mainBackground(CnvettiBackgroundOptions const & options);
 int mainSegment(CnvettiSegmentOptions const & options);
 
@@ -125,7 +125,7 @@ int main(int argc, char ** argv)
 
     // Add sub command `cnvetti ratio`
 
-    CnvettiNormalizeOptions ratioOptions;
+    CnvettiRatioOptions ratioOptions;
     ratioOptions.argc = argc;
     ratioOptions.argv = argv;
 
@@ -141,11 +141,11 @@ int main(int argc, char ** argv)
         "Path to output VCF/BCF file (required)"
     )->required()->group("Input / Output");
     cnvettiRatio->add_option(
-        "-n,--normal-sample", ratioOptions.outputFileName,
+        "-n,--normal-sample", ratioOptions.normalSample,
         "Name of the matched normal sample in BCF file"
     )->required()->group("Input / Output");
     cnvettiRatio->add_option(
-        "-t,--tumor-sample", ratioOptions.outputFileName,
+        "-t,--tumor-sample", ratioOptions.tumorSample,
         "Name of the matched tumor sample in BCF file"
     )->required()->group("Input / Output");
     cnvettiRatio->add_option(
@@ -252,6 +252,9 @@ int main(int argc, char ** argv)
         } else if (app.got_subcommand("background")) {
             CLI::AutoTimer timer("running time");
             mainBackground(bgOptions);
+        } else if (app.got_subcommand("ratio")) {
+            CLI::AutoTimer timer("running time");
+            mainRatio(ratioOptions);
         } else if (app.got_subcommand("segment")) {
             CLI::AutoTimer timer("running time");
             mainSegment(segOptions);

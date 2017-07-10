@@ -6,6 +6,10 @@ set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../cmake ${CMAKE_MODULE_PATH})
 include(GetGitRevisionDescription)
 git_describe(VERSION --tags --dirty=-dirty)
 
+# Install CLI11
+include(AddCLI)
+include_directories(SYSTEM ${CLI11_BINARY_DIR}/include)
+
 # Parse the version information into its components
 string(REGEX REPLACE "^v([0-9]+)\\..*" "\\1" VERSION_MAJOR "${VERSION}")
 string(REGEX REPLACE "^v[0-9]+\\.([0-9]+).*" "\\1" VERSION_MINOR "${VERSION}")

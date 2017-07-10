@@ -25,8 +25,8 @@
 
 #include <cstdlib>
 #include <iostream>
-#include <map>
 #include <memory>
+#include <set>
 #include <stdexcept>
 #include <vector>
 
@@ -72,6 +72,9 @@ private:
     std::shared_ptr<bcf_hdr_t> vcfHeaderOutPtr;
     bcf_hdr_t * vcfHeaderIn;
     bcf_hdr_t * vcfHeaderOut;
+
+    int nSamplesOut;
+    std::vector<int> idMap;
 };
 
 
@@ -80,7 +83,7 @@ void CnvettiRatioApp::run()
     if (options.verbosity >= 1)
     {
         std::cerr << "cnvetti ratio\n"
-                  << "=============n\n";
+                  << "=============\n";
         options.print(std::cerr);
     }
 
@@ -147,8 +150,18 @@ void CnvettiRatioApp::openFiles()
     vcfFileOutPtr->format.format = openFormat;
     vcfFileOutPtr->format.compression = openCompression;
 
-    // Copy input to output header
-    vcfHeaderOutPtr = std::shared_ptr<bcf_hdr_t>(bcf_hdr_dup(vcfHeaderIn), bcf_hdr_destroy);
+    // Copy input to output header, removing tumor sample.
+    nSamplesOut = bcf_hdr_nsamples(vcfHeaderIn) - 1;
+    std::vector<char *> samplesOut;
+    for (int i = 0; i < bcf_hdr_nsamples(vcfHeaderIn); ++i) {
+        if (options.normalSample != vcfHeaderIn->samples[i]) {
+            samplesOut.push_back(vcfHeaderIn->samples[i]);
+        }
+    }
+    idMap.resize(bcf_hdr_nsamples(vcfHeaderIn), -1);
+    vcfHeaderOutPtr = std::shared_ptr<bcf_hdr_t>(
+            bcf_hdr_subset(vcfHeaderIn, nSamplesOut, &samplesOut[0], &idMap[0]),
+            bcf_hdr_destroy);
     vcfHeaderOut = vcfHeaderOutPtr.get();
 
     std::string cmdLine = options.argv[1];
@@ -163,12 +176,24 @@ void CnvettiRatioApp::openFiles()
 
 void CnvettiRatioApp::checkFiles()
 {
-    // XXX TODO CHECK SAMPLES
+    // Check that the file contains the two samples.
+    std::set<std::string> samples;
+    for (int i = 0; i < bcf_hdr_nsamples(vcfHeaderIn); ++i) {
+        samples.insert(vcfHeaderIn->samples[i]);
+    }
+    if (samples.count(options.tumorSample) == 0u) {
+        throw std::runtime_error(
+                "Could not find tumor sample " + options.tumorSample + " in input file.");
+    }
+    if (samples.count(options.normalSample) == 0u) {
+        throw std::runtime_error(
+                "Could not find normal sample " + options.normalSample + " in input file.");
+    }
+    if (options.normalSample == options.tumorSample) {
+        throw std::runtime_error("Normal sample name == tumor sample name!");
+    }
 
     // Check that the file looks like created by "cnvetti coverage"
-    if (!bcf_hdr_get_hrec(vcfHeaderIn, BCF_HL_FLT, "ID", "CNVETTI_STATS", NULL))
-        throw std::runtime_error(
-            "Input file does not look like cnvetti coverage file, FILTER/CNVETTI_STATS header missing");
     if (!bcf_hdr_get_hrec(vcfHeaderIn, BCF_HL_STR, "ID", "STATS", "ALT"))
         throw std::runtime_error(
             "Input file does not look like cnvetti coverage file, ALT/STATS header missing");
@@ -203,14 +228,17 @@ void CnvettiRatioApp::checkFiles()
 
 void CnvettiRatioApp::processChromosomes()
 {
-    for (int i = 0; i < vcfHeaderIn->nhrec; ++i)  // skip pseudo contig
+    for (int i = 0; i < vcfHeaderIn->nhrec; ++i)
     {
         bcf_hrec_t * hrec = vcfHeaderIn->hrec[i];
         if (hrec->type == BCF_HL_CTG)
         {
             for (int j = 0; j < hrec->nkeys; ++j)
             {
-                processRegion(hrec->vals[j], 0, 0);
+                if (strcmp("ID", hrec->keys[j]) == 0)
+                {
+                    processRegion(hrec->vals[j], 0, 0);
+                }
             }
         }
     }
@@ -232,13 +260,134 @@ void CnvettiRatioApp::processRegion(std::string const & contig, int beginPos, in
         return;
     }
 
+    int tumorSampleId = -1;
+    int normalSampleId = -1;
+    for (int i = 0; i < bcf_hdr_nsamples(vcfHeaderIn); ++i) {
+        if (options.tumorSample == vcfHeaderIn->samples[i]) {
+            tumorSampleId = i;
+        } else if (options.normalSample == vcfHeaderIn->samples[i]) {
+            normalSampleId = i;
+        }
+    }
+
     while (bcf_sr_next_line(vcfReaderPtr.get()))
     {
         bcf1_t * line = bcf_sr_get_line(vcfReaderPtr.get(), 0);
         if (contig != vcfReaderPtr.get()->regions->seq_names[line->rid])
             break;  // on different contig
-        if (bcf_translate(vcfHeaderOut, vcfHeaderIn, line))
-            throw std::runtime_error("Could not translate from old to new header");
+
+        // Compute COV ratios
+        {
+            float * values = nullptr;
+            int sizeVals = 0;
+            int res = bcf_get_format_float(vcfHeaderIn, line, "COV", &values, &sizeVals);
+            if (!res) {
+                free(values);
+                throw std::runtime_error("Could not get FORMAT/COV value");
+            }
+            if (values[normalSampleId] == 0.0) {
+                bcf_float_set_missing(values[tumorSampleId]);
+            } else {
+                values[tumorSampleId] /= values[normalSampleId];
+            }
+            bcf_update_format_float(vcfHeaderIn, line, "COV", values, sizeVals);
+            free(values);
+        }
+
+        // Compute COV0 ratios
+        {
+            float * values = nullptr;
+            int sizeVals = 0;
+            int res = bcf_get_format_float(vcfHeaderIn, line, "COV0", &values, &sizeVals);
+            if (!res) {
+                free(values);
+                throw std::runtime_error("Could not get FORMAT/COV0 value");
+            }
+            if (values[normalSampleId] == 0.0) {
+                bcf_float_set_missing(values[tumorSampleId]);
+            } else {
+                values[tumorSampleId] /= values[normalSampleId];
+            }
+            bcf_update_format_float(vcfHeaderIn, line, "COV0", values, sizeVals);
+            free(values);
+        }
+
+        // Compute WINSD ratios
+        {
+            float * values = nullptr;
+            int sizeVals = 0;
+            int res = bcf_get_format_float(vcfHeaderIn, line, "WINSD", &values, &sizeVals);
+            if (!res) {
+                free(values);
+                throw std::runtime_error("Could not get FORMAT/WINSD value");
+            }
+            if (values[normalSampleId] == 0.0) {
+                bcf_float_set_missing(values[tumorSampleId]);
+            } else {
+                values[tumorSampleId] /= values[normalSampleId];
+            }
+            bcf_update_format_float(vcfHeaderIn, line, "WINSD", values, sizeVals);
+            free(values);
+        }
+
+        // Compute WINSD0 ratios
+        {
+            float * values = nullptr;
+            int sizeVals = 0;
+            int res = bcf_get_format_float(vcfHeaderIn, line, "WINSD0", &values, &sizeVals);
+            if (!res) {
+                free(values);
+                throw std::runtime_error("Could not get FORMAT/WINSD0 value");
+            }
+            if (values[normalSampleId] == 0.0) {
+                bcf_float_set_missing(values[tumorSampleId]);
+            } else {
+                values[tumorSampleId] /= values[normalSampleId];
+            }
+            bcf_update_format_float(vcfHeaderIn, line, "WINSD0", values, sizeVals);
+            free(values);
+        }
+
+        // Compute RC ratios
+        {
+            float * values = nullptr;
+            int sizeVals = 0;
+            int res = bcf_get_format_float(vcfHeaderIn, line, "RC", &values, &sizeVals);
+            if (!res) {
+                free(values);
+                throw std::runtime_error("Could not get FORMAT/RC value");
+            }
+            if (values[normalSampleId] == 0.0) {
+                bcf_float_set_missing(values[tumorSampleId]);
+            } else {
+                values[tumorSampleId] /= values[normalSampleId];
+            }
+            bcf_update_format_float(vcfHeaderIn, line, "RC", values, sizeVals);
+            free(values);
+        }
+
+        // Compute RC0 ratios
+        {
+            float * values = nullptr;
+            int sizeVals = 0;
+            int res = bcf_get_format_float(vcfHeaderIn, line, "RC0", &values, &sizeVals);
+            if (!res) {
+                free(values);
+                throw std::runtime_error("Could not get FORMAT/RC0 value");
+            }
+            if (values[normalSampleId] == 0.0) {
+                bcf_float_set_missing(values[tumorSampleId]);
+            } else {
+                values[tumorSampleId] /= values[normalSampleId];
+            }
+            bcf_update_format_float(vcfHeaderIn, line, "RC0", values, sizeVals);
+            free(values);
+        }
+
+        // Subset record before writing out.
+        if (bcf_subset(vcfHeaderOut, line, nSamplesOut, &idMap[0]) != 0) {
+            throw std::runtime_error("Could not subset record.");
+        }
 
         bcf_write(vcfFileOutPtr.get(), vcfHeaderOut, line);
     }
