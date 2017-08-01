@@ -75,7 +75,7 @@ private:
     void processRegion(std::string const & contig, int beginPos, int endPos);
     // Perform segmentation for one sample
     std::vector<float> doSegmentation(
-        std::vector<int> const & pos, std::vector<float> & values) const;
+        std::vector<int> const & pos, std::vector<float> const & values) const;
 
     CnvettiSegmentOptions const & options;
 
@@ -525,21 +525,41 @@ void CnvettiSegmentApp::processRegion(std::string const & contig, int beginPos, 
 }
 
 std::vector<float> CnvettiSegmentApp::doSegmentation(
-    std::vector<int> const & pos, std::vector<float> & vals) const
+    std::vector<int> const & pos, std::vector<float> const & vals) const
 {
-    std::transform(vals.begin(), vals.end(), vals.begin(),
+    // Create a copy of vals without inf/-inf/nan and mapping back
+    std::vector<unsigned> valsCopyToVals;
+    std::vector<float> valsCopy;
+    valsCopyToVals.reserve(vals.size());
+    valsCopy.reserve(vals.size());
+    for (unsigned i = 0; i < vals.size(); ++i) {
+        if (std::isfinite(vals[i])) {
+            valsCopyToVals.push_back(i);
+            valsCopy.push_back(vals[i]);
+        }
+    }
+
+    // Log2-transform data, segment, transform back
+    std::transform(valsCopy.begin(), valsCopy.end(), valsCopy.begin(),
                    [](float x) { return x + PSEUDO_EPSILON; });
-    std::transform(vals.begin(), vals.end(), vals.begin(), log2);  // log2-transform values
+    std::transform(valsCopy.begin(), valsCopy.end(), valsCopy.begin(), log2);  // log2-transform values
 
     std::vector<size_t> breakpoints = segmentHaarSeg(
-        vals, options.haarSegBreaksFdrQ, nullptr, nullptr, options.haarSegLmin,
+        valsCopy, options.haarSegBreaksFdrQ, nullptr, nullptr, options.haarSegLmin,
         options.haarSegLmax);
-    std::vector<float> segmented = replaceWithSegmentMedians(vals, breakpoints);
+    std::vector<float> segmented = replaceWithSegmentMedians(valsCopy, breakpoints);
 
     std::transform(segmented.begin(), segmented.end(), segmented.begin(), exp2);  // transform back
     std::transform(segmented.begin(), segmented.end(), segmented.begin(),
                    [](float x) { return x - PSEUDO_EPSILON; });
-    return segmented;
+
+    // Copy segmented to output, keeping the inf/-inf/nan values from input intact.
+    std::vector<float> result(vals);
+    for (unsigned i = 0; i < valsCopyToVals.size(); ++i) {
+        result[valsCopyToVals[i]] = segmented[i];
+    }
+
+    return result;
 }
 
 }  // anonymous namespace
