@@ -3,6 +3,9 @@
 library(argparser, quietly=TRUE);
 library(futile.logger, quietly=TRUE);
 library(tidyr, quietly=TRUE);
+library(plotrix, quietly=TRUE);
+library(maptools, quietly=TRUE);
+gpclibPermit();
 library(readr, quietly=TRUE);
 library(plyr, quietly=TRUE);
 suppressPackageStartupMessages(library(dplyr));
@@ -24,7 +27,10 @@ p = arg_parser('CNVetti plotting') %>%
     add_argument('--out-chrom', help='Path to chromsome output PNG file, "%s" will be replaced by chromosome name.') %>%
     add_argument('--out-genome', help='Path to genome output PNG file.') %>%
     add_argument('--input-bed', help='Path to input BED file.') %>%
-    add_argument('--samples', help='Comma-separated list of samples to plot for.');
+    add_argument('--samples', help='Comma-separated list of samples to plot for.') %>%
+    add_argument('--gene-beds', help='Comma-separated list of gene BED files.') %>%
+    add_argument('--axis-y-min', help='Lower bound of y axis', default=-4) %>%
+    add_argument('--axis-y-max', help='Lower bound of y axis', default=4);
 
 argv <- parse_args(p);
 
@@ -43,6 +49,10 @@ if (is.na(argv$samples)) {
 } else {
     argv$samples = strsplit(argv$samples, ',')[[1]];
 }
+gene_files = c();
+if (!is.na(argv$gene_beds)) {
+    gene_files = strsplit(argv$gene_beds, ',')[[1]];
+}
 
 # Define chromosomes.
 CHROMS = c(as.character(1:22), "X", "Y")
@@ -56,9 +66,23 @@ chrom_offsets = data.frame(
     length=chrom_lens$length,
     offset=c(0, head(cumsum(chrom_lens$length), -1)),
     end=c(tail(cumsum(chrom_lens$length), -1), 0)) %>%
-    mutate(label_pos = offset + length / 2.0) %>%
-    filter(chrom %in% c(as.character(1:22), "X", "Y"))
+    mutate(label_pos = offset + length / 2.0);
+rownames(chrom_offsets) = chrom_offsets$chrom;
 
+
+# Load gene BEDs.
+genes = list();
+for (gene_bed in gene_files) {
+    genes[[gene_bed]] = read_tsv(gene_bed, col_names = c('chrom', 'begin', 'end', 'gene'), col_types = 'ciic');
+}
+genes = do.call(rbind, genes);
+genes$offset = chrom_offsets[genes$chrom,]$offset;
+genes$apos = (genes$offset + genes$begin + (genes$end - genes$begin) / 2) * 1e-6;
+genes$pos = (genes$begin + (genes$end - genes$begin) / 2) * 1e-6;
+genes$abegin = (genes$offset + genes$begin) * 1e-6;
+genes$aend = (genes$offset + genes$end) * 1e-6;
+
+# Prepare loading of mass data.
 col_names = c('chrom', 'begin', 'end');
 col_types = 'cdd';
 for (sample in argv$samples) {
@@ -82,8 +106,9 @@ for (sample in argv$samples) {
             seg = starts_with(paste(sample, 'seg', sep = '.'))) %>%
         mutate(
             sample = sample
-        ) %>%
-        join(chrom_offsets, by = 'chrom') %>%
+        );
+    slice$offset = chrom_offsets[slice$chrom,]$offset;
+    slice = slice %>%
         mutate(apos = pos + offset) %>%  # absolute pos
         mutate(  # to Mbp
             pos = pos * 1e-6,
@@ -100,15 +125,18 @@ nsamples = length(argv$samples);
 cols = list(
     ncov = "lightgray",
     seg = "red",
-    extremes = "magenta"
+    extremes = "magenta",
+    gene_region = "#DFFF00AA",
+    gene_name = "black",
+    grid = "darkgray"
 );
 xlimits = list(
     min = min(chrom_offsets$offset) * 1e-6,
     max = max(chrom_offsets$offset + chrom_offsets$length) * 1e-6
 );
 ylimits = list(
-    min = -4,
-    max = 4
+    min = argv$axis_y_min,
+    max = argv$axis_y_max
 );
 
 # genome-wide plotting
@@ -117,8 +145,9 @@ flog.info("Plotting genome to %s", argv$out_genome);
 
 CairoPNG(
     sprintf(argv$out_genome),
-    width = 1200,
-    height = 300 * nsamples
+    width = 1200 * 4,
+    height = 300 * nsamples * 4,
+    res = 64 * 4
 );
 
 par(omi = rep(1.0, 4), mar = c(0,0,0,0), mfrow = c(nsamples, 1));
@@ -127,8 +156,8 @@ for (s in argv$samples) {
     # Limit data to current sample for plotting.
     flog.info("  => %s", s);
     sub_df = all_data %>%
-        filter(as.character(sample) == s) %>%
-        mutate(rounded_seg = as.integer(round(seg * 2))) %>%
+        filter(as.character(sample) == s & !is.na(ncov) & !is.na(seg)) %>%
+        mutate(rounded_seg = as.integer(round(seg * 10))) %>%
         mutate(seg_diff = ifelse(rounded_seg - lag(rounded_seg) != 0, 1, 0)) %>%
         mutate(seg_diff = ifelse(is.na(seg_diff), 0, seg_diff)) %>%
         mutate(seg_no = cumsum(seg_diff)) %>%
@@ -154,7 +183,7 @@ for (s in argv$samples) {
         xaxs='i'
     );
     mtext(s, 2, 4);
-    mtext(expression('log(coverage ratio)'), 2, 2);
+    mtext(expression('log2(coverage ratio)'), 2, 2);
     box();
     axis(2);
 
@@ -165,7 +194,7 @@ for (s in argv$samples) {
         data = sub_df,
         col = cols$seg,
         bg = cols$seg,
-        cex = 1,
+        cex = 0.5,
         pch = 22
     );
 
@@ -178,7 +207,7 @@ for (s in argv$samples) {
         data = too_small,
         col = cols$extremes,
         bg = cols$extremes,
-        cex = 2,
+        cex = 1,
         pch = 25);
     too_small = sub_df %>% filter(seg > ylimits$max);
     too_small$seg = rep(ylimits$max, length(too_small$seg));
@@ -187,17 +216,40 @@ for (s in argv$samples) {
         data = too_small,
         col = cols$extremes,
         bg = cols$extremes,
-        cex = 2,
+        cex = 1,
         pch = 24);
 
     for (offset in tail(chrom_offsets$offset, -1)) {
         abline(v = offset * 1e-6);
     }
 
+    if (nrow(genes) > 0) {
+        flog.info('    => %d genes', nrow(genes));
+
+        ys = head(rep(c(-2, -2.5, -3, -3.5, -4), length(genes$apos)), length(genes$apos));
+        rect(
+            xleft = genes$abegin,
+            ybottom = ylimits$min,
+            xright = genes$aend,
+            ytop = ylimits$max,
+            density = NA,
+            col = cols$gene_region
+        );
+        pointLabel(
+            genes$apos,
+            ys,
+            labels = genes$gene,
+            col = cols$gene_name);
+    } else {
+        flog.info('    => no genes');
+    }
+
+
     # title and bottom label
     if (s == argv$samples[[1]]) {
         mtext(sprintf("whole genome", c), 3, 2);
-    } else if (s == argv$samples[[nsamples]]) {
+    }
+    if (s == argv$samples[[nsamples]]) {
         axis(1, at=chrom_offsets$label_pos * 1e-6, labels=chrom_offsets$chrom, tick=FALSE, line=NA);
         mtext("chromosomes", 1, 2);
     }
@@ -212,19 +264,19 @@ for (c in CHROMS) {
 
     CairoPNG(
         sprintf(argv$out_chrom, c),
-        width = 1200,
-        height = 300 * nsamples
+        width = 1200 * 4,
+        height = 300 * nsamples * 4,
+        res = 64 * 4
     );
 
     par(omi = rep(1.0, 4), mar = c(0,0,0,0), mfrow = c(nsamples, 1));
 
     for (s in argv$samples) {
-        # Limit data to current chromosome, improve segmentation by rounding,
-        # compute segment number
+        # Limit data to current chromosome.
         flog.info("  => %s", s);
         sub_df = all_data %>%
-            filter(chrom == c & as.character(sample) == s) %>%
-            mutate(rounded_seg = as.integer(round(seg * 2))) %>%
+            filter(chrom == c & as.character(sample) == s & !is.na(ncov) & !is.na(seg)) %>%
+            mutate(rounded_seg = as.integer(round(seg * 10))) %>%
             mutate(seg_diff = ifelse(rounded_seg - lag(rounded_seg) != 0, 1, 0)) %>%
             mutate(seg_diff = ifelse(is.na(seg_diff), 0, seg_diff)) %>%
             mutate(seg_no = cumsum(seg_diff)) %>%
@@ -244,7 +296,9 @@ for (c in CHROMS) {
             axes = FALSE,
             cex = 0.1,
             pch = 22,
-            ylim = as.double(ylimits)
+            xlim = c(0, chrom_offsets[c,]$length * 1e-6),
+            ylim = as.double(ylimits),
+            xaxs='i'
         );
         mtext(s, 2, 4);
         mtext("log2(relative coverage)", 2, 2);
@@ -252,11 +306,11 @@ for (c in CHROMS) {
         axis(2);
         # Overlay coverage point cloud with segmentation
         points(
-            seg_median ~ pos,
+            seg ~ pos,
             data = sub_df,
             col = cols$seg,
             bg = cols$seg,
-            cex = 1,
+            cex = 0.2,
             pch = 22
         );
 
@@ -268,7 +322,7 @@ for (c in CHROMS) {
             data = too_small,
             col = cols$extremes,
             bg = cols$extremes,
-            cex = 2,
+            cex = 1,
             pch = 25);
         too_small = sub_df %>% filter(seg > ylimits$max);
         too_small$seg = rep(ylimits$max, length(too_small$seg));
@@ -277,14 +331,37 @@ for (c in CHROMS) {
             data = too_small,
             col = cols$extremes,
             bg = cols$extremes,
-            cex = 2,
+            cex = 1,
             pch = 24);
 
         if (s == argv$samples[[1]]) {
             mtext(sprintf("chr%s", c), 3, 2);
-        } else if (s == argv$samples[[nsamples]]) {
+        }
+        if (s == argv$samples[[nsamples]]) {
             axis(1);
             mtext("position [Mbp]", 1, 2);
+        }
+
+        chrom_genes = genes %>% filter(chrom == c);
+        if (nrow(chrom_genes) > 0) {
+            flog.info('    => %d genes', nrow(chrom_genes));
+
+            ys = head(rep(c(-2, -2.5, -3, -3.5, -4), length(chrom_genes$pos)), length(chrom_genes$pos));
+            rect(
+                xleft = chrom_genes$begin * 1e-6,
+                ybottom = ylimits$min,
+                xright = chrom_genes$end * 1e-6,
+                ytop = ylimits$max,
+                density = NA,
+                col = cols$gene_region
+            );
+            pointLabel(
+                chrom_genes$pos,
+                ys,
+                labels = chrom_genes$gene,
+                col = cols$gene_name);
+        } else {
+            flog.info('    => no genes');
         }
     }
 
