@@ -35,6 +35,7 @@
 // ----------------------------------------------------------------------------
 
 int mainCoverage(CnvettiCoverageOptions const & options);
+int mainPeaks(CnvettiPeaksOptions const & options);
 int mainNormalize(CnvettiNormalizeOptions const & options);
 int mainRatio(CnvettiRatioOptions const & options);
 int mainBackground(CnvettiBackgroundOptions const & options);
@@ -100,6 +101,37 @@ int main(int argc, char ** argv)
     covApp->add_option(
         "--min-unclipped", covOptions.minUnclipped,
         "Minimal unclipped fraction of reads to keep, in percent"
+    )->group("Algorithm Parameters");
+
+    // Add sub command `cnvetti peaks`
+
+    CnvettiPeaksOptions peaksOptions;
+    peaksOptions.argc = argc;
+    peaksOptions.argv = argv;
+
+    CLI::App * peaksApp = app.add_subcommand(
+        "peaks", "Compute peaks (amplified) regions BED file");
+
+    peaksApp->add_option(
+        "-i,--input", peaksOptions.inputFileName,
+        "Path to input BCF file (required)"
+    )->required()->check(CLI::ExistingFile)->group("Input / Output");
+    peaksApp->add_option(
+        "-o,--output", peaksOptions.outputFileName,
+        "Path to output BED file (required)"
+    )->required()->group("Input / Output");
+    peaksApp->add_option(
+        "--num-io-threads", peaksOptions.numIOThreads,
+        "Number of threads to use for de-/compression in I/O"
+    )->group("Input / Output");
+
+    peaksApp->add_option(
+        "--percentile", peaksOptions.percentile,
+        "Percentile to select for threshold, in percent"
+    )->group("Algorithm Parameters");
+    peaksApp->add_option(
+        "--thresh-factor", peaksOptions.threshFactor,
+        "Factor to multiply threshold with after selecting by percentile"
     )->group("Algorithm Parameters");
 
     // Add sub command `cnvetti normalize`
@@ -246,6 +278,9 @@ int main(int argc, char ** argv)
         if (app.got_subcommand("coverage")) {
             CLI::AutoTimer timer("running time");
             mainCoverage(covOptions);
+        } else if (app.got_subcommand("peaks")) {
+            CLI::AutoTimer timer("running time");
+            mainPeaks(peaksOptions);
         } else if (app.got_subcommand("normalize")) {
             CLI::AutoTimer timer("running time");
             mainNormalize(normOptions);

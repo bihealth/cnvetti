@@ -15,6 +15,7 @@ add_executable(
     main_background.cpp
     main_coverage.cpp
     main_normalize.cpp
+    main_peaks.cpp
     main_ratio.cpp
     main_segment.cpp
     histo_stats.cpp
