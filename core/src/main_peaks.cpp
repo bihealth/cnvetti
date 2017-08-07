@@ -25,8 +25,8 @@
 
 #include <cmath>
 #include <cstdlib>
-#include <fstream>
 #include <iostream>
+#include <sstream>
 #include <map>
 #include <memory>
 #include <stdexcept>
@@ -34,7 +34,7 @@
 
 #include <htslib/tbx.h>
 #include <htslib/vcf.h>
-#include <htslib/tbx.h>
+#include <htslib/bgzf.h>
 #include <htslib/synced_bcf_reader.h>
 
 #include "cnvetti/program_options.h"
@@ -86,7 +86,9 @@ private:
 
     std::shared_ptr<bcf_srs_t> vcfReaderPtr;
     bcf_hdr_t * vcfHeaderIn;
-    std::ofstream outBedFile;
+    std::unique_ptr<BGZF, std::function<void(BGZF*)>> outBgzf;
+
+    uint64_t peakCount { 0 };
 };
 
 
@@ -115,7 +117,7 @@ void CnvettiPeaksApp::run()
     uint64_t totalCov0 = 0;
     for (auto entry : histogram)
     {
-        if (options.verbosity >= 1)
+        if (options.verbosity >= 2)
             std::cerr << (entry.first / 100.0) << "\t" << entry.second.cov0 << "\n";
         totalCov0 += entry.second.cov0;
     }
@@ -126,7 +128,7 @@ void CnvettiPeaksApp::run()
     for (auto entry : histogram)
     {
         threshold = entry.first / 100.0;
-        if (val > entry.second.cov0)
+        if (val >= entry.second.cov0)
         {
             val -= entry.second.cov0;
         }
@@ -145,6 +147,14 @@ void CnvettiPeaksApp::run()
             [&](std::string const & chrom, int beginPos, int endPos) {
                 processRegionWriteBed(chrom, beginPos, endPos, threshold);
             });
+
+    if (options.verbosity >= 1)
+        std::cerr << "peak count: " << peakCount << "\n";
+
+    if (options.verbosity >= 1)
+        std::cerr << "\nCLOSE BGZF, CREATE INDEX\n\n";
+    outBgzf.reset();
+    tbx_index_build(options.outputFileName.c_str(), -1, &tbx_conf_bed);
 
     if (options.verbosity >= 1)
         std::cerr << "\nDone. Have a nice day!\n";
@@ -166,7 +176,8 @@ void CnvettiPeaksApp::openFiles()
     // Open output file.
     if (options.verbosity >= 1)
         std::cerr << "Opening " << options.outputFileName << " ...\n";
-    outBedFile.open(options.outputFileName.c_str(), std::fstream::out);
+    outBgzf = std::unique_ptr<BGZF, std::function<void(BGZF*)>>(
+            bgzf_open(options.outputFileName.c_str(), "w"), [](BGZF * bgzf) { bgzf_close(bgzf); } );
 }
 
 void CnvettiPeaksApp::processChromosomes(
@@ -226,7 +237,7 @@ void CnvettiPeaksApp::processRegionCreateHistogram(
 
         for (int sampleID = 0; sampleID < numSamples; ++sampleID)
         {
-            ++histogram[(int)(std::ceil(cov0s.get()[sampleID]) * 100)].cov0;
+            ++histogram[(int)(std::ceil(cov0s.get()[sampleID] * 100))].cov0;
         }
     }
 }
@@ -250,6 +261,7 @@ void CnvettiPeaksApp::processRegionWriteBed(
 
     // Count samples.
     int const numSamples = bcf_hdr_nsamples(vcfHeaderIn);
+    std::stringstream ss;
 
     while (bcf_sr_next_line(vcfReaderPtr.get()))
     {
@@ -270,12 +282,29 @@ void CnvettiPeaksApp::processRegionWriteBed(
         int32_t numOut = 1;
         if (!bcf_get_info_int32(vcfHeaderIn, line, "END", &endPtr, &numOut))
             throw std::runtime_error("Could not get INFO/END value.");
-        outBedFile << contig << "\t" << line->pos << "\t" << end[0];
+
+        bool anyPeak = false;
         for (int sampleID = 0; sampleID < numSamples; ++sampleID)
         {
-            outBedFile << "\t" << (cov0s.get()[sampleID] >= threshold);
+            if (cov0s.get()[sampleID] >= threshold)
+            {
+                anyPeak = true;
+                break;
+            }
         }
-        outBedFile << "\n";
+
+        if (anyPeak)
+        {
+            peakCount += 1;
+            ss.str("");
+            ss.clear();
+            ss << contig << "\t" << line->pos << "\t" << end[0] << "\n";
+
+            if (bgzf_write(outBgzf.get(), ss.str().c_str(), ss.str().size()) != ss.str().size())
+            {
+                throw std::runtime_error("Problem writing to BGZF BED file.");
+            }
+        }
     }
 }
 
