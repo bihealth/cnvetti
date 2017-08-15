@@ -1,0 +1,15 @@
+channels:
+- conda-forge
+- bioconda
+dependencies:
+- r-argparser
+- r-base =3.3.2.*
+- r-cairo
+- r-dplyr
+- r-futile.logger
+- r-maptools
+- r-plotrix
+- r-plotrix
+- r-plyr
+- r-readr
+- r-tidyr

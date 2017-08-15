@@ -1,7 +1,7 @@
 #!/bin/bash
 set -exuo pipefail
 
-HTSLIB_VERSION=1.4
+HTSLIB_VERSION=1.5
 CLI11_VERSION=0.8
 ARMA_VERSION=7.800.2
 

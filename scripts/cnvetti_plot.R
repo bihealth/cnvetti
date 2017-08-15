@@ -76,6 +76,9 @@ for (gene_bed in gene_files) {
     genes[[gene_bed]] = read_tsv(gene_bed, col_names = c('chrom', 'begin', 'end', 'gene'), col_types = 'ciic');
 }
 genes = do.call(rbind, genes);
+if (is.null(genes)) {
+    genes = data.frame(x=c());
+}
 genes$offset = chrom_offsets[genes$chrom,]$offset;
 genes$apos = (genes$offset + genes$begin + (genes$end - genes$begin) / 2) * 1e-6;
 genes$pos = (genes$begin + (genes$end - genes$begin) / 2) * 1e-6;

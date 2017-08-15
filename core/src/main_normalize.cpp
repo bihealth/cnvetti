@@ -23,6 +23,7 @@
 
 #include "cnvetti/program_options.h"
 
+#include <cmath>
 #include <cstdlib>
 #include <iostream>
 #include <map>
@@ -41,6 +42,8 @@
 
 namespace {  // anonymous namespace
 
+const double MAD_RES = 10000.0;
+
 // ---------------------------------------------------------------------------
 // Struct MedianStats
 // ---------------------------------------------------------------------------
@@ -53,6 +56,21 @@ struct MedianStats
     double cov0;
     double rc;
     double rc0;
+};
+
+// ---------------------------------------------------------------------------
+// Struct MadHistoEntry
+// ---------------------------------------------------------------------------
+
+struct MadHistoEntry
+{
+    MadHistoEntry() : cov(0), cov0(0), rc(0), rc0(0)
+    {}
+
+    int cov;
+    int cov0;
+    int rc;
+    int rc0;
 };
 
 // ---------------------------------------------------------------------------
@@ -80,6 +98,8 @@ private:
     void processChromosomes();
     // Process a region
     void processRegion(std::string const & contig, int beginPos, int endPos);
+    // Print statistics such as MAD.
+    void printStatistics(std::ostream & out);
 
     CnvettiNormalizeOptions const & options;
 
@@ -87,6 +107,13 @@ private:
     std::vector<
         std::map<int, MedianStats>
     > medianStats;
+
+    // Median absolute deviation of normalized value.
+    //
+    // madHisto[sampleID][(int)(MAD * 100)]
+    std::vector<
+        std::map<int, MadHistoEntry>
+    > madHistos;
 
     std::shared_ptr<bcf_srs_t> vcfReaderPtr;
     std::shared_ptr<vcfFile> vcfFileOutPtr;
@@ -116,6 +143,9 @@ void CnvettiNormalizeApp::run()
     if (options.verbosity >= 1)
         std::cerr << "\nPROCESSING\n\n";
     processChromosomes();
+
+    if (options.verbosity >= 1)
+        printStatistics(std::cerr);
 
     if (options.verbosity >= 1)
         std::cerr << "\nDone. Have a nice day!\n";
@@ -239,6 +269,7 @@ void CnvettiNormalizeApp::loadMedians()
     // Allocate median stats for all samples
     int const numSamples = bcf_hdr_nsamples(vcfHeaderIn);
     medianStats.resize(numSamples);
+    madHistos.resize(numSamples);
 
     while (bcf_sr_next_line(vcfReaderPtr.get()))
     {
@@ -423,10 +454,14 @@ void CnvettiNormalizeApp::processRegion(std::string const & contig, int beginPos
                 throw std::runtime_error("Could not get FORMAT/COV value");
             }
             for (int sampleID = 0; sampleID < bcf_hdr_nsamples(vcfHeaderOut); ++sampleID)
+            {
                 if (medianStats[sampleID][gcContent].cov)
                     values[sampleID] /= medianStats[sampleID][gcContent].cov;
                 else
                     values[sampleID] = 0;
+
+                madHistos[sampleID][abs(MAD_RES - round(MAD_RES * values[sampleID]))].cov += 1;
+            }
             bcf_update_format_float(vcfHeaderOut, line, "COV", values, sizeVals);
             free(values);
         }
@@ -442,10 +477,14 @@ void CnvettiNormalizeApp::processRegion(std::string const & contig, int beginPos
                 throw std::runtime_error("Could not get FORMAT/COV0 value");
             }
             for (int sampleID = 0; sampleID < bcf_hdr_nsamples(vcfHeaderOut); ++sampleID)
+            {
                 if (medianStats[sampleID][gcContent].cov0)
                     values[sampleID] /= medianStats[sampleID][gcContent].cov0;
                 else
                     values[sampleID] = 0;
+
+                madHistos[sampleID][abs(MAD_RES - round(MAD_RES * values[sampleID]))].cov0 += 1;
+            }
             bcf_update_format_float(vcfHeaderOut, line, "COV0", values, sizeVals);
             free(values);
         }
@@ -499,10 +538,14 @@ void CnvettiNormalizeApp::processRegion(std::string const & contig, int beginPos
                 throw std::runtime_error("Could not get FORMAT/RC value");
             }
             for (int sampleID = 0; sampleID < bcf_hdr_nsamples(vcfHeaderOut); ++sampleID)
+            {
                 if (medianStats[sampleID][gcContent].rc)
                     values[sampleID] /= medianStats[sampleID][gcContent].rc;
                 else
                     values[sampleID] = 0;
+
+                madHistos[sampleID][abs(MAD_RES - round(MAD_RES * values[sampleID]))].rc += 1;
+            }
             bcf_update_format_float(vcfHeaderOut, line, "RC", values, sizeVals);
             free(values);
         }
@@ -518,15 +561,113 @@ void CnvettiNormalizeApp::processRegion(std::string const & contig, int beginPos
                 throw std::runtime_error("Could not get FORMAT/RC0 value");
             }
             for (int sampleID = 0; sampleID < bcf_hdr_nsamples(vcfHeaderOut); ++sampleID)
+            {
                 if (medianStats[sampleID][gcContent].rc0)
                     values[sampleID] /= medianStats[sampleID][gcContent].rc0;
                 else
                     values[sampleID] = 0;
+
+                madHistos[sampleID][abs(MAD_RES - round(MAD_RES * values[sampleID]))].rc0 += 1;
+            }
             bcf_update_format_float(vcfHeaderOut, line, "RC0", values, sizeVals);
             free(values);
         }
 
         bcf_write(vcfFileOutPtr.get(), vcfHeaderOut, line);
+    }
+}
+
+double medianValue(std::map<int, int> const & histo)
+{
+    // Determine total number of value registered in histogram
+    int totalCount = 0;
+    for (auto const & pair : histo)
+        totalCount += pair.second;
+    if (totalCount == 0u)
+        return 0.0;  // Short-circuit if empty
+
+    // Compute median
+    int low;
+    int up;
+    if (totalCount % 2 == 0)
+    {
+        low = (totalCount / 2) - 1;
+        up = low + 1;
+    }
+    else
+    {
+        low = totalCount / 2;
+        up = low;
+    }
+
+    int a = -1, b = -1;
+    for (auto const & pair : histo)
+    {
+        int const val = pair.first;
+        int const num = pair.second;
+        if (a == -1 && num > low)
+            a = val;
+        else if (a == -1 && num <= low)
+            low -= num;
+        if (b == -1 && num > up)
+            b = val;
+        else if (b == -1 && num <= up)
+            up -= num;
+        if (a != -1 && b != -1)
+            break;
+    }
+
+    if (a == -1 && b == -1)
+        return 0.0;
+    else
+        return static_cast<double>(a + b) / 2.0;
+}
+
+void CnvettiNormalizeApp::printStatistics(std::ostream & out)
+{
+    std::cerr << "\nSTATISTICS\n\n";
+
+    for (int sampleID = 0; sampleID < bcf_hdr_nsamples(vcfHeaderOut); ++sampleID)
+    {
+        std::cerr << "SAMPLE: " << vcfHeaderOut->samples[sampleID] << "\n\n";
+
+        std::map<int, MadHistoEntry> const & madHisto = madHistos[sampleID];
+
+        // std::cerr << "\nAbsolute deviations coverage\n\n";
+        std::map<int, int> covHisto;
+        for (auto const & entry : madHisto)
+        {
+            // std::cerr << entry.first / MAD_RES << "\t" << entry.second.cov << "\n";
+            covHisto[entry.first] = entry.second.cov;
+        }
+        std::cerr << "\nMAD coverage: " << medianValue(covHisto) / MAD_RES * 100 << "%\n";
+
+        // std::cerr << "\nAbsolute deviations coverage (incl. q0)\n\n";
+        std::map<int, int> cov0Histo;
+        for (auto const & entry : madHisto)
+        {
+            // std::cerr << entry.first / MAD_RES << "\t" << entry.second.cov0 << "\n";
+            cov0Histo[entry.first] = entry.second.cov0;
+        }
+        std::cerr << "\nMAD coverage (incl. q0): " << medianValue(cov0Histo) / MAD_RES * 100 << "%\n";
+
+        // std::cerr << "\nAbsolute deviations read count\n\n";
+        std::map<int, int> rcHisto;
+        for (auto const & entry : madHisto)
+        {
+            // std::cerr << entry.first / MAD_RES << "\t" << entry.second.rc << "\n";
+            rcHisto[entry.first] = entry.second.rc;
+        }
+        std::cerr << "\nMAD read count: " << medianValue(rcHisto) / MAD_RES * 100 << "%\n";
+
+        // std::cerr << "\nAbsolute deviations read count (incl. q0)\n\n";
+        std::map<int, int> rc0Histo;
+        for (auto const & entry : madHisto)
+        {
+            // std::cerr << entry.first / MAD_RES << "\t" << entry.second.rc0 << "\n";
+            rc0Histo[entry.first] = entry.second.rc0;
+        }
+        std::cerr << "\nMAD read count (incl. q0): " << medianValue(rc0Histo) / MAD_RES * 100 << "%\n";
     }
 }
 

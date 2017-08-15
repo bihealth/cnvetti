@@ -220,7 +220,7 @@ void CnvettiPeaksApp::processRegionCreateHistogram(
     // Count samples.
     int const numSamples = bcf_hdr_nsamples(vcfHeaderIn);
 
-    // Compute histogram in bins of 0.01x.
+    // Compute histogram in bins in resolution of 0.01x.
     while (bcf_sr_next_line(vcfReaderPtr.get()))
     {
         bcf1_t * line = bcf_sr_get_line(vcfReaderPtr.get(), 0);
@@ -263,6 +263,9 @@ void CnvettiPeaksApp::processRegionWriteBed(
     int const numSamples = bcf_hdr_nsamples(vcfHeaderIn);
     std::stringstream ss;
 
+    int chunkBegin = 0;
+    int chunkEnd = 0;
+
     while (bcf_sr_next_line(vcfReaderPtr.get()))
     {
         bcf1_t * line = bcf_sr_get_line(vcfReaderPtr.get(), 0);
@@ -296,14 +299,43 @@ void CnvettiPeaksApp::processRegionWriteBed(
         if (anyPeak)
         {
             peakCount += 1;
-            ss.str("");
-            ss.clear();
-            ss << contig << "\t" << line->pos << "\t" << end[0] << "\n";
 
-            if (bgzf_write(outBgzf.get(), ss.str().c_str(), ss.str().size()) != ss.str().size())
+            if (chunkBegin == chunkEnd)  // first chunk
             {
-                throw std::runtime_error("Problem writing to BGZF BED file.");
+                chunkBegin = line->pos;
+                chunkEnd = end[0];
             }
+            else
+            {
+                if (chunkEnd == line->pos)  // extend
+                {
+                    chunkEnd = end[0];
+                }
+                else  // write out and create new chunk
+                {
+                    ss.str("");
+                    ss.clear();
+                    ss << contig << "\t" << chunkBegin << "\t" << chunkEnd << "\n";
+                    if (bgzf_write(outBgzf.get(), ss.str().c_str(), ss.str().size()) != ss.str().size())
+                    {
+                        throw std::runtime_error("Problem writing to BGZF BED file.");
+                    }
+
+                    chunkBegin = line->pos;
+                    chunkEnd = end[0];
+                }
+            }
+        }
+    }
+
+    if (chunkBegin != chunkEnd)
+    {
+        ss.str("");
+        ss.clear();
+        ss << contig << "\t" << chunkBegin << "\t" << chunkEnd << "\n";
+        if (bgzf_write(outBgzf.get(), ss.str().c_str(), ss.str().size()) != ss.str().size())
+        {
+            throw std::runtime_error("Problem writing to BGZF BED file.");
         }
     }
 }

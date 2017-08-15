@@ -43,6 +43,7 @@
 
 #include "cnvetti/contig_selection.h"
 #include "cnvetti/histo_stats.h"
+#include "cnvetti/interval_tree.h"
 #include "cnvetti/program_options.h"
 #include "cnvetti/utils.h"
 #include "cnvetti/version.h"
@@ -79,7 +80,8 @@ public:
             return 1.0 * numQ0Bases / numBases;
     }
 
-    // Mark bin as done (triggers stdev computation)
+    // Mark bin as done (triggers stdev computation; stdev computation
+    // currently only works correctly when not using peaks BED).
     void markAsDone(unsigned windowLength)
     {
         stdev = 0;
@@ -150,6 +152,19 @@ public:
 };
 
 // ---------------------------------------------------------------------------
+// Class MaskedBins
+// ---------------------------------------------------------------------------
+
+struct MaskedBins
+{
+    std::vector<ChromosomeBin> bins;
+    IntervalTree<void> maskedRegions;
+
+    bool hasMaskedRegions() const
+    { return !maskedRegions.empty(); }
+};
+
+// ---------------------------------------------------------------------------
 // Class ChromosomeBinCounter
 // ---------------------------------------------------------------------------
 
@@ -176,7 +191,7 @@ public:
     // Ran after processing last region on chromosome
     void finalize();
 
-    std::vector<std::vector<ChromosomeBin>> const & getBins()
+    std::vector<MaskedBins> const & getBins()
     { return bins; }
 
 private:
@@ -185,19 +200,27 @@ private:
     void init();
 
     // Read the given file and update the given bins list.
-    void processRegion(std::vector<std::vector<ChromosomeBin>> & bins,
+    void processRegion(std::vector<MaskedBins> & bins,
                        GenomicRegion const & region,
                        unsigned fileID);
 
     // Increment counters in bins.
-    void incrementCounters(std::vector<ChromosomeBin> & bins, int beginPos, int endPos, bool isQ0Read);
+    void incrementCounters(
+        MaskedBins & bins, int beginPos, int endPos, bool isQ0Read,
+        std::vector<IntervalTree<void>::TInterval> const & intervalBuffer);
 
     // Mark chromosome bins up to the given window ID as done (triggers stdev computation and frees
     // memory required for stdev computation)
     void markBinsDone(int windowID);
 
-    // bins[rgID][binsID]
-    std::vector<std::vector<ChromosomeBin>> bins;
+    // Load the masked regions from options.peaksBedFile if given.
+    void loadMaskedRegions();
+
+    // Scale the bin statistics with with 1/unmasked-ratio.
+    void scaleBinStats();
+
+    // bins[rgID].bins[binsID]
+    std::vector<MaskedBins> bins;
 
     // Mapping from read group name to ID
     std::map<std::string, int> rgToSampleID;
@@ -224,7 +247,9 @@ void ChromosomeBinCounter::init()
         numSamples = std::max((unsigned)pair.second + 1, numSamples);
     bins.resize(numSamples);
     for (unsigned i = 0; i < bins.size(); ++i)
-        bins[i].resize(numBins, ChromosomeBin(0u));
+        bins[i].bins.resize(numBins, ChromosomeBin(0u));
+
+    loadMaskedRegions();
 }
 
 void ChromosomeBinCounter::run(GenomicRegion const & region)
@@ -240,9 +265,36 @@ void ChromosomeBinCounter::finalize()
         uint32_t const chromLen = bamHeadersIn[0].get()->target_len[rID];
         markBinsDone(chromLen / options.windowLength);
     }
+
+    scaleBinStats();
 }
 
-void ChromosomeBinCounter::processRegion(std::vector<std::vector<ChromosomeBin>> & bins,
+double unclippedRatio(bam1_t const * record)
+{
+    int basesClipped = 0;
+    int basesUnclipped = 0;
+
+    for (unsigned i = 0; i < record->core.n_cigar; ++i)
+    {
+        char const cigarType = bam_cigar_opchr(bam_get_cigar(record)[i]);
+        uint32_t const cigarCount = bam_cigar_oplen(bam_get_cigar(record)[i]);
+        switch (cigarType)
+        {
+            case 'H':
+            case 'S':
+                basesClipped += cigarCount;
+            case 'I':
+            case 'M':
+            case '=':
+            case 'X':
+                basesUnclipped += cigarCount;
+        }
+    }
+
+    return (1.0 * basesUnclipped) / (basesClipped + basesUnclipped);
+}
+
+void ChromosomeBinCounter::processRegion(std::vector<MaskedBins> & bins,
                                          GenomicRegion const & region,
                                          unsigned fileID)
 {
@@ -253,6 +305,9 @@ void ChromosomeBinCounter::processRegion(std::vector<std::vector<ChromosomeBin>>
         throw std::runtime_error("Problem opening BAI index file");
 
     std::string tagValue;
+
+    // Buffer for regions masks.
+    std::vector<IntervalTree<void>::TInterval> maskedIntervals;
 
     // Jump to the correct position
     std::string regionS(region.toString());
@@ -267,41 +322,48 @@ void ChromosomeBinCounter::processRegion(std::vector<std::vector<ChromosomeBin>>
     {
         bam1_core_t const & recordCore = record.get()->core;
 
-        if (recordCore.flag & BAM_FUNMAP)
-            continue;  // skip unaligned records
+        // Ignore unaligned, duplicate, secondary, supplementary alignments and, if configured,
+        // discordant pairs.
+        if ((recordCore.flag & (BAM_FUNMAP | BAM_FSECONDARY | BAM_FSUPPLEMENTARY | BAM_FDUP)) ||
+            (options.ignoreDiscordantPairs && !(recordCore.flag & BAM_FPROPER_PAIR)))
+        {
+            continue;
+        }
+
+        // Ignore reads with too low alignment quality.
+        if (recordCore.qual < options.minAlignmentQuality)
+        {
+            continue;
+        }
 
         const unsigned nCigar = recordCore.n_cigar;
         int const beginPos = recordCore.pos;
         int endPos = beginPos + bam_cigar2rlen(nCigar, bam_get_cigar(record.get()));
 
         if (endPos <= region.beginPos)
+        {
             continue;  // skip, left of region
+        }
 
         // Ignore reads with too much clipping
-        int basesClipped = 0, basesUnclipped = 0;
-        for (unsigned i = 0; i < nCigar; ++i)
+        if (100 * unclippedRatio(record.get()) < options.minUnclipped)
         {
-            char const cigarType = bam_cigar_opchr(bam_get_cigar(record.get())[i]);
-            uint32_t const cigarCount = bam_cigar_oplen(bam_get_cigar(record.get())[i]);
-            switch (cigarType)
-            {
-                case 'H':
-                case 'S':
-                    basesClipped += cigarCount;
-                case 'I':
-                case 'M':
-                case '=':
-                case 'X':
-                    basesUnclipped += cigarCount;
-            }
-        }
-        if ((100.0 * basesUnclipped) / (basesClipped + basesUnclipped) < options.minUnclipped)
             continue;
+        }
 
-        // TODO: count correctly for full overlap alignments
-        if (recordCore.tid == recordCore.mtid && recordCore.mpos >= recordCore.mpos &&
+        // Ignore second read in case of full overlap alignments.
+        if (recordCore.tid == recordCore.mtid && recordCore.pos == recordCore.mpos &&
+                (recordCore.flag & BAM_FREAD2))
+        {
+            continue;
+        }
+
+        // Don't count overlapping bases twice.
+        if (recordCore.tid == recordCore.mtid && recordCore.pos < recordCore.mpos &&
                 endPos > recordCore.mpos)
-            endPos = recordCore.mpos;  // don't count overlapping bases twice
+        {
+            endPos = recordCore.mpos;
+        }
 
         // Get RG tag
         uint8_t * ptr = bam_aux_get(record.get(), "RG");
@@ -315,14 +377,25 @@ void ChromosomeBinCounter::processRegion(std::vector<std::vector<ChromosomeBin>>
             throw std::runtime_error(std::string("Unknown RG ID found! ") + rg);
         int const rgID = it->second;
 
-        incrementCounters(bins[rgID], beginPos, endPos, recordCore.qual == 0u);
-        if (recordCore.flag & BAM_FREAD1)
+        // Query for masked regions, if any.
+        if (bins[rgID].hasMaskedRegions()) {
+            bins[rgID].maskedRegions.findOverlapping(beginPos, endPos, maskedIntervals);
+            std::cerr << "processRegion -- findOverlapping(" << beginPos << ", "
+                      << endPos << ", " << maskedIntervals.size() << ")\n";
+        }
+
+        // Increment base-wise counters.
+        incrementCounters(
+            bins[rgID], beginPos, endPos, recordCore.qual == 0u, maskedIntervals);
+
+        // Increment read counters.
+        if ((recordCore.flag & BAM_FREAD1) && maskedIntervals.empty())
         {
             int const pos = beginPos / options.windowLength;
             if (recordCore.qual == 0u)
-                bins[rgID][pos].numQ0FirstReads += 1;
+                bins[rgID].bins[pos].numQ0FirstReads += 1;
             else
-                bins[rgID][pos].numFirstReads += 1;
+                bins[rgID].bins[pos].numFirstReads += 1;
         }
 
         if (beginPos / options.windowLength > 0u && options.computeBinStdevs)
@@ -330,38 +403,187 @@ void ChromosomeBinCounter::processRegion(std::vector<std::vector<ChromosomeBin>>
     }
 }
 
-void ChromosomeBinCounter::incrementCounters(std::vector<ChromosomeBin> & bins, int beginPos, int endPos,
-                                             bool isQ0Read)
+void ChromosomeBinCounter::incrementCounters(
+    MaskedBins & maskedBins, int beginPos, int endPos, bool isQ0Read,
+    std::vector<IntervalTree<void>::TInterval> const & maskedIntervals)
 {
+    // Note that this function contains an inner loop and thus contains some
+    // redundancy for optimized running time.
+
     if (options.verbosity >= 3)
-        std::cerr << "incrementCounters(bins, " << beginPos << ", " << endPos << ", " << isQ0Read << ")\n";
-    if (isQ0Read)
+        std::cerr << "incrementCounters(maskedBins, " << beginPos << ", " << endPos << ", " << isQ0Read << ", maskedIntervals)\n";
+
+    auto func = [&](int beginPos, int endPos)
     {
-        for (int pos = beginPos; pos < endPos; ++pos)
+        if (isQ0Read)
         {
-            if (options.computeBinStdevs)
-                bins[pos / options.windowLength].registerDetailCoverageQ0(pos % options.windowLength);
-            bins[pos / options.windowLength].numQ0Bases += 1;
+            for (int pos = beginPos; pos < endPos; ++pos)
+            {
+                if (options.computeBinStdevs)
+                    maskedBins.bins[pos / options.windowLength].registerDetailCoverageQ0(pos % options.windowLength);
+                maskedBins.bins[pos / options.windowLength].numQ0Bases += 1;
+            }
         }
-    }
-    else
+        else
+        {
+            for (int pos = beginPos; pos < endPos; ++pos)
+            {
+                maskedBins.bins[pos / options.windowLength].registerDetailCoverage(pos % options.windowLength);
+                maskedBins.bins[pos / options.windowLength].numBases += 1;
+            }
+        }
+    };
+
+    std::vector<IntervalTree<void>::TInterval>::const_iterator it =
+        maskedIntervals.begin();
+    std::vector<IntervalTree<void>::TInterval>::const_iterator const itEnd =
+        maskedIntervals.end();
+
+    int fragBegin = beginPos;
+    int fragEnd = endPos;
+    for (; it != itEnd; ++it)
     {
-        for (int pos = beginPos; pos < endPos; ++pos)
-        {
-            if (options.computeBinStdevs)
-                bins[pos / options.windowLength].registerDetailCoverage(pos % options.windowLength);
-            bins[pos / options.windowLength].numBases += 1;
+        fragEnd = endPos;
+        if (it != itEnd && it->beginPos < endPos) {
+            fragEnd = it->beginPos;
         }
+        func(fragBegin, fragEnd);
+        fragBegin = it->endPos;
     }
+    func(fragBegin, fragEnd);
 }
 
 void ChromosomeBinCounter::markBinsDone(int windowID)
 {
-    for (/*nop*/; doneUpToWindow < windowID && doneUpToWindow < bins[0].size(); ++doneUpToWindow)
+    for (/*nop*/; doneUpToWindow < windowID && doneUpToWindow < bins[0].bins.size(); ++doneUpToWindow)
         for (auto & rgBins : bins)
-            rgBins[doneUpToWindow].markAsDone(options.windowLength);
+            rgBins.bins[doneUpToWindow].markAsDone(options.windowLength);
 }
 
+void ChromosomeBinCounter::loadMaskedRegions()
+{
+    if (options.peaksBedFile.empty())
+    {
+        return;  // short-circuit, nothing to do
+    }
+
+    if (options.verbosity >= 2)
+    {
+        std::cerr << "Loading masked regions from " << options.peaksBedFile << "\n";
+    }
+
+    typedef IntervalTree<void>::TInterval TInterval;
+    std::vector<TInterval> intervals;
+
+    // Open BED file.
+    std::unique_ptr<htsFile, int (&)(htsFile *)> fnPtr(
+        hts_open(options.peaksBedFile.c_str(), "r"),
+        hts_close);
+    htsFile *fn = fnPtr.get();
+
+    // Open tabix file.
+    std::unique_ptr<tbx_t, void (&)(tbx_t *)> peaksBedIdxPtr(
+        tbx_index_load(options.peaksBedFile.c_str()),
+        tbx_destroy);
+    tbx_t * idx = peaksBedIdxPtr.get();  // shortcut
+    if (!idx)
+    {
+        throw std::runtime_error("Could not load peaks BED tabix index.");
+    }
+
+    // Get coordinates to query for.
+    char const * contigName = bamHeadersIn[0].get()->target_name[rID];
+    int const endPos = bamHeadersIn[0].get()->target_len[rID];
+    std::stringstream regionS;
+    regionS << contigName << ":1" << "-" << endPos;
+
+    // Load all peak intervals.
+    std::unique_ptr<hts_itr_t, void (&)(hts_itr_t *)> itrPtr(
+        tbx_itr_querys(idx, regionS.str().c_str()), hts_itr_destroy);
+    hts_itr_t * itr = itrPtr.get();
+    if (!itr)
+    {
+        throw std::runtime_error("Could not jump to start of chrom.");
+    }
+    kstring_t record { 0, 0, nullptr };
+
+    std::stringstream ss;
+    std::string chrom;
+    int bedBeginPos, bedEndPos;
+    while (tbx_itr_next(fn, idx, itr, &record) > 0)
+    {
+        ss.str(record.s);
+        ss.clear();
+        ss >> chrom;
+        ss >> bedBeginPos;
+        ss >> bedEndPos;
+
+        // Add boundary around peaks.
+        bedBeginPos = std::max(0, bedBeginPos - options.peakBoundary);
+        bedEndPos = std::min(endPos, bedEndPos + options.peakBoundary);
+
+        // Append or extend previous interval.
+        if (intervals.empty() || bedBeginPos > intervals.back().endPos)
+        {
+            if (!intervals.empty())
+                std::cerr << "interval: " << intervals.back().beginPos << "-" << intervals.back().endPos << "\n";
+            intervals.push_back(TInterval(bedBeginPos, bedEndPos));
+        }
+        else
+        {
+            intervals.back().endPos = std::max(intervals.back().endPos, bedEndPos);
+        }
+    }
+    if (!intervals.empty())
+        std::cerr << "interval: " << intervals.back().beginPos << "-" << intervals.back().endPos << "\n";
+
+    for (auto & maskedBins : bins) {
+        maskedBins.maskedRegions = IntervalTree<void>(
+            intervals.begin(), intervals.end());
+    }
+
+    if (options.verbosity >= 2)
+    {
+        std::cerr << "DONE loading masked regions";
+    }
+}
+
+void ChromosomeBinCounter::scaleBinStats()
+{
+    std::vector<IntervalTree<void>::TInterval> intervals;
+
+    for (auto & maskedBins : bins)  // for each RG
+    {
+        for (unsigned windowId = 0; windowId < maskedBins.bins.size(); ++windowId)
+        {
+            int unmaskedLength = options.windowLength;  // original window size
+            IntervalTree<void>::TInterval window(
+                windowId * options.windowLength, (windowId + 1) * options.windowLength);
+            intervals.clear();
+            maskedBins.maskedRegions.findOverlapping(
+                window.beginPos, window.endPos, intervals);
+            std::cerr << "scaleBinStats -- findOverlapping(" << window.beginPos << ", "
+                      << window.endPos << ", " << intervals.size() << ")\n";
+
+            // This assumes non-overlapping mask windows!
+            for (auto const & maskedInterval : intervals)
+            {
+                if (window.overlapLength(maskedInterval) > unmaskedLength)
+                {
+                    throw std::runtime_error("Overlap longer than window?!");
+                }
+                unmaskedLength -= window.overlapLength(maskedInterval);
+            }
+
+            double const scaleFactor = (1.0 * options.windowLength) / unmaskedLength;
+            auto & entry = maskedBins.bins[windowId];
+            entry.numBases *= scaleFactor;
+            entry.numQ0Bases *= scaleFactor;
+            entry.numFirstReads *= scaleFactor;
+            entry.numQ0FirstReads *= scaleFactor;
+        }
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Class CnvettiCoverageApp
@@ -393,7 +615,7 @@ private:
     void processGenomicRegions();
 
     // Print bins to VCF file.
-    void printBinsToVcf(std::vector<std::vector<ChromosomeBin>> const & bins, int rID);
+    void printBinsToVcf(std::vector<MaskedBins> const & bins, int rID);
 
     // Print statistics to VCF file at the very end
     void printStatisticsToVCF();
@@ -642,6 +864,10 @@ void CnvettiCoverageApp::openFiles()
     bcf_hdr_printf(vcfHeader.get(),
         "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">");
     bcf_hdr_printf(vcfHeader.get(),
+        "##FORMAT=<ID=MAXCOV,Number=1,Type=Float,Description=\"Maximal coverage of non-q0 reads in windows\">");
+    bcf_hdr_printf(vcfHeader.get(),
+        "##FORMAT=<ID=MAXCOV0,Number=1,Type=Float,Description=\"Maximal coverage of q0+non-q0 reads in windows\">");
+    bcf_hdr_printf(vcfHeader.get(),
         "##FORMAT=<ID=COV,Number=1,Type=Float,Description=\"Average coverage with non-q0 reads\">");
     bcf_hdr_printf(vcfHeader.get(),
         "##FORMAT=<ID=COV0,Number=1,Type=Float,Description=\"Average coverage with q0+non-q0 reads\">");
@@ -767,13 +993,13 @@ void CnvettiCoverageApp::processGenomicRegions()
         std::cerr << " DONE\n";
 }
 
-void CnvettiCoverageApp::printBinsToVcf(std::vector<std::vector<ChromosomeBin>> const & bins, int rID)
+void CnvettiCoverageApp::printBinsToVcf(std::vector<MaskedBins> const & bins, int rID)
 {
     std::vector<double> const gcContent(getGCContent(rID));
     std::vector<bool> const hasGap(getHasGap(rID));
     std::vector<double> const mapability(getMapability(rID));
 
-    unsigned numWindows = bins[0].size();
+    unsigned numWindows = bins[0].bins.size();
     for (unsigned windowID = 0; windowID < numWindows; ++windowID)
     {
         std::unique_ptr<bcf1_t, void (&)(bcf1_t*)> recordPtr(bcf_init(), bcf_destroy);
@@ -812,7 +1038,7 @@ void CnvettiCoverageApp::printBinsToVcf(std::vector<std::vector<ChromosomeBin>> 
         std::vector<float> cov(sampleNames.size(), 0.0);
         for (unsigned i = 0; i < sampleNames.size(); ++i)
         {
-            cov[i] = bins[i][windowID].coverage(options.windowLength);
+            cov[i] = bins[i].bins[windowID].coverage(options.windowLength);
             if (!hasGap[windowID])  // ignore if overlapping with gap
                 statsHandler->registerValue(i, StatsMetric::COV, valGCContent, cov[i]);
         }
@@ -822,7 +1048,7 @@ void CnvettiCoverageApp::printBinsToVcf(std::vector<std::vector<ChromosomeBin>> 
         std::vector<float> covQ0(sampleNames.size(), 0.0);
         for (unsigned i = 0; i < sampleNames.size(); ++i)
         {
-            covQ0[i] = bins[i][windowID].coverageQ0(options.windowLength) + cov[i];
+            covQ0[i] = bins[i].bins[windowID].coverageQ0(options.windowLength) + cov[i];
             if (!hasGap[windowID])  // ignore if overlapping with gap
                 statsHandler->registerValue(i, StatsMetric::COV0, valGCContent, covQ0[i]);
         }
@@ -832,7 +1058,7 @@ void CnvettiCoverageApp::printBinsToVcf(std::vector<std::vector<ChromosomeBin>> 
         std::vector<float> winsd(sampleNames.size(), 0.0);
         for (unsigned i = 0; i < sampleNames.size(); ++i)
         {
-            winsd[i] = bins[i][windowID].stdev;
+            winsd[i] = bins[i].bins[windowID].stdev;
             if (!hasGap[windowID])  // ignore if overlapping with gap
                 statsHandler->registerValue(i, StatsMetric::WINSD, valGCContent, winsd[i]);
         }
@@ -842,31 +1068,31 @@ void CnvettiCoverageApp::printBinsToVcf(std::vector<std::vector<ChromosomeBin>> 
         std::vector<float> winsdQ0(sampleNames.size(), 0.0);
         for (unsigned i = 0; i < sampleNames.size(); ++i)
         {
-            winsdQ0[i] = bins[i][windowID].stdevQ0;
+            winsdQ0[i] = bins[i].bins[windowID].stdevQ0;
             if (!hasGap[windowID])  // ignore if overlapping with gap
                 statsHandler->registerValue(i, StatsMetric::WINSD0, valGCContent, winsdQ0[i]);
         }
         bcf_update_format_float(vcfHeader.get(), record, "WINSD0", &winsdQ0[0], winsdQ0.size());
 
         // RC
-        std::vector<int32_t> rc(sampleNames.size(), 0);
+        std::vector<float> rc(sampleNames.size(), 0);
         for (unsigned i = 0; i < sampleNames.size(); ++i)
         {
-            rc[i] = bins[i][windowID].numFirstReads;
+            rc[i] = bins[i].bins[windowID].numFirstReads;
             if (!hasGap[windowID])  // ignore if overlapping with gap
                 statsHandler->registerValue(i, StatsMetric::RC, valGCContent, rc[i]);
         }
-        bcf_update_format_int32(vcfHeader.get(), record, "RC", &rc[0], rc.size());
+        bcf_update_format_float(vcfHeader.get(), record, "RC", &rc[0], rc.size());
 
         // RC0
-        std::vector<int32_t> rc0(sampleNames.size(), 0);
+        std::vector<float> rc0(sampleNames.size(), 0);
         for (unsigned i = 0; i < sampleNames.size(); ++i)
         {
-            rc0[i] = bins[i][windowID].numQ0FirstReads + rc[i];
+            rc0[i] = bins[i].bins[windowID].numQ0FirstReads + rc[i];
             if (!hasGap[windowID])  // ignore if overlapping with gap
                 statsHandler->registerValue(i, StatsMetric::RC0, valGCContent, rc0[i]);
         }
-        bcf_update_format_int32(vcfHeader.get(), record, "RC0", &rc0[0], rc.size());
+        bcf_update_format_float(vcfHeader.get(), record, "RC0", &rc0[0], rc.size());
 
         bcf_write(vcfFileOut.get(), vcfHeader.get(), record);
     }
@@ -948,42 +1174,6 @@ void CnvettiCoverageApp::printStatisticsToVCF()
     }
 }
 
-// parse mapability bed
-int regidx_parse_mapability_bed(const char *line, char **chr_beg, char **chr_end, reg_t *reg, void *payload, void *usr)
-{
-    char *ss = (char*) line;
-    while ( *ss && isspace(*ss) ) ss++;
-    if ( !*ss ) return -1;      // skip blank lines
-    if ( *ss=='#' ) return -1;  // skip comments
-
-    char *se = ss;
-    while ( *se && !isspace(*se) ) se++;
-    if ( !*se ) { fprintf(stderr,"Could not parse bed line: %s\n", line); return -2; }
-
-    *chr_beg = ss;
-    *chr_end = se-1;
-
-    ss = se+1;
-    reg->start = hts_parse_decimal(ss, &se, 0);
-    if ( ss==se ) { fprintf(stderr,"Could not parse bed line: %s\n", line); return -2; }
-
-    ss = se+1;
-    reg->end = hts_parse_decimal(ss, &se, 0) - 1;
-    if ( ss==se ) { fprintf(stderr,"Could not parse bed line: %s\n", line); return -2; }
-
-    if ( !isspace(*se) ) { fprintf(stderr, "mapability missing in bed line: %s\n", line); return -2; }
-    ++se;
-    float map = -1;
-    if (sscanf(se, "%f", &map) != 1 || map == -1)
-    {
-        fprintf(stderr, "mapability float not parseable in bed line: %s\n", line);
-        return -2;
-    }
-    *((float*)payload) = map;
-
-    return 0;
-}
-
 std::vector<double> CnvettiCoverageApp::getMapability(int rID) const
 {
     std::vector<double> result;
@@ -992,31 +1182,52 @@ std::vector<double> CnvettiCoverageApp::getMapability(int rID) const
         return result;
     }
 
-    // Open mapability BED file and tabix index
-    std::unique_ptr<regidx_t, void (&)(regidx_t *)> bedRegIdxPtr(
-        regidx_init(options.mapabilityBedFileName.c_str(), regidx_parse_mapability_bed, NULL, sizeof(float), NULL),
-        regidx_destroy);
-    regidx_t * idx = bedRegIdxPtr.get();  // shortcut
+    // Open BED file.
+    std::unique_ptr<htsFile, int (&)(htsFile *)> fnPtr(
+        hts_open(options.mapabilityBedFileName.c_str(), "r"),
+        hts_close);
+    htsFile *fn = fnPtr.get();
+
+    // Open tabix file.
+    std::unique_ptr<tbx_t, void (&)(tbx_t *)> mapBedIdxPtr(
+        tbx_index_load(options.mapabilityBedFileName.c_str()),
+        tbx_destroy);
+    tbx_t * idx = mapBedIdxPtr.get();  // shortcut
     if (!idx)
-        throw std::runtime_error("Could not open mapability BED file");
+    {
+        throw std::runtime_error("Could not load mapability BED tabix index.");
+    }
 
     // Get coordinates to query for
     char const * contigName = bamHeadersIn[0].get()->target_name[rID];
-    int const beginPos = 0;
     int const endPos = bamHeadersIn[0].get()->target_len[rID];
+    std::stringstream regionS;
+    regionS << contigName << ":1" << "-" << endPos;
 
     // Query overlap with contigName:(beginPos + 1)-endPos
-    regitr_t itr;
-    if (!regidx_overlap(idx, contigName, beginPos, endPos, &itr)) {
-        std::cerr << "INFO: no mapability entries for contig " << contigName << "\n";
-        return result;
-    }
-    result.resize((endPos + options.windowLength) / options.windowLength, 0.0);
-    while (REGITR_OVERLAP(itr, beginPos, endPos))
+    std::unique_ptr<hts_itr_t, void (&)(hts_itr_t *)> itrPtr(
+        tbx_itr_querys(idx, regionS.str().c_str()), hts_itr_destroy);
+    hts_itr_t * itr = itrPtr.get();
+    if (!itr)
     {
-        int const bedBeginPos = REGITR_START(itr);
-        int const bedEndPos = REGITR_END(itr);
-        float const mapability = REGITR_PAYLOAD(itr, float);
+        throw std::runtime_error("Could not jump to start of chrom.");
+    }
+
+    result.resize((endPos + options.windowLength) / options.windowLength, 0.0);
+    kstring_t record { 0, 0, nullptr };
+    std::stringstream ss;
+    std::string chrom;
+    int bedBeginPos, bedEndPos;
+    float mapability;
+
+    while (tbx_itr_next(fn, idx, itr, &record) > 0)
+    {
+        ss.str(record.s);
+        ss.clear();
+        ss >> chrom;
+        ss >> bedBeginPos;
+        ss >> bedEndPos;
+        ss >> mapability;
 
         int windowID = bedBeginPos / options.windowLength;
         auto windowBegin = [&]() { return windowID * options.windowLength; };
@@ -1028,8 +1239,6 @@ std::vector<double> CnvettiCoverageApp::getMapability(int rID) const
                 windowEnd(), bedEndPos) - std::max(windowBegin(), bedBeginPos);
             result[windowID] += (len / options.windowLength) * mapability;
         }
-
-        itr.i++;
     }
 
     return result;
@@ -1076,7 +1285,15 @@ std::vector<double> CnvettiCoverageApp::getGCContent(int rID) const
         for (; (pos < offset + options.windowLength) && (pos < contigLength); ++pos)
             if (isGC(seq[pos]))
                 numGC++;
-        gcContent[offset / options.windowLength] = 1.0 * numGC / (pos - offset);
+        unsigned const windowId = offset / options.windowLength;
+        gcContent[windowId] = 1.0 * numGC / (pos - offset);
+        // Scale for GC content step size.
+        if (options.gcStepSize != 1.0)
+        {
+            gcContent[windowId] = (
+                round(100.0 * gcContent[windowId] / options.gcStepSize) *
+                options.gcStepSize / 100.0);
+        }
     }
 
     return gcContent;

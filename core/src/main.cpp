@@ -91,6 +91,10 @@ int main(int argc, char ** argv)
     )->group("Input / Output");
 
     covApp->add_flag(
+        "--ignore-discordant-pairs", covOptions.ignoreDiscordantPairs,
+        "Ignore discordant pairs (for second pass, targeted seq.)"
+    )->group("Algorithm Parameters");
+    covApp->add_flag(
         "--compute-bin-stdevs", covOptions.computeBinStdevs,
         "Whether or not to compute per-bin stdevs in coverage"
     )->group("Algorithm Parameters");
@@ -99,9 +103,26 @@ int main(int argc, char ** argv)
         "Window length to use"
     )->group("Algorithm Parameters");
     covApp->add_option(
+        "--min-alignment-quality", covOptions.minAlignmentQuality,
+        "Minimal alignment quality to enforce"
+    )->group("Algorithm Parameters");
+    covApp->add_option(
+        "--gc-step-size", covOptions.gcStepSize,
+        "GC step size to use"
+    )->group("Algorithm Parameters");
+    covApp->add_option(
         "--min-unclipped", covOptions.minUnclipped,
         "Minimal unclipped fraction of reads to keep, in percent"
     )->group("Algorithm Parameters");
+
+    covApp->add_option(
+        "--peaks-bed-file", covOptions.peaksBedFile,
+        "Peaks BED file from 'cnvetti peaks' output"
+    )->group("Off-Target Read Processing");
+    covApp->add_option(
+        "--peak-boundary", covOptions.peakBoundary,
+        "Number of base pairs to ignore adjacent to peak windows"
+    )->group("Off-Target Read Processing");
 
     // Add sub command `cnvetti peaks`
 
@@ -154,6 +175,11 @@ int main(int argc, char ** argv)
         "--num-io-threads", normOptions.numIOThreads,
         "Number of threads to use for de-/compression in I/O"
     )->group("Input / Output");
+
+    cnvettiNormalize->add_option(
+        "--min-gc-window-count", normOptions.minGCWindowCount,
+        "Flag GC contents with fewer windows as FEW_GCWINDOWS"
+    )->group("Algorithm Parameters");
 
     // Add sub command `cnvetti ratio`
 

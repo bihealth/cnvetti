@@ -67,7 +67,11 @@ void CnvettiCoverageOptions::print(std::ostream & out) const
         << "    computeBinStdevs:      " << trueFalse(computeBinStdevs) << "\n"
         << "    windowLength:          " << windowLength << "\n"
         << "    minUnclipped:          " << minUnclipped << " # percent\n"
+        << "    ignoreDiscordantPairs: " << trueFalse(ignoreDiscordantPairs) << "\n"
         << "    numIOThreads:          " << numIOThreads << "\n"
+        << "    peaksBedFile:          '" << peaksBedFile << "'\n"
+        << "    windowBoundary:        " << peakBoundary << "\n"
+        << "    gcStepSize:            " << gcStepSize << "\n"
         << "\n";
 }
 
