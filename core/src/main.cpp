@@ -83,7 +83,11 @@ int main(int argc, char ** argv)
     )->group("Input / Output");
     covApp->add_option(
         "--mapability-bed", covOptions.mapabilityBedFileName,
-        "Path to mapability BED file (required)"
+        "Path to mapability BED file"
+    )->check(CLI::ExistingFile)->group("Input / Output");
+    covApp->add_option(
+        "--target-bed", covOptions.targetBedFile,
+        "Path to target BED file (optional)"
     )->check(CLI::ExistingFile)->group("Input / Output");
     covApp->add_option(
         "--num-io-threads", covOptions.numIOThreads,
@@ -270,8 +274,8 @@ int main(int argc, char ** argv)
     });
     cnvettiSegment->add_option(
         "--min-mapability", segOptions.minMapability,
-        "Minimal mapability value of windows to consider"
-    )->group("Segmentation Algorithm");
+        "Minimal mapability value of windows to consider (required)"
+    )->required()->group("Segmentation Algorithm");
     cnvettiSegment->add_option(
         "--min-gc", segOptions.minGC,
         "Minimal GC value of windows to consider"

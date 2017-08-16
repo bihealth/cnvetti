@@ -639,11 +639,17 @@ private:
     // has not been given.
     std::vector<double> getMapability(int rID) const;
 
+    // Return flags whether bin is on target.
+    std::vector<bool> getIsOnTarget(int rID);
+
     // Program configuration.
     CnvettiCoverageOptions options;
 
     // Genomic regions to process
     std::vector<GenomicRegion> genomicRegions;
+
+    // Whether or not a bin is on target.
+    std::vector<bool> binIsOnTarget;
 
     // Mapping from read group name to read group.
     std::map<std::string, int> rgToSampleID;
@@ -866,6 +872,8 @@ void CnvettiCoverageApp::openFiles()
     bcf_hdr_printf(vcfHeader.get(),
         "##INFO=<ID=GAP,Number=0,Type=Flag,Description=\"Window overlaps with N in reference (gap)\">");
     bcf_hdr_printf(vcfHeader.get(),
+        "##INFO=<ID=ONTARGET,Number=0,Type=Flag,Description=\"Is on-target bin\">");
+    bcf_hdr_printf(vcfHeader.get(),
         "##INFO=<ID=GCWINDOWS,Number=1,Type=Integer,Description=\"Number of windows with same GC content\">");
     bcf_hdr_printf(vcfHeader.get(),
         "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">");
@@ -922,6 +930,75 @@ void CnvettiCoverageApp::checkFiles()
                       << "         I will set G+C content to 0 for this contig.\n";
         }
     }
+}
+
+std::vector<bool> CnvettiCoverageApp::getIsOnTarget(int rID)
+{
+    std::vector<bool> result;
+
+    char const * contigName = bamHeadersIn[0].get()->target_name[rID];
+    int const contigLength = bamHeadersIn[0].get()->target_len[rID];
+    std::stringstream regionS;
+    regionS << contigName << ":1" << "-" << contigLength;
+
+    if (options.targetBedFile.empty())
+    {
+        result.resize((contigLength + options.windowLength) / options.windowLength, true);
+        return result;
+    }
+    else
+    {
+        result.resize((contigLength + options.windowLength) / options.windowLength, false);
+    }
+
+    // Open BED file.
+    std::unique_ptr<htsFile, int (&)(htsFile *)> fnPtr(
+        hts_open(options.targetBedFile.c_str(), "r"),
+        hts_close);
+    htsFile *fn = fnPtr.get();
+
+    // Open tabix file.
+    std::unique_ptr<tbx_t, void (&)(tbx_t *)> peaksBedIdxPtr(
+        tbx_index_load(options.targetBedFile.c_str()),
+        tbx_destroy);
+    tbx_t * idx = peaksBedIdxPtr.get();  // shortcut
+    if (!idx)
+    {
+        throw std::runtime_error("Could not load peaks BED tabix index.");
+    }
+
+    // Load all on target regions.
+    std::unique_ptr<hts_itr_t, void (&)(hts_itr_t *)> itrPtr(
+        tbx_itr_querys(idx, regionS.str().c_str()), hts_itr_destroy);
+    hts_itr_t * itr = itrPtr.get();
+    if (!itr)
+    {
+        throw std::runtime_error("Could not jump to start of chrom.");
+    }
+    kstring_t record { 0, 0, nullptr };
+
+    std::stringstream ss;
+    std::string chrom;
+    int prevBeginPos = -1;
+    int bedBeginPos, bedEndPos;
+    // Flag all bins fully contained in on target regions as being on-target.
+    while (tbx_itr_next(fn, idx, itr, &record) > 0)
+    {
+        ss.str(record.s);
+        ss.clear();
+        ss >> chrom;
+        ss >> bedBeginPos;
+        ss >> bedEndPos;
+
+        int const beginBin = (bedBeginPos + options.windowLength) / options.windowLength;
+        int const endBin = bedEndPos / options.windowLength;
+        for (int i = beginBin; i < endBin; ++i)
+        {
+            result[i] = true;
+        }
+    }
+
+    return result;
 }
 
 void CnvettiCoverageApp::processChromosomes()
@@ -1006,6 +1083,7 @@ void CnvettiCoverageApp::printBinsToVcf(std::vector<MaskedBins> const & bins, in
     std::vector<double> const gcContent(getGCContent(rID));
     std::vector<bool> const hasGap(getHasGap(rID));
     std::vector<double> const mapability(getMapability(rID));
+    std::vector<bool> const isOnTarget(getIsOnTarget(rID));
 
     unsigned numWindows = bins[0].bins.size();
     for (unsigned windowID = 0; windowID < numWindows; ++windowID)
@@ -1030,6 +1108,8 @@ void CnvettiCoverageApp::printBinsToVcf(std::vector<MaskedBins> const & bins, in
         }
         if (hasGap[windowID])
             bcf_update_info_flag(vcfHeader.get(), record, "GAP", "", 1);
+        if (!options.targetBedFile.empty() && isOnTarget.at(windowID))
+            bcf_update_info_flag(vcfHeader.get(), record, "ONTARGET", "", 1);
 
         // FORMAT and variant call information
 

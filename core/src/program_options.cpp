@@ -70,6 +70,7 @@ void CnvettiCoverageOptions::print(std::ostream & out) const
         << "    ignoreDiscordantPairs: " << trueFalse(ignoreDiscordantPairs) << "\n"
         << "    numIOThreads:          " << numIOThreads << "\n"
         << "    peaksBedFile:          '" << peaksBedFile << "'\n"
+        << "    targetBedFile:         '" << targetBedFile << "'\n"
         << "    windowBoundary:        " << peakBoundary << "\n"
         << "    gcStepSize:            " << gcStepSize << "\n"
         << "\n";
