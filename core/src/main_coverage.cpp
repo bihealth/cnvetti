@@ -35,7 +35,6 @@
 
 #include <htslib/bgzf.h>
 #include <htslib/faidx.h>
-#include <htslib/regidx.h>
 #include <htslib/sam.h>
 #include <htslib/tbx.h>
 #include <htslib/vcf.h>
@@ -214,6 +213,9 @@ private:
     void markBinsDone(int windowID);
 
     // Load the masked regions from options.peaksBedFile if given.
+    //
+    // Intervals must be sorted by start position and are then loaded such that overlapping
+    // inervals are merged.
     void loadMaskedRegions();
 
     // Scale the bin statistics with with 1/unmasked-ratio.
@@ -380,8 +382,6 @@ void ChromosomeBinCounter::processRegion(std::vector<MaskedBins> & bins,
         // Query for masked regions, if any.
         if (bins[rgID].hasMaskedRegions()) {
             bins[rgID].maskedRegions.findOverlapping(beginPos, endPos, maskedIntervals);
-            std::cerr << "processRegion -- findOverlapping(" << beginPos << ", "
-                      << endPos << ", " << maskedIntervals.size() << ")\n";
         }
 
         // Increment base-wise counters.
@@ -509,6 +509,7 @@ void ChromosomeBinCounter::loadMaskedRegions()
 
     std::stringstream ss;
     std::string chrom;
+    int prevBeginPos = -1;
     int bedBeginPos, bedEndPos;
     while (tbx_itr_next(fn, idx, itr, &record) > 0)
     {
@@ -518,6 +519,16 @@ void ChromosomeBinCounter::loadMaskedRegions()
         ss >> bedBeginPos;
         ss >> bedEndPos;
 
+        // Guard against unsorted BED input (unlikely, is tabix-indexed)
+        if (prevBeginPos != -1 && prevBeginPos > bedBeginPos)
+        {
+            std::stringstream msg;
+            msg << "Unsorted masked regions found " << prevBeginPos << " < "
+                << bedBeginPos << "!";
+            throw std::runtime_error(msg.str());
+        }
+        prevBeginPos = bedBeginPos;
+
         // Add boundary around peaks.
         bedBeginPos = std::max(0, bedBeginPos - options.peakBoundary);
         bedEndPos = std::min(endPos, bedEndPos + options.peakBoundary);
@@ -525,8 +536,6 @@ void ChromosomeBinCounter::loadMaskedRegions()
         // Append or extend previous interval.
         if (intervals.empty() || bedBeginPos > intervals.back().endPos)
         {
-            if (!intervals.empty())
-                std::cerr << "interval: " << intervals.back().beginPos << "-" << intervals.back().endPos << "\n";
             intervals.push_back(TInterval(bedBeginPos, bedEndPos));
         }
         else
@@ -534,8 +543,6 @@ void ChromosomeBinCounter::loadMaskedRegions()
             intervals.back().endPos = std::max(intervals.back().endPos, bedEndPos);
         }
     }
-    if (!intervals.empty())
-        std::cerr << "interval: " << intervals.back().beginPos << "-" << intervals.back().endPos << "\n";
 
     for (auto & maskedBins : bins) {
         maskedBins.maskedRegions = IntervalTree<void>(
@@ -562,10 +569,9 @@ void ChromosomeBinCounter::scaleBinStats()
             intervals.clear();
             maskedBins.maskedRegions.findOverlapping(
                 window.beginPos, window.endPos, intervals);
-            std::cerr << "scaleBinStats -- findOverlapping(" << window.beginPos << ", "
-                      << window.endPos << ", " << intervals.size() << ")\n";
 
-            // This assumes non-overlapping mask windows!
+            // This can assume non-overlapping mask windows as we are loading them
+            // from tabix-indexed file and check on loading.
             for (auto const & maskedInterval : intervals)
             {
                 if (window.overlapLength(maskedInterval) > unmaskedLength)
@@ -880,6 +886,8 @@ void CnvettiCoverageApp::openFiles()
     bcf_hdr_printf(vcfHeader.get(),
         "##FORMAT=<ID=RC0,Number=1,Type=Float,Description=\"Number of aligning q0+non-q0 reads\">");
     bcf_hdr_printf(vcfHeader.get(),
+        "##FORMAT=<ID=MASKED,Number=1,Type=Float,Description=\"Fraction of window that was masked\">");
+    bcf_hdr_printf(vcfHeader.get(),
         "##ALT=<ID=COUNT,Description=\"Window for read counting\">");
     bcf_hdr_printf(vcfHeader.get(),
         "##ALT=<ID=STATS,Description=\"Pseudo-entry for CNVettig statistics\">");
@@ -1093,6 +1101,22 @@ void CnvettiCoverageApp::printBinsToVcf(std::vector<MaskedBins> const & bins, in
                 statsHandler->registerValue(i, StatsMetric::RC0, valGCContent, rc0[i]);
         }
         bcf_update_format_float(vcfHeader.get(), record, "RC0", &rc0[0], rc.size());
+
+        // MASKED
+        std::vector<float> masked(sampleNames.size(), 0);
+        for (unsigned i = 0; i < sampleNames.size(); ++i)
+        {
+            int const beginPos = windowID * options.windowLength;
+            int const endPos = (windowID + 1) * options.windowLength;
+            std::vector<IntervalTree<void>::TInterval> maskedIntervals;
+            bins[i].maskedRegions.findOverlapping(beginPos, endPos, maskedIntervals);
+            int covered = 0;
+            for (auto const & itv : maskedIntervals) {
+                covered += std::min(endPos, itv.endPos) - std::max(beginPos, itv.beginPos);
+            }
+            masked[i] = covered / (1.0 * options.windowLength);
+        }
+        bcf_update_format_float(vcfHeader.get(), record, "MASKED", &masked[0], masked.size());
 
         bcf_write(vcfFileOut.get(), vcfHeader.get(), record);
     }

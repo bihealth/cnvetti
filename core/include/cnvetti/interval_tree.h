@@ -181,14 +181,14 @@ public:
         computeMaxEndProperties(0, entries.size());
     }
 
-    std::vector<TInterval> findOverlapping(int beginPos, int endPos)
+    std::vector<TInterval> findOverlapping(int beginPos, int endPos) const
     {
         std::vector<TInterval> result;
         findOverlapping(beginPos, endPos, result);
         return result;
     }
 
-    void findOverlapping(int beginPos, int endPos, std::vector<TInterval> & result)
+    void findOverlapping(int beginPos, int endPos, std::vector<TInterval> & result) const
     {
         result.clear();
         findOverlapping(beginPos, endPos, 0, entries.size(), entries.size() / 2, result);
@@ -199,7 +199,7 @@ public:
 private:
 
     void findOverlapping(int beginPos, int endPos, size_t beginIdx, size_t endIdx,
-                         size_t centerIdx, std::vector<TInterval> & result)
+                         size_t centerIdx, std::vector<TInterval> & result) const
     {
         if (beginIdx >= endIdx)
         {
