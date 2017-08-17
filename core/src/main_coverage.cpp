@@ -1091,6 +1091,11 @@ void CnvettiCoverageApp::printBinsToVcf(std::vector<MaskedBins> const & bins, in
         std::unique_ptr<bcf1_t, void (&)(bcf1_t*)> recordPtr(bcf_init(), bcf_destroy);
         bcf1_t * record = recordPtr.get();
 
+        if (!options.targetBedFile.empty() && !isOnTarget.at(windowID) && options.ignoreOffTarget)
+        {
+            continue;  // off-target bins are to be skipped
+        }
+
         // CHROM, POS, REF, ALT
         record->rid = rID;
         record->pos = windowID * options.windowLength;

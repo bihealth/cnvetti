@@ -95,6 +95,10 @@ int main(int argc, char ** argv)
     )->group("Input / Output");
 
     covApp->add_flag(
+        "--ignore-off-target", covOptions.ignoreOffTarget,
+        "Ignore off-target bins (--target-bed must be given)"
+    )->group("Algorithm Parameters");
+    covApp->add_flag(
         "--ignore-discordant-pairs", covOptions.ignoreDiscordantPairs,
         "Ignore discordant pairs (for second pass, targeted seq.)"
     )->group("Algorithm Parameters");

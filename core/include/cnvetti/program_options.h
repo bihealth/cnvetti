@@ -84,6 +84,10 @@ public:
     // BED file, if given.
     std::string targetBedFile;
 
+    // If targetBedFile is set and this is true then only on-target bins
+    // will be printed.
+    bool ignoreOffTarget;
+
     // Number of base pairs to ignore next to peaks (only interpreted if
     // peaksBedFile is given).
     int peakBoundary;
@@ -95,7 +99,8 @@ public:
     CnvettiCoverageOptions() :
         verbosity(1), numIOThreads(1), windowLength(500), minUnclipped(80),
         gcStepSize(1.0), minAlignmentQuality(0), computeBinStdevs(false),
-        ignoreDiscordantPairs(true), peakBoundary(50), argc(0), argv(nullptr)
+        ignoreDiscordantPairs(true), ignoreOffTarget(false), peakBoundary(50),
+        argc(0), argv(nullptr)
     {}
 
     void print(std::ostream & out) const;
