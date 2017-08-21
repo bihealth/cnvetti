@@ -35,6 +35,7 @@
 // ----------------------------------------------------------------------------
 
 int mainCoverage(CnvettiCoverageOptions const & options);
+int mainJoin(CnvettiJoinOptions const & options);
 int mainPeaks(CnvettiPeaksOptions const & options);
 int mainNormalize(CnvettiNormalizeOptions const & options);
 int mainRatio(CnvettiRatioOptions const & options);
@@ -162,6 +163,28 @@ int main(int argc, char ** argv)
         "--thresh-factor", peaksOptions.threshFactor,
         "Factor to multiply threshold with after selecting by percentile"
     )->group("Algorithm Parameters");
+
+    // Add sub command `cnvetti join`
+
+    CnvettiJoinOptions joinOptions;
+    joinOptions.argc = argc;
+    joinOptions.argv = argv;
+
+    CLI::App * joinApp = app.add_subcommand(
+        "join", "Join adjacent windows (for on-target coverage)");
+
+    joinApp->add_option(
+        "-i,--input", joinOptions.inputFileName,
+        "Path to input BCF file (required)"
+    )->required()->check(CLI::ExistingFile)->group("Input / Output");
+    joinApp->add_option(
+        "-o,--output", joinOptions.outputFileName,
+        "Path to output BED file (required)"
+    )->required()->group("Input / Output");
+    joinApp->add_option(
+        "--num-io-threads", joinOptions.numIOThreads,
+        "Number of threads to use for de-/compression in I/O"
+    )->group("Input / Output");
 
     // Add sub command `cnvetti normalize`
 
@@ -315,6 +338,9 @@ int main(int argc, char ** argv)
         } else if (app.got_subcommand("peaks")) {
             CLI::AutoTimer timer("running time");
             mainPeaks(peaksOptions);
+        } else if (app.got_subcommand("join")) {
+            CLI::AutoTimer timer("running time");
+            mainJoin(joinOptions);
         } else if (app.got_subcommand("normalize")) {
             CLI::AutoTimer timer("running time");
             mainNormalize(normOptions);

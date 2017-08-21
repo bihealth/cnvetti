@@ -14,6 +14,7 @@ add_executable(
     main.cpp
     main_background.cpp
     main_coverage.cpp
+    main_join.cpp
     main_normalize.cpp
     main_peaks.cpp
     main_ratio.cpp

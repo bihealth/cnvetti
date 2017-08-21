@@ -1093,6 +1093,7 @@ void CnvettiCoverageApp::printBinsToVcf(std::vector<MaskedBins> const & bins, in
 
         if (!options.targetBedFile.empty() && !isOnTarget.at(windowID) && options.ignoreOffTarget)
         {
+            // TODO: should off-target regions count into the medians?!
             continue;  // off-target bins are to be skipped
         }
 
@@ -1232,6 +1233,8 @@ void CnvettiCoverageApp::printStatisticsToVCF()
         bcf_update_info_float(vcfHeader.get(), record, "GC", &valGCContent, 1);
         int32_t valGCWindows = statsHandler->getNumWindows(gcContent);
         bcf_update_info_int32(vcfHeader.get(), record, "GCWINDOWS", &valGCWindows, 1);
+        int32_t windowLength = options.windowLength;
+        bcf_update_info_int32(vcfHeader.get(), record, "END", &windowLength, 1);
 
         // FORMAT field
         // Easy access to sample names
