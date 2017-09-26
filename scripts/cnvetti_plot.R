@@ -29,7 +29,7 @@ p = arg_parser('CNVetti plotting') %>%
     add_argument('--input-bed', help='Path to input BED file.') %>%
     add_argument('--samples', help='Comma-separated list of samples to plot for.') %>%
     add_argument('--gene-beds', help='Comma-separated list of gene BED files.') %>%
-    add_argument('--axis-y-min', help='Lower bound of y axis', default=-4) %>%
+    add_argument('--axis-y-min', help='Lower bound of y axis', default=4) %>%
     add_argument('--axis-y-max', help='Lower bound of y axis', default=4);
 
 argv <- parse_args(p);
@@ -138,7 +138,7 @@ xlimits = list(
     max = max(chrom_offsets$offset + chrom_offsets$length) * 1e-6
 );
 ylimits = list(
-    min = argv$axis_y_min,
+    min = -argv$axis_y_min,
     max = argv$axis_y_max
 );
 
