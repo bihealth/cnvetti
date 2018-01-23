@@ -1,31 +1,114 @@
 # Require CMake >=3.2
 cmake_minimum_required(VERSION 3.2 FATAL_ERROR)
 
-# Get version from Git tag
-set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../cmake ${CMAKE_MODULE_PATH})
-include(GetGitRevisionDescription)
-git_describe(VERSION --tags --dirty=-dirty)
+# Version Setup ---------------------------------------------------------------
 
-# Install CLI11
-include(AddCLI)
-include_directories(SYSTEM ${CLI11_BINARY_DIR}/include)
+FIND_PACKAGE(Git)
 
-# Parse the version information into its components
-string(REGEX REPLACE "^v([0-9]+)\\..*" "\\1" VERSION_MAJOR "${VERSION}")
-string(REGEX REPLACE "^v[0-9]+\\.([0-9]+).*" "\\1" VERSION_MINOR "${VERSION}")
-string(REGEX REPLACE "^v[0-9]+\\.[0-9]+\\.([0-9]+).*" "\\1" VERSION_PATCH "${VERSION}")
-string(REGEX REPLACE "^v[0-9]+\\.[0-9]+\\.[0-9]+(.*)" "\\1" VERSION_SHA1 "${VERSION}")
-set(VERSION_SHORT "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}")
+IF(GIT_FOUND)
+  SET(USE_GIT 1)
+ELSE(GIT_FOUND)
+  SET(USE_GIT 0)
+ENDIF(GIT_FOUND)
 
-# Define project and version
-message(STATUS "VERSION ${VERSION}")
-message(STATUS "VERSION_SHORT ${VERSION_SHORT}")
-project(cnvetti_core VERSION "${VERSION_SHORT}" LANGUAGES CXX)
+FILE(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/cnvetti)
+FILE(WRITE ${CMAKE_BINARY_DIR}/cnvetti/version.h.in
+"\#define GIT_VERSION \"@VERSION@\"\n"
+"\#define GIT_VERSION_SHORT \"@VERSION_SHORT@\"\n"
+)
 
-# Setup output directories for bin/lib
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+FILE(WRITE ${CMAKE_BINARY_DIR}/Version.cmake
+"IF(${USE_GIT} EQUAL 1)
+  EXECUTE_PROCESS(
+       COMMAND ${GIT_EXECUTABLE} describe --tags --dirty
+       WORKING_DIRECTORY \${WORKING_DIRECTORY}
+       OUTPUT_VARIABLE GIT_DESCRIBE_VERSION
+       RESULT_VARIABLE GIT_DESCRIBE_RESULT
+       ERROR_VARIABLE GIT_DESCRIBE_ERROR
+       OUTPUT_STRIP_TRAILING_WHITESPACE
+   )
+ELSE(${USE_GIT} EQUAL 1)
+  SET(GIT_DESCRIBE_RESULT -1)
+ENDIF(${USE_GIT} EQUAL 1)
+IF(GIT_DESCRIBE_RESULT EQUAL 0)
+  FILE(WRITE ${CMAKE_BINARY_DIR}/source/VERSION \"\${GIT_DESCRIBE_VERSION}\")
+ELSE(GIT_DESCRIBE_RESULT EQUAL 0)
+  FILE(READ  ${CMAKE_SOURCE_DIR}/VERSION GIT_DESCRIBE_VERSION)
+ENDIF(GIT_DESCRIBE_RESULT EQUAL 0)
+STRING(REGEX REPLACE \"v([0-9]*)\\\\.([0-9]*)\\\\.(.*)\"
+       \"\\\\1.\\\\2.\\\\3\" VERSION \"\${GIT_DESCRIBE_VERSION}\" )
+STRING(REGEX REPLACE \"v([0-9]*)\\\\.([0-9]*)\\\\.(.*)\"
+       \"\\\\1\" VERSION_MAJOR \"\${GIT_DESCRIBE_VERSION}\")
+STRING(REGEX REPLACE \"v([0-9]*)\\\\.([0-9]*)\\\\.(.*)\"
+       \"\\\\2\" VERSION_MINOR \"\${GIT_DESCRIBE_VERSION}\")
+STRING(REGEX REPLACE \"v([0-9]*)\\\\.([0-9]*)\\\\.([^-] *)(-.*)?\"
+       \"\\\\3\" VERSION_PATCH \"\${GIT_DESCRIBE_VERSION}\")
+SET(VERSION_SHORT \"\${VERSION_MAJOR}.\${VERSION_MINOR}.\${VERSION_PATCH}\")
+")
+
+FILE(WRITE ${CMAKE_BINARY_DIR}/FillVersion.cmake
+"INCLUDE(Version.cmake)
+CONFIGURE_FILE(\${SRC} \${DST} @ONLY)
+")
+INCLUDE_DIRECTORIES(${CMAKE_BINARY_DIR})
+ADD_CUSTOM_TARGET(
+    version
+    ${CMAKE_COMMAND} -D SRC=${CMAKE_BINARY_DIR}/cnvetti/version.h.in
+                     -D DST=${CMAKE_BINARY_DIR}/cnvetti/version.h
+                     -D WORKING_DIRECTORY=${CMAKE_SOURCE_DIR}
+                     -P ${CMAKE_BINARY_DIR}/FillVersion.cmake
+)
+SET(WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+INCLUDE(${CMAKE_BINARY_DIR}/Version.cmake)
+SET(CPACK_PACKAGE_VERSION "${VERSION}")
+SET(CPACK_PACKAGE_VERSION_MAJOR "${VERSION_MAJOR}")
+SET(CPACK_PACKAGE_VERSION_MINOR "${VERSION_MINOR}")
+SET(CPACK_PACKAGE_VERSION_PATCH "${VERSION_PATCH}")
+set(CPACK_PACKAGE_INSTALL_DIRECTORY "VERSIONHEADER-${VERSIONHEADER_VERSION_FULL}")
+SET(CPACK_SOURCE_INSTALLED_DIRECTORIES "${CMAKE_SOURCE_DIR};/;${CMAKE_BINARY_DIR}/source;/")
+set(CPACK_SOURCE_IGNORE_FILES
+"~$"
+".sw[a-z]$"
+".DS_Store"
+"tags"
+"cscope.*"
+"^${CMAKE_SOURCE_DIR}/.git.*"
+)
+
+# Software Packaging ----------------------------------------------------------
+
+SET(CPACK_PACKAGE_NAME "cnvetti")
+
+SET(CPACK_PACKAGE_VERSION "${VERSION}")
+SET(CPACK_PACKAGE_VERSION_MAJOR "${VERSION_MAJOR}")
+SET(CPACK_PACKAGE_VERSION_MINOR "${VERSION_MINOR}")
+SET(CPACK_PACKAGE_VERSION_PATCH "${VERSION_PATCH}")
+
+SET(CPACK_GENERATOR "TGZ")
+
+SET(CPACK_SOURCE_GENERATOR "TGZ")
+
+INCLUDE(CPack)
+
+# Trick to build version.cpp file into distribution..
+FILE(WRITE ${CMAKE_BINARY_DIR}/Dist.cmake
+"MESSAGE(STATUS \"Package Dist running...\")
+INCLUDE(CPackSourceConfig.cmake)
+EXECUTE_PROCESS(COMMAND cpack -G TGZ --config CPackSourceConfig.cmake
+  TIMEOUT 3600
+  WORKING_DIRECTORY \${CMAKE_BINARY_DIR})
+")
+  #
+  # Add custom target
+  #
+  ADD_CUSTOM_TARGET(dist
+    COMMAND ${CMAKE_COMMAND} .
+    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_BINARY_DIR}/Dist.cmake
+)
+
+ADD_DEPENDENCIES(dist version)
+
+# Building Package ------------------------------------------------------------
 
 # Include sub directories to get the build system bootstrapped
 include_directories(include)

@@ -1,8 +1,4 @@
 # Create version.cpp file with appropriate version
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/version.cpp.in
-                ${CMAKE_CURRENT_BINARY_DIR}/version.cpp)
-set(version_file "${CMAKE_CURRENT_BINARY_DIR}/version.cpp")
-
 find_library(HTS_LIBRARY NAMES hts)
 
 find_package(Armadillo REQUIRED)
@@ -23,8 +19,9 @@ add_executable(
     program_options.cpp
     segmentation_haar.cpp
     segmentation_utils.cpp
-    utils.cpp
-    ${version_file})
+    utils.cpp)
+
+ADD_DEPENDENCIES(cnvetti version)
 
 target_link_libraries(cnvetti ${HTS_LIBRARY} ${ARMADILLO_LIBRARIES})
 

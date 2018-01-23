@@ -297,7 +297,9 @@ int main(int argc, char ** argv)
         "Metric to use for segmentation (allowed: COV, COV0, RC, RC0; default: COV0)"
     )->group("Segmentation Algorithm")->check([](std::string const & val) {
             std::vector<std::string> const ALLOWED_METRICS { "COV", "COV0", "RC", "RC0" };
-            return std::find(ALLOWED_METRICS.begin(), ALLOWED_METRICS.end(), val) != ALLOWED_METRICS.end();
+            if (std::find(ALLOWED_METRICS.begin(), ALLOWED_METRICS.end(), val) == ALLOWED_METRICS.end()) {
+                return std::string("Invalid --metric given!");
+            }
     });
     cnvettiSegment->add_option(
         "--min-mapability", segOptions.minMapability,
