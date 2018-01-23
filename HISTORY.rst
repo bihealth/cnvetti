@@ -7,6 +7,12 @@ develop
 -------
 
 -----
+0.0.2
+-----
+
+- Better packaging, supports source packages now.
+
+-----
 0.0.1
 -----
 
