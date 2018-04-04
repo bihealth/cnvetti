@@ -4,3 +4,11 @@ version = "0.1.0"
 authors = ["Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>"]
 
 [dependencies]
+rust-htslib = "*"
+clap = "*"
+slog = "*"
+slog-term = "*"
+slog-async = "*"
+
+[build-dependencies]
+git-build-version = "*"
