@@ -2,6 +2,7 @@ extern crate cnvetti;
 
 include!(concat!(env!("OUT_DIR"), "/version.rs"));
 
+#[macro_use]
 extern crate clap;
 
 #[macro_use]
@@ -16,7 +17,7 @@ use std::sync::atomic::Ordering;
 use std::result;
 
 use std::process;
-use clap::{App, Arg, ArgMatches, SubCommand};
+use clap::{App, ArgMatches};
 
 use cnvetti::cli::coverage;
 
@@ -39,9 +40,8 @@ where
         values: &slog::OwnedKVList,
     ) -> result::Result<Self::Ok, Self::Err> {
         let current_level = match self.log_level.load(Ordering::Relaxed) {
-            0 => slog::Level::Error,
-            1 => slog::Level::Warning,
-            2 => slog::Level::Info,
+            0 => slog::Level::Warning,
+            1 => slog::Level::Info,
             _ => slog::Level::Trace,
         };
 
@@ -81,71 +81,14 @@ fn run(matches: ArgMatches) -> Result<(), String> {
     }
 
     match matches.subcommand() {
-        ("coverage", Some(m)) => {
-            cnvetti::cli::coverage::call(logger, cnvetti::cli::coverage::build_options(&m))
-        }
+        ("coverage", Some(m)) => coverage::call(logger, coverage::build_options(&m)),
         _ => Err("Invalid command".to_string()),
     }
 }
 
 fn main() {
-    let matches = App::new("cnvetti")
-        .version(VERSION)
-        .author("Manuel Holtgrewe")
-        .about("CNV calling for the masses")
-        .arg(
-            Arg::with_name("verbose")
-                .short("v")
-                .multiple(true)
-                .help("verbosity level"),
-        )
-        .arg(
-            Arg::with_name("quiet")
-                .short("q")
-                .help("Only show error messages"),
-        )
-        .subcommand(
-            SubCommand::with_name("coverage")
-                .about("Collect per-sample coverage information")
-                .arg(
-                    Arg::with_name("reference")
-                        .long("reference")
-                        .short("r")
-                        .required(true)
-                        .value_name("REFERENCE.fa")
-                        .help("Path to FAI-indexed FASTA file"),
-                )
-                .arg(
-                    Arg::with_name("input")
-                        .long("input")
-                        .short("i")
-                        .required(true)
-                        .value_name("INPUT.bam")
-                        .help("Path to BAI-indexed BAM file"),
-                )
-                .arg(
-                    Arg::with_name("output")
-                        .long("output")
-                        .short("o")
-                        .required(true)
-                        .value_name("OUTPUT.{bcf,vcf}")
-                        .help("Path to output VCF/BCF file"),
-                )
-                .arg(
-                    Arg::with_name("genome-region")
-                        .long("genome-region")
-                        .value_name("REGION")
-                        .multiple(true)
-                        .help("Genome region(s) (e.g., chr1:1,000,000-1,100,000) to process"),
-                )
-                .arg(
-                    Arg::with_name("mapability-bed")
-                        .long("mapability-bed")
-                        .value_name("MAPABILITY.bed")
-                        .help("Path to mapability BED file"),
-                ),
-        )
-        .get_matches();
+    let yaml = load_yaml!("cli.yaml");
+    let matches = App::from_yaml(yaml).version(VERSION).get_matches();
 
     if let Err(e) = run(matches) {
         println!("Application error: {}", e);

@@ -4,11 +4,14 @@ version = "0.1.0"
 authors = ["Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>"]
 
 [dependencies]
+bio = "*"
 rust-htslib = "*"
-clap = "*"
+clap = {version = "*", features = ["yaml", "color", "suggestions"]}
 slog = "*"
 slog-term = "*"
 slog-async = "*"
+chrono = "*"
+shlex = "*"
 
 [build-dependencies]
 git-build-version = "*"

@@ -1,0 +1,64 @@
+name: cnvetti
+version: 0.1.0
+about: CNV calling for the masses
+author: Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>
+
+settings:
+- SubcommandRequiredElseHelp
+- GlobalVersion
+- UnifiedHelpMessage
+- ColorAuto
+
+args:
+- verbose:
+    long: verbose
+    short: v
+    multiple: true
+    takes_value: false
+    help: Increase verbosity
+- quiet:
+    long: quiet
+    short: q
+    multiple: true
+    takes_value: false
+    help: Decrease verbosity
+
+subcommands:
+- coverage:
+    about: Collect per-sample coverage information
+    args:
+    - reference:
+        long: reference
+        short: r
+        takes_value: true
+        required: true
+        value_name: REF.fa
+        help: Path to FAI-indexed reference FASTA file used for read alignment.
+    - input:
+        long: input
+        short: i
+        multiple: true
+        takes_value: true
+        required: true
+        min_values: 1
+        value_name: INPUT.bam
+        help: Path to BAI-indexed BAM file(s).
+    - output:
+        long: output
+        short: o
+        takes_value: true
+        required: true
+        value_name: OUT.bcf
+        help: Path to output BCF file (will also write .csi file)
+    - genome-region:
+        long: genome-region
+        multiple: true
+        takes_value: true
+        value_name: REGION
+        help: Genome region(s) to consider, e.g., 1:1,100,000-1,120,000
+    - mapability-bed:
+        long: mapability-bed
+        multiple: false
+        takes_value: true
+        value_name: MAPABILITY.bed
+        help: Path to mapability BED file.
