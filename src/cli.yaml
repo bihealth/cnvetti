@@ -15,18 +15,21 @@ args:
     short: v
     multiple: true
     takes_value: false
+    global: true
     help: Increase verbosity
 - quiet:
     long: quiet
     short: q
     multiple: true
     takes_value: false
+    global: true
     help: Decrease verbosity
 
 subcommands:
 - coverage:
     about: Collect per-sample coverage information
     args:
+    # Input/Output File Arguments ---------------------------------------------
     - reference:
         long: reference
         short: r
@@ -50,15 +53,80 @@ subcommands:
         required: true
         value_name: OUT.bcf
         help: Path to output BCF file (will also write .csi file)
-    - genome-region:
+    - genome_regions:
         long: genome-region
         multiple: true
         takes_value: true
         value_name: REGION
         help: Genome region(s) to consider, e.g., 1:1,100,000-1,120,000
-    - mapability-bed:
+    - mapability_bed:
         long: mapability-bed
         multiple: false
         takes_value: true
-        value_name: MAPABILITY.bed
-        help: Path to mapability BED file.
+        value_name: MAP.bed.gz
+        help: Path to bgziped and tabix-indexed mapability BED file.
+
+    # Preset-Selecting Arguments ----------------------------------------------
+    - preset:
+        long: preset
+        takes_value: true
+        value_name: PRESET
+        possible_values:
+        - Wgs
+        - WesOffTarget
+        - WesOnTarget
+        help: Select one of the pre-defined preset modes.
+
+    # Binning-Related Arguments -----------------------------------------------
+    - window_length:
+        long: window-length
+        short: w
+        takes_value: true
+        default_value: '500'
+        value_name: LENGTH
+        help: >
+            Length of window for initial coverage computation.  When counting
+            on target regions then targets greater than two times `LENGTH`
+            will be split into (overlapping) windows of length `LENGTH`.
+    - window_overlap:
+        long: window-overlap
+        takes_value: true
+        default_value: '0'
+        value_name: OVL
+        help: Additional overlap for windows.
+
+    # Counting-Related Arguments ----------------------------------------------
+    - count_kind:
+        long: count-kind
+        takes_value: true
+        default_value: Coverage
+        value_name: COUNT
+        possible_values:
+        - Coverage
+        - Alignments
+        help: >
+            Whether to consider coverage or alignments only in the alignment.
+            When counting alignments, only the first read's alignment of a
+            pair will be counted (it is recommended to combine this with
+            `--skip-discordant`).
+    - min_mapq:
+        long: min-mapq
+        takes_value: true
+        default_value: '0'
+        value_name: MIN_MAPQ
+        help: >
+            Alignments with alignment quality less than `MIN_MAPQ` will be
+            ignored.
+    - min_unclipped:
+        long: min-unclipped
+        takes_value: true
+        default_value: '60'
+        value_name: MIN_UNCLIPPED
+        help: >
+            At least `MIN_UNCLIPPED` percent of the read have to be unclipped
+            for it to be counted.
+    - skip_discordant:
+        long: skip-discordant
+        help: >
+            If set, discordant alignments (not both reads aligned or not
+            inwards-pointing) will be skipped.

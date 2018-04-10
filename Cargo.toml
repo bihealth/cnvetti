@@ -5,13 +5,14 @@ authors = ["Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>"]
 
 [dependencies]
 bio = "*"
-rust-htslib = "*"
+rust-htslib = {path = "../rust-htslib"}
 clap = {version = "*", features = ["yaml", "color", "suggestions"]}
 slog = "*"
 slog-term = "*"
 slog-async = "*"
 chrono = "*"
 shlex = "*"
+separator = "*"
 
 [build-dependencies]
 git-build-version = "*"

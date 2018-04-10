@@ -68,7 +68,7 @@ fn run(matches: ArgMatches) -> Result<(), String> {
     }.fuse();
     let drain = slog_async::Async::new(drain).build().fuse();
 
-    let logger = slog::Logger::root(drain, o!());
+    let mut logger = slog::Logger::root(drain, o!());
 
     // Switch log level
     if matches.is_present("quiet") {
@@ -81,13 +81,14 @@ fn run(matches: ArgMatches) -> Result<(), String> {
     }
 
     match matches.subcommand() {
-        ("coverage", Some(m)) => coverage::call(logger, coverage::build_options(&m)),
+        ("coverage", Some(m)) => coverage::call(&mut logger, &coverage::Options::new(&m)),
         _ => Err("Invalid command".to_string()),
     }
 }
 
 fn main() {
     let yaml = load_yaml!("cli.yaml");
+    // TODO: the VERSION from below is ignored :(
     let matches = App::from_yaml(yaml).version(VERSION).get_matches();
 
     if let Err(e) = run(matches) {
