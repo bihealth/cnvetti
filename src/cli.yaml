@@ -95,6 +95,29 @@ subcommands:
         value_name: OVL
         help: Additional overlap for windows.
 
+    # Pile-Finding and Masking Arguments --------------------------------------
+    - mask_piles:
+        long: mask-piles
+        takes_value: false
+        help: >
+            Enable masking of "piles", that is intervals that are (1)
+            contiguously covered (allowing for `--pile-max-gap` of gaps), and
+            (2) at least at one position the depth is >= `--pile-min-depth`.
+            In this case, any alignment overlapping with the pile will be
+            ignored.
+    - pile_min_depth:
+        long: pile-min-depth
+        takes_value: true
+        default_value: 3
+        value_name: DEPTH
+        help: Piles with a depth of >= `DEPTH` will be masked.
+    - pile_fuzzyness:
+        long: pile-max-gap
+        takes_value: true
+        default_value: '5'
+        value_name: VAL
+        help: Merge intervals for piles if distance is <= `VAL`.
+
     # Counting-Related Arguments ----------------------------------------------
     - count_kind:
         long: count-kind

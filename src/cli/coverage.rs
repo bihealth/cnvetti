@@ -10,6 +10,7 @@ use std::fs::File;
 
 use bio::io::fasta;
 use bio::utils::Text;
+use bio::data_structures::interval_tree;
 
 use chrono;
 
@@ -88,6 +89,9 @@ pub struct Options {
     min_mapq: u8,
     min_unclipped: f32,
     skip_discordant: bool,
+    mask_piles: bool,
+    pile_min_depth: i32,
+    pile_max_gap: i32,
 }
 
 impl Options {
@@ -132,6 +136,17 @@ impl Options {
                 .parse::<f32>()
                 .unwrap(),
             skip_discordant: matches.is_present("skip_discordant"),
+            mask_piles: matches.is_present("mask_piles"),
+            pile_min_depth: matches
+                .value_of("pile_min_depth")
+                .unwrap()
+                .parse::<i32>()
+                .unwrap(),
+            pile_max_gap: matches
+                .value_of("pile_max_gap")
+                .unwrap()
+                .parse::<i32>()
+                .unwrap(),
         }
     }
 }
@@ -151,26 +166,6 @@ struct BaseAggregator {
     /// Length of contig process
     contig_length: u64,
 }
-
-
-impl BaseAggregator {
-    fn new(
-        samples: &Vec<String>,
-        read_group_to_sample: &HashMap<String, String>,
-        sample_to_idx: &HashMap<String, u32>,
-        options: &Options,
-        contig_length: u64,
-    ) -> BaseAggregator {
-        BaseAggregator {
-            samples: samples.clone(),
-            read_group_to_sample: read_group_to_sample.clone(),
-            sample_to_idx: sample_to_idx.clone(),
-            options: options.clone(),
-            contig_length,
-        }
-    }
-}
-
 
 /// Trait for alignment aggregation from BAM files.
 trait BamRecordAggregator {
@@ -196,30 +191,89 @@ impl CountAlignmentsAggregator {
     /// Construct new aggregator with the given BAM `header`.  This information is
     /// necessary to appropriately allocate buffers for all samples in the header.
     fn new(
-        samples: &Vec<String>,
-        read_group_to_sample: &HashMap<String, String>,
-        sample_to_idx: &HashMap<String, u32>,
-        options: &Options,
+        samples: Vec<String>,
+        read_group_to_sample: HashMap<String, String>,
+        sample_to_idx: HashMap<String, u32>,
+        options: Options,
         contig_length: u64,
     ) -> CountAlignmentsAggregator {
+        // TODO: construct counters here.
+        let counters = Vec::new();
+
         CountAlignmentsAggregator {
-            base: BaseAggregator::new(
+            base: BaseAggregator {
                 samples,
                 read_group_to_sample,
                 sample_to_idx,
                 options,
                 contig_length,
-            ),
-            counters: Vec::new(),
+            },
+            counters: counters,
         }
     }
 }
 
 
-impl BamRecordAggregator for CountAlignmentsAggregator {
-    fn put_bam_record(&mut self, record: &bam::Record) {}
+impl CountAlignmentsAggregator {
+    // Skip `record` based on `MAPQ`?
+    fn skip_mapq(&self, record: &bam::Record) -> bool {
+        record.mapq() < self.base.options.min_mapq
+    }
 
-    fn fill_bcf_record(&self, record: &mut bcf::Record, window_id: u32) {}
+    // Skip `record` because of flags.
+    fn skip_flags(&self, record: &bam::Record) -> bool {
+        record.is_secondary() || record.is_supplementary() || record.is_duplicate()
+    }
+
+    /// Skip `record` because of discordant alignment?
+    fn skip_discordant(&self, record: &bam::Record) -> bool {
+        self.base.options.skip_discordant && !record.is_paired() &&
+            (record.tid() != record.mtid() || record.is_reverse() == record.is_mate_reverse() ||
+                 record.is_unmapped() || record.is_mate_unmapped())
+    }
+
+    // Skip `record` because of too much clipping?
+    fn skip_clipping(&self, record: &bam::Record) -> bool {
+        use rust_htslib::bam::record::Cigar::*;
+
+        let mut num_clipped = 0;
+        let mut num_unclipped = 0;
+        for c in record.cigar().iter() {
+            match c {
+                Match(num) | Ins(num) | Equal(num) | Diff(num) => {
+                    num_unclipped += num;
+                }
+                SoftClip(num) | HardClip(num) => {
+                    num_clipped += num;
+                }
+                Del(_) | RefSkip(_) | Pad(_) => (),
+            }
+        }
+
+        (num_unclipped as f32) / ((num_clipped + num_unclipped) as f32) < self.base.options.min_unclipped
+    }
+
+    // Skip `record` because it is paired and not the first fragment?
+    fn skip_paired_and_all_but_first(&self, record: &bam::Record) -> bool {
+        !record.is_paired() && !record.is_first_in_template()
+    }
+}
+
+
+impl BamRecordAggregator for CountAlignmentsAggregator {
+    fn put_bam_record(&mut self, record: &bam::Record) {
+        if self.skip_mapq(record) || self.skip_flags(record) || self.skip_discordant(record) ||
+            self.skip_clipping(record) ||
+            self.skip_paired_and_all_but_first(record)
+        {
+            return; // record is to be ignored
+        }
+
+    }
+
+    fn fill_bcf_record(&self, record: &mut bcf::Record, window_id: u32) {
+        panic!("XXX TODO WRITE ME XXX TODO");
+    }
 }
 
 
@@ -238,29 +292,33 @@ struct CoverageAggregator {
 
 impl CoverageAggregator {
     fn new(
-        samples: &Vec<String>,
-        read_group_to_sample: &HashMap<String, String>,
-        sample_to_idx: &HashMap<String, u32>,
-        options: &Options,
+        samples: Vec<String>,
+        read_group_to_sample: HashMap<String, String>,
+        sample_to_idx: HashMap<String, u32>,
+        options: Options,
         contig_length: u64,
     ) -> CoverageAggregator {
         CoverageAggregator {
-            base: BaseAggregator::new(
+            base: BaseAggregator {
                 samples,
                 read_group_to_sample,
                 sample_to_idx,
                 options,
                 contig_length,
-            ),
+            },
             coverage: Vec::new(),
         }
     }
 }
 
 impl BamRecordAggregator for CoverageAggregator {
-    fn put_bam_record(&mut self, record: &bam::Record) {}
+    fn put_bam_record(&mut self, record: &bam::Record) {
+        panic!("XXX TODO WRITE ME XXX TODO");
+    }
 
-    fn fill_bcf_record(&self, record: &mut bcf::Record, window_id: u32) {}
+    fn fill_bcf_record(&self, record: &mut bcf::Record, window_id: u32) {
+        panic!("XXX TODO WRITE ME XXX TODO");
+    }
 }
 
 
@@ -518,6 +576,14 @@ impl CoverageOutput {
     }
 }
 
+
+fn collect_piles(reader: &mut bam::IndexedReader, chrom: &str, options: &mut Options) -> interval_tree::IntervalTree<i32, i32> {
+    let tid = reader.header().tid(chrom.as_bytes()).unwrap();
+
+    interval_tree::IntervalTree::new()
+}
+
+
 /// Implementation of the `cnvetti coverage` command.
 pub struct CoverageApp<'a> {
     /// Logging struct
@@ -601,7 +667,20 @@ impl<'a> CoverageApp<'a> {
             None
         };
 
-        info!(self.logger, "Processing alignments...");
+        // Compute read piles for masking/black-listing.
+        let piles: Vec<interval_tree::IntervalTree<i32, i32>> = if self.options.mask_piles {
+            info!(self.logger, "Computing piles for black listing");
+            self.input
+                .bam_readers
+                .iter_mut()
+                .map(|ref mut reader| collect_piles(reader, chrom, &mut self.options))
+                .collect()
+        } else {
+            info!(self.logger, "Piles for black listing are not considered");
+            (1..(self.input.bam_readers.len())).map(|_| interval_tree::IntervalTree::new()).collect()
+        };
+
+        info!(self.logger, "Computing coverage...");
         // Seek to region in readers.
         for bam_reader in &mut self.input.bam_readers {
             let tid = bam_reader.header().tid(chrom.as_bytes()).expect(
@@ -618,32 +697,19 @@ impl<'a> CoverageApp<'a> {
             .bam_readers
             .iter()
             .map(|bam_reader| {
-                let mut samples = Vec::new();
-                let text = String::from_utf8(Vec::from(bam_reader.header().as_bytes())).unwrap();
-                for line in text.lines() {
-                    if line.starts_with("@RG") {
-                        match parse_line_rg(line.to_string()) {
-                            Some((id, sm)) => {
-                                samples.push(sm.clone());
-                            }
-                            None => (),
-                        }
-                    }
-                }
-
                 let result: Box<BamRecordAggregator> = match self.options.count_kind {
                     CountKind::Coverage => Box::new(CoverageAggregator::new(
-                        &samples,
-                        &self.input.read_group_to_sample,
-                        &self.input.sample_to_index,
-                        &self.options,
+                        self.input.samples.clone(),
+                        self.input.read_group_to_sample.clone(),
+                        self.input.sample_to_index.clone(),
+                        self.options.clone(),
                         chrom_len,
                     )),
                     CountKind::Alignments => Box::new(CountAlignmentsAggregator::new(
-                        &samples,
-                        &self.input.read_group_to_sample,
-                        &self.input.sample_to_index,
-                        &self.options,
+                        self.input.samples.clone(),
+                        self.input.read_group_to_sample.clone(),
+                        self.input.sample_to_index.clone(),
+                        self.options.clone(),
                         chrom_len,
                     )),
                 };
@@ -662,7 +728,7 @@ impl<'a> CoverageApp<'a> {
         }
 
         // Compute histogram of GC contents.
-        // TODO: allow rounding via command line.
+        // TODO: allow giving step size via command line.
         let gc_step: f32 = 0.02;
         let mut gc_histo: HashMap<i32, i32> = HashMap::new();
         for gc in gc_content.iter() {
@@ -707,9 +773,9 @@ impl<'a> CoverageApp<'a> {
             record.push_info_float(b"GC", &[*gc]).expect(
                 "Could not write INFO/GC",
             );
-            record.push_info_integer(b"GAP", &[has_gap[wid] as i32]).expect(
-                "Could not write INFO/GAP",
-            );
+            record
+                .push_info_integer(b"GAP", &[has_gap[wid] as i32])
+                .expect("Could not write INFO/GAP");
             record
                 .push_info_integer(b"GCWINDOWS", &[*gc_histo.get(&rounded_gc).unwrap_or(&0)])
                 .expect("Could not write INFO/GCWINDOWS");
