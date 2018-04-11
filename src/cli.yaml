@@ -108,15 +108,23 @@ subcommands:
     - pile_min_depth:
         long: pile-min-depth
         takes_value: true
-        default_value: 3
+        default_value: '3'
         value_name: DEPTH
         help: Piles with a depth of >= `DEPTH` will be masked.
-    - pile_fuzzyness:
+    - pile_max_gap:
         long: pile-max-gap
         takes_value: true
         default_value: '5'
         value_name: VAL
         help: Merge intervals for piles if distance is <= `VAL`.
+    - pile_mask_window_size:
+        long: pile-mask-window-size
+        takes_value: true
+        default_value: '500'
+        value_name: SIZE
+        help: >
+            Mask windows of length `SIZE` when a pile occurs.  Set to `1` to
+            do no window-based masking.
 
     # Counting-Related Arguments ----------------------------------------------
     - count_kind:

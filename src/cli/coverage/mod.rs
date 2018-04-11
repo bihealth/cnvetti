@@ -14,8 +14,6 @@ use bio::data_structures::interval_tree;
 
 use chrono;
 
-use clap::{ArgMatches, Values};
-
 use rust_htslib::bcf;
 use rust_htslib::tbx::{self, Read as TbxRead};
 use rust_htslib::bam::{self, Read as BamRead};
@@ -26,300 +24,17 @@ use shlex;
 
 use slog::Logger;
 
+mod piles;
+mod options;
+mod agg;
+
+use self::piles::PileCollector;
+pub use self::options::*;
+use self::agg::*;
+
+
 // TODO: check that no two BAM files have overlapping sample names.
 // TODO: remove restriction to same-length windows.
-
-/// Enum for selecting preset.
-#[derive(Clone, Debug)]
-enum OptionsPreset {
-    Wgs,
-    WesOffTarget,
-    WesOnTarget,
-}
-
-
-impl OptionsPreset {
-    /// Parse `CountKind` from `&str`.
-    fn from_str(s: &str) -> Option<OptionsPreset> {
-        match s {
-            "Wgs" => Some(OptionsPreset::Wgs),
-            "WesOffTarget" => Some(OptionsPreset::WesOffTarget),
-            "WesOnTarget" => Some(OptionsPreset::WesOnTarget),
-            _ => {
-                panic!("Invalid preset {}", s);
-            }
-        }
-    }
-}
-
-
-/// Enum for selecting count type.
-#[derive(Clone, Debug)]
-enum CountKind {
-    Coverage,
-    Alignments,
-}
-
-
-impl CountKind {
-    /// Parse `CountKind` from `&str`.
-    fn from_str(s: &str) -> Option<CountKind> {
-        match s {
-            "Coverage" => Some(CountKind::Coverage),
-            "Alignments" => Some(CountKind::Alignments),
-            _ => {
-                panic!("Invalid count type {}", s);
-            }
-        }
-    }
-}
-
-
-/// Options for the "coverage" command.
-#[derive(Clone, Debug)]
-pub struct Options {
-    reference: String,
-    input: Vec<String>,
-    output: String,
-    genome_regions: Vec<String>,
-    mapability_bed: Option<String>,
-    window_length: u64,
-    window_overlap: u64,
-    count_kind: CountKind,
-    min_mapq: u8,
-    min_unclipped: f32,
-    skip_discordant: bool,
-    mask_piles: bool,
-    pile_min_depth: i32,
-    pile_max_gap: i32,
-}
-
-impl Options {
-    /// Build options from ArgMatches.
-    pub fn new(matches: &ArgMatches) -> Options {
-        // TODO: interpret `--preset`
-
-        let count_kind = matches.value_of("count_kind").unwrap();
-
-        Options {
-            reference: matches.value_of("reference").unwrap().to_string(),
-            input: matches
-                .values_of("input")
-                .unwrap_or(Values::default())
-                .map(|res| res.to_string())
-                .collect(),
-            output: matches.value_of("output").unwrap().to_string(),
-            genome_regions: matches
-                .values_of("genome_regions")
-                .unwrap_or(Values::default())
-                .map(|res| res.to_string())
-                .collect(),
-            mapability_bed: match matches.value_of("mapability_bed") {
-                Some(x) => Some(x.to_string()),
-                None => None,
-            },
-            window_length: matches
-                .value_of("window_length")
-                .unwrap()
-                .parse::<u64>()
-                .unwrap(),
-            window_overlap: matches
-                .value_of("window_overlap")
-                .unwrap()
-                .parse::<u64>()
-                .unwrap(),
-            count_kind: CountKind::from_str(count_kind).unwrap(),
-            min_mapq: matches.value_of("min_mapq").unwrap().parse::<u8>().unwrap(),
-            min_unclipped: matches
-                .value_of("min_unclipped")
-                .unwrap()
-                .parse::<f32>()
-                .unwrap(),
-            skip_discordant: matches.is_present("skip_discordant"),
-            mask_piles: matches.is_present("mask_piles"),
-            pile_min_depth: matches
-                .value_of("pile_min_depth")
-                .unwrap()
-                .parse::<i32>()
-                .unwrap(),
-            pile_max_gap: matches
-                .value_of("pile_max_gap")
-                .unwrap()
-                .parse::<i32>()
-                .unwrap(),
-        }
-    }
-}
-
-
-/// Struct with common information for aggregator.
-struct BaseAggregator {
-    /// Names of the samples to aggregate in this sample.
-    samples: Vec<String>,
-    /// Mapping from read group name to sample.
-    read_group_to_sample: HashMap<String, String>,
-    /// Mapping from sample name to sample index.
-    sample_to_idx: HashMap<String, u32>,
-
-    /// Configuration.
-    options: Options,
-    /// Length of contig process
-    contig_length: u64,
-}
-
-/// Trait for alignment aggregation from BAM files.
-trait BamRecordAggregator {
-    /// Put the given record into the aggregation.
-    fn put_bam_record(&mut self, record: &bam::Record);
-
-    /// Write out the counts to the given `record`.
-    fn fill_bcf_record(&self, record: &mut bcf::Record, window_id: u32);
-}
-
-
-/// Struct for aggregating as alignment counts.
-struct CountAlignmentsAggregator {
-    /// Common information from all aggregators.
-    base: BaseAggregator,
-
-    /// Per-sample read counts (each bin is a `u32`).
-    counters: Vec<Vec<u32>>,
-}
-
-
-impl CountAlignmentsAggregator {
-    /// Construct new aggregator with the given BAM `header`.  This information is
-    /// necessary to appropriately allocate buffers for all samples in the header.
-    fn new(
-        samples: Vec<String>,
-        read_group_to_sample: HashMap<String, String>,
-        sample_to_idx: HashMap<String, u32>,
-        options: Options,
-        contig_length: u64,
-    ) -> CountAlignmentsAggregator {
-        // TODO: construct counters here.
-        let counters = Vec::new();
-
-        CountAlignmentsAggregator {
-            base: BaseAggregator {
-                samples,
-                read_group_to_sample,
-                sample_to_idx,
-                options,
-                contig_length,
-            },
-            counters: counters,
-        }
-    }
-}
-
-
-impl CountAlignmentsAggregator {
-    // Skip `record` based on `MAPQ`?
-    fn skip_mapq(&self, record: &bam::Record) -> bool {
-        record.mapq() < self.base.options.min_mapq
-    }
-
-    // Skip `record` because of flags.
-    fn skip_flags(&self, record: &bam::Record) -> bool {
-        record.is_secondary() || record.is_supplementary() || record.is_duplicate()
-    }
-
-    /// Skip `record` because of discordant alignment?
-    fn skip_discordant(&self, record: &bam::Record) -> bool {
-        self.base.options.skip_discordant && !record.is_paired() &&
-            (record.tid() != record.mtid() || record.is_reverse() == record.is_mate_reverse() ||
-                 record.is_unmapped() || record.is_mate_unmapped())
-    }
-
-    // Skip `record` because of too much clipping?
-    fn skip_clipping(&self, record: &bam::Record) -> bool {
-        use rust_htslib::bam::record::Cigar::*;
-
-        let mut num_clipped = 0;
-        let mut num_unclipped = 0;
-        for c in record.cigar().iter() {
-            match c {
-                Match(num) | Ins(num) | Equal(num) | Diff(num) => {
-                    num_unclipped += num;
-                }
-                SoftClip(num) | HardClip(num) => {
-                    num_clipped += num;
-                }
-                Del(_) | RefSkip(_) | Pad(_) => (),
-            }
-        }
-
-        (num_unclipped as f32) / ((num_clipped + num_unclipped) as f32) < self.base.options.min_unclipped
-    }
-
-    // Skip `record` because it is paired and not the first fragment?
-    fn skip_paired_and_all_but_first(&self, record: &bam::Record) -> bool {
-        !record.is_paired() && !record.is_first_in_template()
-    }
-}
-
-
-impl BamRecordAggregator for CountAlignmentsAggregator {
-    fn put_bam_record(&mut self, record: &bam::Record) {
-        if self.skip_mapq(record) || self.skip_flags(record) || self.skip_discordant(record) ||
-            self.skip_clipping(record) ||
-            self.skip_paired_and_all_but_first(record)
-        {
-            return; // record is to be ignored
-        }
-
-    }
-
-    fn fill_bcf_record(&self, record: &mut bcf::Record, window_id: u32) {
-        panic!("XXX TODO WRITE ME XXX TODO");
-    }
-}
-
-
-/// Bin for coverage aggregation.
-struct CoverageBin {}
-
-
-/// Struct for aggregating as coverage.
-struct CoverageAggregator {
-    /// Common information from all aggregators.
-    base: BaseAggregator,
-    /// Number of bases for each base in the current bin for each sample.
-    coverage: Vec<Vec<CoverageBin>>,
-}
-
-
-impl CoverageAggregator {
-    fn new(
-        samples: Vec<String>,
-        read_group_to_sample: HashMap<String, String>,
-        sample_to_idx: HashMap<String, u32>,
-        options: Options,
-        contig_length: u64,
-    ) -> CoverageAggregator {
-        CoverageAggregator {
-            base: BaseAggregator {
-                samples,
-                read_group_to_sample,
-                sample_to_idx,
-                options,
-                contig_length,
-            },
-            coverage: Vec::new(),
-        }
-    }
-}
-
-impl BamRecordAggregator for CoverageAggregator {
-    fn put_bam_record(&mut self, record: &bam::Record) {
-        panic!("XXX TODO WRITE ME XXX TODO");
-    }
-
-    fn fill_bcf_record(&self, record: &mut bcf::Record, window_id: u32) {
-        panic!("XXX TODO WRITE ME XXX TODO");
-    }
-}
 
 
 /// Structure holding the input files readers and related data structures.
@@ -418,6 +133,10 @@ impl CoverageInput {
         let mut idx: u32 = 0;
         for reader in &bam_readers {
             let text = String::from_utf8(Vec::from(reader.header().as_bytes())).unwrap();
+            // The one sample for the current reader.
+            let mut seen_sm = Option::None;
+            // All samples seen so far.
+            let mut seen_before = samples.clone();
 
             for line in text.lines() {
                 if line.starts_with("@RG") {
@@ -425,6 +144,23 @@ impl CoverageInput {
                         Some((id, sm)) => {
                             debug!(logger, "RG '{}' => '{}'", &id, &sm);
                             debug!(logger, "SM '{}' => '{}'", &sm, &idx);
+
+                            // Protect against two different samples in the same file.
+                            seen_sm = match seen_sm {
+                                Some(seen_sm) => {
+                                    if seen_sm != sm {
+                                        panic!("Seen more than one sample in same BAM file");
+                                    }
+                                    Some(seen_sm)
+                                }
+                                None => Some(sm.clone()),
+                            };
+
+                            // Protect against same sample in two files.
+                            if seen_before.contains(&sm) {
+                                panic!("Seen sample in more than one file");
+                            }
+
                             samples.push(sm.clone());
                             read_group_to_sample.insert(id.clone(), sm.clone());
                             sample_to_index.insert(sm.clone(), idx.clone());
@@ -471,6 +207,7 @@ impl CoverageInput {
 }
 
 /// Structure holding the output files readers and related data structures.
+#[derive(Debug)]
 struct CoverageOutput {
     header: bcf::Header,
     bcf_writer: bcf::Writer,
@@ -554,18 +291,11 @@ impl CoverageOutput {
             "##INFO=<ID=GCWINDOWS,Number=1,Type=Integer,Description=\"Number of windows with same \
             GC content\">",
             "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">",
-            "##FORMAT=<ID=COV,Number=1,Type=Float,Description=\"Average coverage with non-q0 \
-            reads\">",
-            "##FORMAT=<ID=COV0,Number=1,Type=Float,Description=\"Average coverage with \
-            q0+non-q0 reads\">",
-            "##FORMAT=<ID=WINSD,Number=1,Type=Float,Description=\"Per-window coverage SD (non-q0 \
-            reads)\">",
-            "##FORMAT=<ID=WINSD0,Number=1,Type=Float,Description=\"Per-window coverage SD \
-            (q0+non-q0 reads)\">",
-            "##FORMAT=<ID=RC,Number=1,Type=Float,Description=\"Number of aligning non-q0 \
-            reads\">",
-            "##FORMAT=<ID=RC0,Number=1,Type=Float,Description=\"Number of aligning q0+non-q0 \
-            reads\">",
+            "##FORMAT=<ID=COV,Number=1,Type=Float,Description=\"Average coverage\">",
+            "##FORMAT=<ID=WINSD,Number=1,Type=Float,Description=\"Per-window coverage SD)\">",
+            "##FORMAT=<ID=RC,Number=1,Type=Integer,Description=\"Number of aligning reads\">",
+            "##FORMAT=<ID=MS,Number=1,Type=Integer,Description=\"Number of bases in window \
+            masked because of read piles\">",
             "##ALT=<ID=COUNT,Description=\"Record describes a window for read counting\">",
         ];
         for line in lines {
@@ -574,13 +304,6 @@ impl CoverageOutput {
 
         header
     }
-}
-
-
-fn collect_piles(reader: &mut bam::IndexedReader, chrom: &str, options: &mut Options) -> interval_tree::IntervalTree<i32, i32> {
-    let tid = reader.header().tid(chrom.as_bytes()).unwrap();
-
-    interval_tree::IntervalTree::new()
 }
 
 
@@ -597,6 +320,7 @@ pub struct CoverageApp<'a> {
     /// Output files.
     output: CoverageOutput,
 }
+
 
 impl<'a> CoverageApp<'a> {
     /// Construct and initialize new `CoverageApp` instance.
@@ -631,6 +355,8 @@ impl<'a> CoverageApp<'a> {
         self.process_regions(&regions);
 
         info!(self.logger, "Writing statistics");
+        // TODO
+
         info!(self.logger, "Done. Have a nice day!");
 
         Ok(())
@@ -653,32 +379,13 @@ impl<'a> CoverageApp<'a> {
             end.separated_string()
         );
 
-        info!(self.logger, "Loading GC content and gap (is-N) status...");
-        let begin = start - 1; // 1-based to 0-based
+        // Get `u32` 0-based coordinates.
+        let begin = (start - 1) as u32;
+        let end = end as u32;
+
         let (chrom_len, gc_content, has_gap) = self.analyze_reference(chrom).unwrap();
-
-        let mapability = if self.input.tbx_reader.is_some() {
-            info!(self.logger, "Loading mapability...");
-            Some(self.load_mapability(&chrom, chrom_len).expect(
-                "loading mapability failed",
-            ))
-        } else {
-            info!(self.logger, "Mapability is not considered.");
-            None
-        };
-
-        // Compute read piles for masking/black-listing.
-        let piles: Vec<interval_tree::IntervalTree<i32, i32>> = if self.options.mask_piles {
-            info!(self.logger, "Computing piles for black listing");
-            self.input
-                .bam_readers
-                .iter_mut()
-                .map(|ref mut reader| collect_piles(reader, chrom, &mut self.options))
-                .collect()
-        } else {
-            info!(self.logger, "Piles for black listing are not considered");
-            (1..(self.input.bam_readers.len())).map(|_| interval_tree::IntervalTree::new()).collect()
-        };
+        let mapability = self.maybe_load_mapability(chrom, chrom_len);
+        let piles = self.maybe_collect_piles(chrom);
 
         info!(self.logger, "Computing coverage...");
         // Seek to region in readers.
@@ -686,7 +393,7 @@ impl<'a> CoverageApp<'a> {
             let tid = bam_reader.header().tid(chrom.as_bytes()).expect(
                 "Could not resolve contig name to integer",
             );
-            bam_reader.fetch(tid, start as u32, end as u32).expect(
+            bam_reader.fetch(tid, begin, end).expect(
                 "Could not fetch region!",
             );
         }
@@ -696,7 +403,8 @@ impl<'a> CoverageApp<'a> {
         let mut aggregators: Vec<Box<BamRecordAggregator>> = self.input
             .bam_readers
             .iter()
-            .map(|bam_reader| {
+            .enumerate()
+            .map(|(i, bam_reader)| {
                 let result: Box<BamRecordAggregator> = match self.options.count_kind {
                     CountKind::Coverage => Box::new(CoverageAggregator::new(
                         self.input.samples.clone(),
@@ -706,6 +414,7 @@ impl<'a> CoverageApp<'a> {
                         chrom_len,
                     )),
                     CountKind::Alignments => Box::new(CountAlignmentsAggregator::new(
+                        &piles[i],
                         self.input.samples.clone(),
                         self.input.read_group_to_sample.clone(),
                         self.input.sample_to_index.clone(),
@@ -717,6 +426,9 @@ impl<'a> CoverageApp<'a> {
                 result
             })
             .collect();
+
+        // Compute number of samples.
+        let num_samples = self.input.bam_readers.len();
 
         // Count reads / compute coverage.
         let mut record = bam::Record::new();
@@ -761,10 +473,14 @@ impl<'a> CoverageApp<'a> {
                 end as usize,
                 (wid + 1) * self.options.window_length as usize,
             ) as i32;
-            record.update_id(
-                format!("WIN_{}_{}_{}", chrom, pos + 1, window_end).as_bytes(),
+            record
+                .update_id(
+                    format!("WIN_{}_{}_{}", chrom, pos + 1, window_end).as_bytes(),
+                )
+                .expect("Could not update ID");
+            record.update_alleles_str(b"N,<COUNT>").expect(
+                "Could not update alleles!",
             );
-            record.update_alleles_str(b"N,<COUNT>");
 
             // INFO fields
             record.push_info_integer(b"END", &[window_end]).expect(
@@ -791,8 +507,11 @@ impl<'a> CoverageApp<'a> {
                 .expect("Could not push genotypes");
 
             // The remaining FORMAT fields are done by `BamRecordAggregator`s.
-            for agg in &aggregators {
-                agg.fill_bcf_record(&mut record, wid as u32);
+            aggregators.first().map(|agg| {
+                agg.prepare_bcf_record(&mut record, num_samples)
+            });
+            for (i, agg) in aggregators.iter().enumerate() {
+                agg.fill_bcf_record(&mut record, i, wid as u32);
             }
 
             // Actually write the record.
@@ -811,6 +530,22 @@ impl<'a> CoverageApp<'a> {
             .iter()
             .map(|seq| (seq.name.clone(), 1, seq.len))
             .collect()
+    }
+
+    /// Load mapability if configured to do so.
+    fn maybe_load_mapability(&mut self, chrom: &str, chrom_len: u64) -> Option<Vec<f32>> {
+        match self.input.tbx_reader {
+            Some(_) => {
+                info!(self.logger, "Loading mapability...");
+                Some(self.load_mapability(&chrom, chrom_len).expect(
+                    "loading mapability failed",
+                ))
+            }
+            None => {
+                info!(self.logger, "Mapability is not considered.");
+                None
+            }
+        }
     }
 
     /// Load mapability of `chrom` from BED file.
@@ -869,8 +604,46 @@ impl<'a> CoverageApp<'a> {
         Ok(result)
     }
 
+    /// Load piles for black-listing or an empty `IntervalTree` for each sample.
+    fn maybe_collect_piles(&mut self, chrom: &str) -> Vec<interval_tree::IntervalTree<u32, i32>> {
+        // Only collect piles when masking by pile and counting alignments.
+        if self.options.mask_piles && self.options.count_kind == CountKind::Alignments {
+            info!(self.logger, "Computing piles for black listing");
+            let options = self.options.clone();
+            let samples = self.input.samples.clone();
+
+            let mut result = Vec::new();
+            for (i, bam_reader) in self.input.bam_readers.iter_mut().enumerate() {
+                let mut collector = PileCollector::new(
+                    bam_reader,
+                    options.pile_min_depth,
+                    options.pile_max_gap,
+                    options.min_mapq,
+                    options.pile_mask_window_size,
+                );
+                let (len_sum, tree) = collector.collect_piles(chrom);
+                debug!(
+                    self.logger,
+                    "Black listed {} bp for {}",
+                    len_sum.separated_string(),
+                    samples[i]
+                );
+
+                result.push(tree);
+            }
+
+            result
+        } else {
+            info!(self.logger, "Piles for black listing are not considered");
+            (1..(self.input.bam_readers.len()))
+                .map(|_| interval_tree::IntervalTree::new())
+                .collect()
+        }
+    }
+
     /// Analyze reference for GC content, and is-gap (=N) status.
     fn analyze_reference(&mut self, chrom: &str) -> Result<(u64, Vec<f32>, Vec<bool>), String> {
+        info!(self.logger, "Loading GC content and gap (is-N) status...");
         let window_length = self.options.window_length as usize;
 
         // Read reference sequence.
