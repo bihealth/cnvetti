@@ -17,9 +17,8 @@ impl OptionsPreset {
             "Wgs" => Some(OptionsPreset::Wgs),
             "WesOffTarget" => Some(OptionsPreset::WesOffTarget),
             "WesOnTarget" => Some(OptionsPreset::WesOnTarget),
-            _ => {
-                panic!("Invalid preset {}", s);
-            }
+            _ => None,
+
         }
     }
 }
@@ -39,9 +38,7 @@ impl CountKind {
         match s {
             "Coverage" => Some(CountKind::Coverage),
             "Alignments" => Some(CountKind::Alignments),
-            _ => {
-                panic!("Invalid count type {}", s);
-            }
+            _ => None,
         }
     }
 }
@@ -75,7 +72,7 @@ impl Options {
 
         let count_kind = matches.value_of("count_kind").unwrap();
 
-        Options {
+        let mut options = Options {
             reference: matches.value_of("reference").unwrap().to_string(),
             input: matches
                 .values_of("input")
@@ -102,7 +99,7 @@ impl Options {
                 .unwrap()
                 .parse::<u64>()
                 .unwrap(),
-            count_kind: CountKind::from_str(count_kind).unwrap(),
+            count_kind: CountKind::from_str(count_kind).expect("Unknown count kind"),
             min_mapq: matches.value_of("min_mapq").unwrap().parse::<u8>().unwrap(),
             min_unclipped: matches
                 .value_of("min_unclipped")
@@ -126,6 +123,31 @@ impl Options {
                 .unwrap()
                 .parse::<u32>()
                 .unwrap(),
+        };
+
+        if let Some(preset) = matches.value_of("preset") {
+            match OptionsPreset::from_str(preset).expect("Unknown --preset") {
+                OptionsPreset::Wgs => {
+                    panic!("Wgs preset not implemented yet!");
+                }
+                OptionsPreset::WesOnTarget => {
+                    panic!("WesOnTarget preset not implemented yet!");
+                }
+                OptionsPreset::WesOffTarget => {
+                    // For WES off-target, we count alignments, use a larger window size, and
+                    // enable appropriate pile removal and count alignments.
+                    options.window_length = 20_000;
+
+                    options.mask_piles = true;
+                    options.pile_mask_window_size = 500;
+                    options.pile_min_depth = 3;
+                    options.pile_max_gap = 5;
+
+                    options.count_kind = CountKind::Alignments;
+                }
+            }
         }
+
+        options
     }
 }

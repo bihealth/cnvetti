@@ -24,6 +24,11 @@ pub struct BaseAggregator {
     options: Options,
     /// Length of contig process
     contig_length: u64,
+
+    /// Number of processed records.
+    num_processed: u32,
+    /// Number of skipped records.
+    num_skipped: u32,
 }
 
 /// Trait for alignment aggregation from BAM files.
@@ -31,13 +36,23 @@ pub trait BamRecordAggregator {
     /// Put the given record into the aggregation.
     fn put_bam_record(&mut self, record: &bam::Record);
 
-    // TODO: more elegant solution for pushing format values.
+    /// Names of the integer fields that will be written out.
+    fn integer_field_names(&self) -> Vec<String>;
 
-    /// Initialize arrays for counters in `record`.
-    fn prepare_bcf_record(&self, record: &mut bcf::Record, num_sample: usize);
+    /// Names of the float fields that will be written out.
+    fn float_field_names(&self) -> Vec<String>;
 
-    /// Write out the statistics for the given sample to the given `record`.
-    fn fill_bcf_record(&self, record: &mut bcf::Record, sample_id: usize, window_id: u32);
+    /// Return float values.
+    fn integer_values(&self, window_id: u32) -> HashMap<String, i32>;
+
+    /// Return float values.
+    fn float_values(&self, window_id: u32) -> HashMap<String, f32>;
+
+    /// Number of processed records.
+    fn num_processed(&self) -> u32;
+
+    /// Number of skipped records.
+    fn num_skipped(&self) -> u32;
 }
 
 
@@ -74,6 +89,8 @@ impl<'a> CountAlignmentsAggregator<'a> {
                 sample_to_idx,
                 options,
                 contig_length,
+                num_processed: 0,
+                num_skipped: 0,
             },
             tree: tree,
             counters: vec![0; contig_length as usize],
@@ -95,9 +112,14 @@ impl<'a> CountAlignmentsAggregator<'a> {
 
     /// Skip `record` because of discordant alignment?
     fn skip_discordant(&self, record: &bam::Record) -> bool {
-        self.base.options.skip_discordant && !record.is_paired() &&
-            (record.tid() != record.mtid() || record.is_reverse() == record.is_mate_reverse() ||
-                 record.is_unmapped() || record.is_mate_unmapped())
+        if !self.base.options.skip_discordant {
+            false // skipping based on discordant has to be enabled
+        } else if !record.is_paired() {
+            false // unpaired cannot be discordant
+        } else {
+            record.tid() != record.mtid() || record.is_reverse() == record.is_mate_reverse() ||
+                record.is_unmapped() || record.is_mate_unmapped()
+        }
     }
 
     // Skip `record` because of too much clipping?
@@ -135,45 +157,37 @@ impl<'a> BamRecordAggregator for CountAlignmentsAggregator<'a> {
             !self.skip_discordant(record) && !self.skip_clipping(record) &&
             !self.skip_paired_and_all_but_first(record)
         {
+            self.base.num_processed += 1;
+
             let pos = (record.pos() as u32)..((record.pos() + 1) as u32);
             let window_length = self.base.options.window_length as usize;
             let bin = record.pos() as usize / window_length;
-            if !self.tree.find(pos).next().is_none() {
+            if self.tree.find(pos).next().is_none() {
                 self.counters[bin] += 1;
+            } else {
+                self.base.num_skipped += 1;
             }
         }
     }
 
-    fn prepare_bcf_record(&self, record: &mut bcf::Record, num_samples: usize) {
-        record
-            .push_format_integer(b"RC", vec![0 as i32; num_samples].as_slice())
-            .expect("Writing FORMAT/RC failed");
-        record
-            .push_format_integer(b"MS", vec![0 as i32; num_samples].as_slice())
-            .expect("Writing FORMAT/MS failed");
+    fn integer_field_names(&self) -> Vec<String> {
+        vec![String::from("RC"), String::from("MS")]
     }
 
-    fn fill_bcf_record(&self, record: &mut bcf::Record, sample_id: usize, window_id: u32) {
-        let window_id = window_id as usize;
+    fn float_field_names(&self) -> Vec<String> {
+        Vec::new()
+    }
 
-        // Write out read count.
-        let rc = [self.counters[window_id] as i32];
-        // Scope to only have record mutably once.
-        // TODO: is there a more elegant solution?
-        {
-            let mut rcs = record.format(b"RC").integer_mut().expect(
-                "FORMAT/RC not found",
-            );
-            rcs[0].copy_from_slice(&rc);
-            println!("Writing {:?} into RC => {:?}", rc, rcs);
-        }
+    fn integer_values(&self, window_id: u32) -> HashMap<String, i32> {
+        let mut result = HashMap::new();
+        result.insert(String::from("RC"), self.counters[window_id as usize] as i32);
 
-        // Compute number of masked bases in window.
         let window = Range {
-            start: (window_id * self.base.options.window_length as usize) as u32,
-            end: ((window_id + 1) * self.base.options.window_length as usize) as u32,
+            start: (window_id * self.base.options.window_length as u32) as u32,
+            end: ((window_id + 1) * self.base.options.window_length as u32) as u32,
         };
-        let ms = [
+        result.insert(
+            String::from("MS"),
             self.tree
                 .find(window.clone())
                 .map(|entry| {
@@ -183,16 +197,21 @@ impl<'a> BamRecordAggregator for CountAlignmentsAggregator<'a> {
                     end - start
                 })
                 .sum::<i32>(),
-        ];
-        // Scope to only have record mutably once.
-        // TODO: is there a more elegant solution?
-        {
-            let mut mss = record.format(b"MS").integer_mut().expect(
-                "FORMAT/MS not found",
-            );
-            mss[0].copy_from_slice(&ms);
-            println!("Writing {:?} into MS => {:?}", ms, mss);
-        }
+        );
+
+        result
+    }
+
+    fn float_values(&self, window_id: u32) -> HashMap<String, f32> {
+        HashMap::new()
+    }
+
+    fn num_processed(&self) -> u32 {
+        self.base.num_processed
+    }
+
+    fn num_skipped(&self) -> u32 {
+        self.base.num_skipped
     }
 }
 
@@ -227,6 +246,8 @@ impl CoverageAggregator {
                 sample_to_idx,
                 options,
                 contig_length,
+                num_processed: 0,
+                num_skipped: 0,
             },
             coverage: Vec::new(),
         }
@@ -238,11 +259,29 @@ impl BamRecordAggregator for CoverageAggregator {
         panic!("XXX TODO WRITE ME XXX TODO");
     }
 
-    fn prepare_bcf_record(&self, record: &mut bcf::Record, num_sample: usize) {
-        panic!("XXX TODO WRITE ME XXX TODO");
+    fn integer_field_names(&self) -> Vec<String> {
+        Vec::new()
     }
 
-    fn fill_bcf_record(&self, record: &mut bcf::Record, sample_id: usize, window_id: u32) {
-        panic!("XXX TODO WRITE ME XXX TODO");
+    fn float_field_names(&self) -> Vec<String> {
+        vec![String::from("COV"), String::from("WINSD")]
+    }
+
+    fn integer_values(&self, window_id: u32) -> HashMap<String, i32> {
+        panic!("Implement me!");
+        // HashMap::new()
+    }
+
+    fn float_values(&self, window_id: u32) -> HashMap<String, f32> {
+        panic!("Implement me!");
+        // HashMap::new()
+    }
+
+    fn num_processed(&self) -> u32 {
+        self.base.num_processed
+    }
+
+    fn num_skipped(&self) -> u32 {
+        self.base.num_skipped
     }
 }

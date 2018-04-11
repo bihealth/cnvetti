@@ -434,9 +434,18 @@ impl<'a> CoverageApp<'a> {
         let mut record = bam::Record::new();
         for (i, ref mut bam_reader) in self.input.bam_readers.iter_mut().enumerate() {
             // Read all records in region for reader `i`.
+            let mut count = 0;
             while bam_reader.read(&mut record).is_ok() {
                 aggregators[i].put_bam_record(&mut record);
+                count += 1;
             }
+            debug!(
+                self.logger,
+                "For sample {} -- processed {}, skipped {} records",
+                self.input.samples[i],
+                aggregators[i].num_processed(),
+                aggregators[i].num_skipped(),
+            );
         }
 
         // Compute histogram of GC contents.
@@ -474,11 +483,12 @@ impl<'a> CoverageApp<'a> {
                 (wid + 1) * self.options.window_length as usize,
             ) as i32;
             record
-                .update_id(
+                .set_id(
                     format!("WIN_{}_{}_{}", chrom, pos + 1, window_end).as_bytes(),
                 )
                 .expect("Could not update ID");
-            record.update_alleles_str(b"N,<COUNT>").expect(
+            let alleles = &[Vec::from("N"), Vec::from("<COUNT>")];
+            record.set_alleles(alleles).expect(
                 "Could not update alleles!",
             );
 
@@ -498,8 +508,9 @@ impl<'a> CoverageApp<'a> {
 
             // FORMAT/GT
             record
-                .push_format_genotypes(
-                    iter::repeat(bcf::gt_missing)
+                .push_format_integer(
+                    b"GT",
+                    iter::repeat(bcf::GT_MISSING)
                         .take(self.input.sample_to_index.len())
                         .collect::<Vec<i32>>()
                         .as_slice(),
@@ -507,11 +518,25 @@ impl<'a> CoverageApp<'a> {
                 .expect("Could not push genotypes");
 
             // The remaining FORMAT fields are done by `BamRecordAggregator`s.
-            aggregators.first().map(|agg| {
-                agg.prepare_bcf_record(&mut record, num_samples)
-            });
-            for (i, agg) in aggregators.iter().enumerate() {
-                agg.fill_bcf_record(&mut record, i, wid as u32);
+            for field in aggregators[0].integer_field_names() {
+                let values: Vec<i32> = aggregators
+                    .iter()
+                    .map(|ref agg| {
+                        *agg.integer_values(wid as u32).get(&field).unwrap()
+                    })
+                    .collect();
+                record
+                    .push_format_integer(field.as_bytes(), values.as_slice())
+                    .expect("Could not write FORMAT field");
+            }
+            for field in aggregators[0].float_field_names() {
+                let values: Vec<f32> = aggregators
+                    .iter()
+                    .map(|ref agg| *agg.float_values(wid as u32).get(&field).unwrap())
+                    .collect();
+                record
+                    .push_format_float(field.as_bytes(), values.as_slice())
+                    .expect("Could not write FORMAT field");
             }
 
             // Actually write the record.
@@ -635,7 +660,7 @@ impl<'a> CoverageApp<'a> {
             result
         } else {
             info!(self.logger, "Piles for black listing are not considered");
-            (1..(self.input.bam_readers.len()))
+            (0..(self.input.bam_readers.len()))
                 .map(|_| interval_tree::IntervalTree::new())
                 .collect()
         }

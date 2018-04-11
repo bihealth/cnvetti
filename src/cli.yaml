@@ -151,7 +151,7 @@ subcommands:
     - min_unclipped:
         long: min-unclipped
         takes_value: true
-        default_value: '60'
+        default_value: '0.6'
         value_name: MIN_UNCLIPPED
         help: >
             At least `MIN_UNCLIPPED` percent of the read have to be unclipped
