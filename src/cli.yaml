@@ -25,7 +25,10 @@ args:
     global: true
     help: Decrease verbosity
 
+# TODO: add option to select I/O threads
+
 subcommands:
+# Sub Command: coverage =======================================================
 - coverage:
     about: Collect per-sample coverage information
     args:
@@ -52,7 +55,9 @@ subcommands:
         takes_value: true
         required: true
         value_name: OUT.bcf
-        help: Path to output BCF file (will also write .csi file)
+        help: >
+            Path to output BCF file (cnvetti coverage will also write .csi
+            and .stats.json file).
     - genome_regions:
         long: genome-region
         multiple: true
@@ -161,3 +166,65 @@ subcommands:
         help: >
             If set, discordant alignments (not both reads aligned or not
             inwards-pointing) will be skipped.
+
+# Sub Command: coverage =======================================================
+- normalize:
+    about: Normalize per-sample coverage information
+    args:
+    # Input/Output File Arguments ---------------------------------------------
+    - input:
+        long: input
+        short: i
+        multiple: false
+        takes_value: true
+        required: true
+        value_name: INPUT.bcf
+        help: >
+            Path to indexed input BCF or VCF file resulting from `cnvetti
+            coverage`.  Note that also the corresonding .stats.json file has
+            to exist.
+    - output:
+        long: output
+        short: o
+        takes_value: true
+        required: true
+        value_name: OUT.bcf
+        help: Path to output BCF file (will also write .csi file)
+    - genome_regions:
+        long: genome-region
+        multiple: true
+        takes_value: true
+        value_name: REGION
+        help: Genome region(s) to consider, e.g., 1:1,100,000-1,120,000
+
+    # Filtration-Related Arguments --------------------------------------------
+    - min_gc_window_count:
+        long: min-gc-window-count
+        takes_value: true
+        default_value: '100'
+        value_name: COUNT
+        help: >
+            Flag windows of GC content with an occurence of less than `COUNT`
+            as `INFO/FEW_GCWINDOWS`.
+
+    # Statistics-Related Arguments --------------------------------------------
+    - count_kind:
+        long: count-kind
+        takes_value: true
+        default_value: Coverage
+        value_name: COUNT
+        possible_values:
+        - Coverage
+        - Alignments
+        help: Whether to consider coverage or read count statistics.
+
+    # Preset-Selecting Arguments ----------------------------------------------
+    - preset:
+        long: preset
+        takes_value: true
+        value_name: PRESET
+        possible_values:
+        - Wgs
+        - WesOffTarget
+        - WesOnTarget
+        help: Select one of the pre-defined preset modes.

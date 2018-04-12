@@ -441,7 +441,8 @@ impl<'a> CoverageApp<'a> {
         let end = end as u32;
 
         let (chrom_len, gc_content, has_gap) = self.analyze_reference(chrom).unwrap();
-        let mapability = self.maybe_load_mapability(chrom, chrom_len);
+        // TODO: write out mapability
+        let _mapability = self.maybe_load_mapability(chrom, chrom_len);
         let piles = self.maybe_collect_piles(chrom);
 
         info!(self.logger, "Computing coverage...");
@@ -483,9 +484,6 @@ impl<'a> CoverageApp<'a> {
                 result
             })
             .collect();
-
-        // Compute number of samples.
-        let num_samples = self.input.bam_readers.len();
 
         // Count reads / compute coverage.
         let mut record = bam::Record::new();

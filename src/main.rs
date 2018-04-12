@@ -1,5 +1,3 @@
-extern crate serde_derive;
-
 extern crate cnvetti;
 
 include!(concat!(env!("OUT_DIR"), "/version.rs"));
@@ -22,6 +20,7 @@ use std::process;
 use clap::{App, ArgMatches};
 
 use cnvetti::cli::coverage;
+use cnvetti::cli::normalize;
 
 /// Custom Drain logic
 struct RuntimeLevelFilter<D> {
@@ -84,6 +83,7 @@ fn run(matches: ArgMatches) -> Result<(), String> {
 
     match matches.subcommand() {
         ("coverage", Some(m)) => coverage::call(&mut logger, &coverage::Options::new(&m)),
+        ("normalize", Some(m)) => normalize::call(&mut logger, &normalize::Options::new(&m)),
         _ => Err("Invalid command".to_string()),
     }
 }

@@ -204,7 +204,7 @@ impl<'a> BamRecordAggregator for CountAlignmentsAggregator<'a> {
         result
     }
 
-    fn float_values(&self, window_id: u32) -> HashMap<String, f32> {
+    fn float_values(&self, _window_id: u32) -> HashMap<String, f32> {
         HashMap::new()
     }
 
@@ -261,7 +261,7 @@ impl CoverageAggregator {
 }
 
 impl BamRecordAggregator for CoverageAggregator {
-    fn put_bam_record(&mut self, record: &bam::Record) {
+    fn put_bam_record(&mut self, _record: &bam::Record) {
         panic!("XXX TODO WRITE ME XXX TODO");
     }
 
