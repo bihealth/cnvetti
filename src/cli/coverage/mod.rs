@@ -374,7 +374,9 @@ impl<'a> CoverageApp<'a> {
             use std::ffi;
             let res = unsafe {
                 rust_htslib::htslib::tbx_index_build(
-                    ffi::CString::new(self.options.output.as_bytes()).unwrap().as_ptr(),
+                    ffi::CString::new(self.options.output.as_bytes())
+                        .unwrap()
+                        .as_ptr(),
                     0,
                     &rust_htslib::htslib::tbx_conf_vcf,
                 )
@@ -387,7 +389,9 @@ impl<'a> CoverageApp<'a> {
             use std::ffi;
             let res = unsafe {
                 rust_htslib::htslib::bcf_index_build(
-                    ffi::CString::new(self.options.output.as_bytes()).unwrap().as_ptr(),
+                    ffi::CString::new(self.options.output.as_bytes())
+                        .unwrap()
+                        .as_ptr(),
                     14,
                 )
             };
