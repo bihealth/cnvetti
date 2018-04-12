@@ -9,6 +9,11 @@ use bio::data_structures::interval_tree;
 use rust_htslib::bam;
 
 
+// TODO: make this configurable in options.
+/// Largest fraction of pile-masked windows before ignoring.
+const MAX_MS: f64 = 0.5;
+
+
 /// Struct with common information for aggregator.
 #[derive(Debug)]
 pub struct BaseAggregator {
@@ -52,6 +57,9 @@ pub trait BamRecordAggregator {
 
     /// Number of skipped records.
     fn num_skipped(&self) -> u32;
+
+    /// Whether the window is masked for the sample.
+    fn is_masked(&self, window_id: u32) -> bool;
 
     /// Coverage/count for the given window.
     fn get_coverage(&self, window_id: u32) -> i32;
@@ -173,7 +181,12 @@ impl<'a> BamRecordAggregator for CountAlignmentsAggregator<'a> {
     }
 
     fn integer_field_names(&self) -> Vec<String> {
-        vec![String::from("RC"), String::from("MS")]
+        vec![
+            String::from("RRC"),
+            String::from("RC"),
+            String::from("MS"),
+            String::from("MP"),
+        ]
     }
 
     fn float_field_names(&self) -> Vec<String> {
@@ -182,23 +195,44 @@ impl<'a> BamRecordAggregator for CountAlignmentsAggregator<'a> {
 
     fn integer_values(&self, window_id: u32) -> HashMap<String, i32> {
         let mut result = HashMap::new();
-        result.insert(String::from("RC"), self.counters[window_id as usize] as i32);
 
         let window = Range {
             start: (window_id * self.base.options.window_length as u32) as u32,
             end: ((window_id + 1) * self.base.options.window_length as u32) as u32,
         };
+
+        // Pile-masked bases.
+        let ms = self.tree
+            .find(window.clone())
+            .map(|entry| {
+                let end = min(window.end, entry.interval().end) as i32;
+                let start = max(window.start, entry.interval().start) as i32;
+                assert!(end >= start, "Should overlap, come from tree query");
+                end - start
+            })
+            .sum::<i32>();
+        result.insert(String::from("MS"), ms);
+
+        // Raw read counts.
         result.insert(
-            String::from("MS"),
-            self.tree
-                .find(window.clone())
-                .map(|entry| {
-                    let end = min(window.end, entry.interval().end) as i32;
-                    let start = max(window.start, entry.interval().start) as i32;
-                    assert!(end >= start, "Should overlap, come from tree query");
-                    end - start
-                })
-                .sum::<i32>(),
+            String::from("RRC"),
+            self.counters[window_id as usize] as i32,
+        );
+
+        // Ratio for scaling up to the read count.
+        let len = (window.end - window.start) as i32;
+        let ratio = (len - ms) as f64 / len as f64;
+        result.insert(String::from("MP"), (ratio < MAX_MS) as i32);
+
+        // TODO: maybe better use floats for RC after all?
+        result.insert(
+            String::from("RC"),
+            if ratio > 0.001 {
+                // guard against NaN...
+                (self.counters[window_id as usize] as f64 / ratio).round() as i32
+            } else {
+                0
+            },
         );
 
         result
@@ -214,6 +248,28 @@ impl<'a> BamRecordAggregator for CountAlignmentsAggregator<'a> {
 
     fn num_skipped(&self) -> u32 {
         self.base.num_skipped
+    }
+
+    fn is_masked(&self, window_id: u32) -> bool {
+        let window = Range {
+            start: (window_id * self.base.options.window_length as u32) as u32,
+            end: ((window_id + 1) * self.base.options.window_length as u32) as u32,
+        };
+        let ms = self.tree
+            .find(window.clone())
+            .map(|entry| {
+                let end = min(window.end, entry.interval().end) as i32;
+                let start = max(window.start, entry.interval().start) as i32;
+                assert!(end >= start, "Should overlap, come from tree query");
+                end - start
+            })
+            .sum::<i32>();
+
+        // Ratio for scaling up to the read count.
+        let len = (window.end - window.start) as i32;
+        let ratio = (len - ms) as f64 / len as f64;
+
+        ratio < MAX_MS
     }
 
     fn get_coverage(&self, window_id: u32) -> i32 {
@@ -289,6 +345,11 @@ impl BamRecordAggregator for CoverageAggregator {
 
     fn num_skipped(&self) -> u32 {
         self.base.num_skipped
+    }
+
+    /// Whether the window is masked for the sample.
+    fn is_masked(&self, window_id: u32) -> bool {
+        false // no pile-based masking for coverage
     }
 
     fn get_coverage(&self, _window_id: u32) -> i32 {

@@ -1,13 +1,12 @@
-use clap::{ArgMatches, Values};
+use clap::ArgMatches;
 
 pub use cli::options::*;
 
 /// Options for the "coverage" command.
 #[derive(Clone, Debug)]
 pub struct Options {
-    pub input: Vec<String>,
+    pub input: String,
     pub output: String,
-    pub genome_regions: Vec<String>,
     pub count_kind: CountKind,
     pub min_gc_window_count: i32,
 }
@@ -21,17 +20,8 @@ impl Options {
         let count_kind = matches.value_of("count_kind").unwrap();
 
         let mut options = Options {
-            input: matches
-                .values_of("input")
-                .unwrap_or(Values::default())
-                .map(|res| res.to_string())
-                .collect(),
+            input: matches.value_of("input").unwrap().to_string(),
             output: matches.value_of("output").unwrap().to_string(),
-            genome_regions: matches
-                .values_of("genome_regions")
-                .unwrap_or(Values::default())
-                .map(|res| res.to_string())
-                .collect(),
             count_kind: CountKind::from_str(count_kind).expect("Unknown count kind"),
             min_gc_window_count: matches
                 .value_of("min_gc_window_count")

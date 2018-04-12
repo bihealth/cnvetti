@@ -30,17 +30,17 @@ use slog::Logger;
 mod piles;
 mod options;
 mod agg;
-mod summary;
+pub mod summary; // TODO: move into mod shared?
 
 use self::piles::PileCollector;
 pub use self::options::*;
 use self::agg::*;
 use self::summary::CoverageSummarizer;
 
+use cli::shared;
 
-// TODO: check that no two BAM files have overlapping sample names.
+
 // TODO: remove restriction to same-length windows.
-// TODO: write out index files to result
 
 
 /// Structure holding the input files readers and related data structures.
@@ -299,7 +299,11 @@ impl CoverageOutput {
             "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">",
             "##FORMAT=<ID=COV,Number=1,Type=Float,Description=\"Average coverage\">",
             "##FORMAT=<ID=WINSD,Number=1,Type=Float,Description=\"Per-window coverage SD)\">",
-            "##FORMAT=<ID=RC,Number=1,Type=Integer,Description=\"Number of aligning reads\">",
+            "##FORMAT=<ID=MP,Description=\"Masked for sample because too much masked because of \
+            piles\",Type=Integer,Number=1>",
+            "##FORMAT=<ID=RC,Number=1,Type=Integer,Description=\"Number of aligning reads, \
+            scaled in the case of pile-masking\">",
+            "##FORMAT=<ID=RRC,Number=1,Type=Integer,Description=\"Raw number of aligning reads\">",
             "##FORMAT=<ID=MS,Number=1,Type=Integer,Description=\"Number of bases in window \
             masked because of read piles\">",
             "##ALT=<ID=COUNT,Description=\"Record describes a window for read counting\">",
@@ -367,44 +371,8 @@ impl<'a> CoverageApp<'a> {
             self.process_regions(output, &regions);
         }
 
-        info!(self.logger, "Writing .tbi/.csi index file...");
-        if self.options.output.ends_with(".vcf.gz") {
-            // TODO: the unsafe stuff should go into rust_htslib
-            use rust_htslib;
-            use std::ffi;
-            let res = unsafe {
-                rust_htslib::htslib::tbx_index_build(
-                    ffi::CString::new(self.options.output.as_bytes())
-                        .unwrap()
-                        .as_ptr(),
-                    0,
-                    &rust_htslib::htslib::tbx_conf_vcf,
-                )
-            };
-            if res != 0 {
-                panic!("Could not create .tbi index");
-            }
-        } else if self.options.output.ends_with(".bcf") {
-            use rust_htslib;
-            use std::ffi;
-            let res = unsafe {
-                rust_htslib::htslib::bcf_index_build(
-                    ffi::CString::new(self.options.output.as_bytes())
-                        .unwrap()
-                        .as_ptr(),
-                    14,
-                )
-            };
-            if res != 0 {
-                panic!("Could not create .tbi index");
-            }
-        } else {
-            info!(
-                self.logger,
-                "Not building index, output file does not having ending .bcf or .vcf.gz"
-            );
-        }
-
+        // Build index on the output file.
+        shared::build_index(&mut self.logger, &self.options.output);
 
         info!(self.logger, "Writing statistics file...");
         let path_stats = self.options.output.clone() + ".stats.txt";
@@ -598,11 +566,13 @@ impl<'a> CoverageApp<'a> {
 
             // Update summary statistics.
             for (sample_id, agg) in aggregators.iter().enumerate() {
-                self.summariser.increment(
-                    &self.input.samples[sample_id],
-                    *gc,
-                    agg.get_coverage(wid as u32),
-                );
+                if !agg.is_masked(wid as u32) {
+                    self.summariser.increment(
+                        &self.input.samples[sample_id],
+                        *gc,
+                        agg.get_coverage(wid as u32),
+                    );
+                }
             }
 
             // Actually write the record.

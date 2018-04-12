@@ -190,12 +190,6 @@ subcommands:
         required: true
         value_name: OUT.bcf
         help: Path to output BCF file (will also write .csi file)
-    - genome_regions:
-        long: genome-region
-        multiple: true
-        takes_value: true
-        value_name: REGION
-        help: Genome region(s) to consider, e.g., 1:1,100,000-1,120,000
 
     # Filtration-Related Arguments --------------------------------------------
     - min_gc_window_count:
