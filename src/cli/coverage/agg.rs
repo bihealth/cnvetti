@@ -348,7 +348,7 @@ impl BamRecordAggregator for CoverageAggregator {
     }
 
     /// Whether the window is masked for the sample.
-    fn is_masked(&self, window_id: u32) -> bool {
+    fn is_masked(&self, _window_id: u32) -> bool {
         false // no pile-based masking for coverage
     }
 

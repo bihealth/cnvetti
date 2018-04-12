@@ -61,7 +61,9 @@ fn process(
                 [0];
             if gc_windows < options.min_gc_window_count {
                 // XXX should be push_filter
-                record.push_info_integer(b"FEW_GCWINDOWS", &[0]);
+                record.push_info_integer(b"FEW_GCWINDOWS", &[0]).expect(
+                    "Could not write INFO/FEW_GCWINDOWS",
+                );
             }
         }
 
@@ -100,7 +102,9 @@ fn process(
                         slice[0] as f32 / median
                     })
                     .collect();
-                record.push_format_float(b"NRC", nrcs.as_slice());
+                record.push_format_float(b"NRC", nrcs.as_slice()).expect(
+                    "Could not write FORMAT/NRC",
+                );
             }
         }
 
