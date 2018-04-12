@@ -323,8 +323,6 @@ pub struct CoverageApp<'a> {
 
     /// Input files.
     input: CoverageInput,
-    /// Output files.
-    output: CoverageOutput,
 
     /// Summariser.
     summariser: CoverageSummarizer,
@@ -342,16 +340,12 @@ impl<'a> CoverageApp<'a> {
         info!(logger, "Opening input files and parsing genomic regions...");
         let input = CoverageInput::open_files(&options, logger);
 
-        info!(logger, "Opening output files...");
-        let output = CoverageOutput::open_files(&options, &input, logger);
-
         // Computation of summaries.
         CoverageApp {
             summariser: CoverageSummarizer::new(2, &input.samples, &options.count_kind.to_string()),
             logger,
             options,
             input,
-            output,
         }
     }
 
@@ -363,9 +357,52 @@ impl<'a> CoverageApp<'a> {
         } else {
             self.input.genome_regions.clone()
         };
-        self.process_regions(&regions);
+        // Open output files and start processing in its own scope.
+        {
+            // The output file has to be opened here so it can go out of scope and be closed
+            // before we build the index.
+            info!(self.logger, "Opening output files...");
+            let output = CoverageOutput::open_files(&self.options, &self.input, self.logger);
 
-        info!(self.logger, "Writing statistics");
+            self.process_regions(output, &regions);
+        }
+
+        info!(self.logger, "Writing .tbi/.csi index file...");
+        if self.options.output.ends_with(".vcf.gz") {
+            // TODO: the unsafe stuff should go into rust_htslib
+            use rust_htslib;
+            use std::ffi;
+            let res = unsafe {
+                rust_htslib::htslib::tbx_index_build(
+                    ffi::CString::new(self.options.output.as_bytes()).unwrap().as_ptr(),
+                    0,
+                    &rust_htslib::htslib::tbx_conf_vcf,
+                )
+            };
+            if res != 0 {
+                panic!("Could not create .tbi index");
+            }
+        } else if self.options.output.ends_with(".bcf") {
+            use rust_htslib;
+            use std::ffi;
+            let res = unsafe {
+                rust_htslib::htslib::bcf_index_build(
+                    ffi::CString::new(self.options.output.as_bytes()).unwrap().as_ptr(),
+                    14,
+                )
+            };
+            if res != 0 {
+                panic!("Could not create .tbi index");
+            }
+        } else {
+            info!(
+                self.logger,
+                "Not building index, output file does not having ending .bcf or .vcf.gz"
+            );
+        }
+
+
+        info!(self.logger, "Writing statistics file...");
         let path_stats = self.options.output.clone() + ".stats.txt";
         // Scope for the output file.
         {
@@ -383,14 +420,14 @@ impl<'a> CoverageApp<'a> {
     }
 
     /// Process all given regions.
-    fn process_regions(&mut self, regions: &Vec<(String, u64, u64)>) {
+    fn process_regions(&mut self, mut output: CoverageOutput, regions: &Vec<(String, u64, u64)>) {
         for &(ref chrom, start, end) in regions {
-            self.process_region(&chrom, start, end);
+            self.process_region(&mut output, &chrom, start, end);
         }
     }
 
     /// Process one region.
-    fn process_region(&mut self, chrom: &str, start: u64, end: u64) {
+    fn process_region(&mut self, output: &mut CoverageOutput, chrom: &str, start: u64, end: u64) {
         info!(
             self.logger,
             "Processing region {}:{}-{}",
@@ -461,8 +498,8 @@ impl<'a> CoverageApp<'a> {
                 self.logger,
                 "For sample {} -- processed {}, skipped {} records",
                 self.input.samples[i],
-                aggregators[i].num_processed(),
-                aggregators[i].num_skipped(),
+                aggregators[i].num_processed().separated_string(),
+                aggregators[i].num_skipped().separated_string(),
             );
         }
 
@@ -483,7 +520,7 @@ impl<'a> CoverageApp<'a> {
             "Writing {} windows to BCF file...",
             num_windows.separated_string()
         );
-        let rid = self.output
+        let rid = output
             .bcf_writer
             .header()
             .name2rid(chrom.as_bytes())
@@ -491,7 +528,7 @@ impl<'a> CoverageApp<'a> {
         for (wid, gc) in gc_content.iter().enumerate() {
             let rounded_gc = (*gc / gc_step) as i32;
 
-            let mut record = self.output.bcf_writer.empty_record();
+            let mut record = output.bcf_writer.empty_record();
             // Columns: CHROM, POS, ID, REF, ALT, FILTER
             record.inner_mut().rid = rid;
             let pos = wid * self.options.window_length as usize;
@@ -567,7 +604,7 @@ impl<'a> CoverageApp<'a> {
             }
 
             // Actually write the record.
-            self.output.bcf_writer.write(&record).expect(
+            output.bcf_writer.write(&record).expect(
                 "Could not write record!",
             );
         }
