@@ -7,7 +7,6 @@ use cli::coverage::options::*;
 use bio::data_structures::interval_tree;
 
 use rust_htslib::bam;
-use rust_htslib::bcf;
 
 
 /// Struct with common information for aggregator.
@@ -53,6 +52,9 @@ pub trait BamRecordAggregator {
 
     /// Number of skipped records.
     fn num_skipped(&self) -> u32;
+
+    /// Coverage/count for the given window.
+    fn get_coverage(&self, window_id: u32) -> i32;
 }
 
 
@@ -213,6 +215,10 @@ impl<'a> BamRecordAggregator for CountAlignmentsAggregator<'a> {
     fn num_skipped(&self) -> u32 {
         self.base.num_skipped
     }
+
+    fn get_coverage(&self, window_id: u32) -> i32 {
+        return self.counters[window_id as usize] as i32;
+    }
 }
 
 
@@ -267,12 +273,12 @@ impl BamRecordAggregator for CoverageAggregator {
         vec![String::from("COV"), String::from("WINSD")]
     }
 
-    fn integer_values(&self, window_id: u32) -> HashMap<String, i32> {
+    fn integer_values(&self, _window_id: u32) -> HashMap<String, i32> {
         panic!("Implement me!");
         // HashMap::new()
     }
 
-    fn float_values(&self, window_id: u32) -> HashMap<String, f32> {
+    fn float_values(&self, _window_id: u32) -> HashMap<String, f32> {
         panic!("Implement me!");
         // HashMap::new()
     }
@@ -283,5 +289,9 @@ impl BamRecordAggregator for CoverageAggregator {
 
     fn num_skipped(&self) -> u32 {
         self.base.num_skipped
+    }
+
+    fn get_coverage(&self, _window_id: u32) -> i32 {
+        panic!("Implement me!");
     }
 }

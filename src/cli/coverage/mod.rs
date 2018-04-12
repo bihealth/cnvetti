@@ -5,6 +5,7 @@ include!(concat!(env!("OUT_DIR"), "/version.rs"));
 use std::collections::HashMap;
 use std::cmp::{max, min};
 use std::env;
+use std::io::Write;
 use std::iter;
 use std::fs::File;
 
@@ -20,6 +21,8 @@ use rust_htslib::bam::{self, Read as BamRead};
 
 use separator::Separatable;
 
+use serde_json;
+
 use shlex;
 
 use slog::Logger;
@@ -27,14 +30,17 @@ use slog::Logger;
 mod piles;
 mod options;
 mod agg;
+mod summary;
 
 use self::piles::PileCollector;
 pub use self::options::*;
 use self::agg::*;
+use self::summary::CoverageSummarizer;
 
 
 // TODO: check that no two BAM files have overlapping sample names.
 // TODO: remove restriction to same-length windows.
+// TODO: write out index files to result
 
 
 /// Structure holding the input files readers and related data structures.
@@ -319,6 +325,9 @@ pub struct CoverageApp<'a> {
     input: CoverageInput,
     /// Output files.
     output: CoverageOutput,
+
+    /// Summariser.
+    summariser: CoverageSummarizer,
 }
 
 
@@ -336,7 +345,9 @@ impl<'a> CoverageApp<'a> {
         info!(logger, "Opening output files...");
         let output = CoverageOutput::open_files(&options, &input, logger);
 
+        // Computation of summaries.
         CoverageApp {
+            summariser: CoverageSummarizer::new(2, &input.samples, &options.count_kind.to_string()),
             logger,
             options,
             input,
@@ -355,7 +366,16 @@ impl<'a> CoverageApp<'a> {
         self.process_regions(&regions);
 
         info!(self.logger, "Writing statistics");
-        // TODO
+        let path_stats = self.options.output.clone() + ".stats.txt";
+        // Scope for the output file.
+        {
+            let mut file_stats =
+                File::create(path_stats).expect("Could not open stats file for writing");
+            let summaries = self.summariser.summaries();
+            file_stats
+                .write_all(serde_json::to_string(&summaries).unwrap().as_bytes())
+                .expect("Could not write statistics to output file");
+        }
 
         info!(self.logger, "Done. Have a nice day!");
 
@@ -404,7 +424,7 @@ impl<'a> CoverageApp<'a> {
             .bam_readers
             .iter()
             .enumerate()
-            .map(|(i, bam_reader)| {
+            .map(|(i, _)| {
                 let result: Box<BamRecordAggregator> = match self.options.count_kind {
                     CountKind::Coverage => Box::new(CoverageAggregator::new(
                         self.input.samples.clone(),
@@ -434,10 +454,8 @@ impl<'a> CoverageApp<'a> {
         let mut record = bam::Record::new();
         for (i, ref mut bam_reader) in self.input.bam_readers.iter_mut().enumerate() {
             // Read all records in region for reader `i`.
-            let mut count = 0;
             while bam_reader.read(&mut record).is_ok() {
                 aggregators[i].put_bam_record(&mut record);
-                count += 1;
             }
             debug!(
                 self.logger,
@@ -537,6 +555,15 @@ impl<'a> CoverageApp<'a> {
                 record
                     .push_format_float(field.as_bytes(), values.as_slice())
                     .expect("Could not write FORMAT field");
+            }
+
+            // Update summary statistics.
+            for (sample_id, agg) in aggregators.iter().enumerate() {
+                self.summariser.increment(
+                    &self.input.samples[sample_id],
+                    *gc,
+                    agg.get_coverage(wid as u32),
+                );
             }
 
             // Actually write the record.

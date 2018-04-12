@@ -1,3 +1,5 @@
+extern crate serde_derive;
+
 extern crate cnvetti;
 
 include!(concat!(env!("OUT_DIR"), "/version.rs"));

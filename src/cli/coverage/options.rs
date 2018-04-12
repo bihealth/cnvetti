@@ -1,3 +1,5 @@
+use std::fmt;
+
 use clap::{ArgMatches, Values};
 
 
@@ -40,6 +42,13 @@ impl CountKind {
             "Alignments" => Some(CountKind::Alignments),
             _ => None,
         }
+    }
+}
+
+
+impl fmt::Display for CountKind {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
     }
 }
 
