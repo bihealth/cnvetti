@@ -190,7 +190,12 @@ impl CoverageInput {
             tbx_reader: match &options.mapability_bed {
                 &Some(ref path) => {
                     match tbx::Reader::from_path(&path) {
-                        Ok(reader) => Some(reader),
+                        Ok(mut reader) => {
+                            reader.set_threads(options.io_threads as usize).expect(
+                                "Could not set I/O thread count",
+                            );
+                            Some(reader)
+                        }
                         Err(error) => {
                             panic!("Could create BED reader {:?}", error);
                         }
@@ -235,7 +240,12 @@ impl CoverageOutput {
 
         CoverageOutput {
             bcf_writer: match bcf::Writer::from_path(&options.output, &header, uncompressed, vcf) {
-                Ok(writer) => writer,
+                Ok(mut writer) => {
+                    writer.set_threads(options.io_threads as usize).expect(
+                        "Could not set I/O thread count",
+                    );
+                    writer
+                }
                 Err(error) => {
                     panic!(
                         "Could not open BCF file for output {}. {:?}",
@@ -466,10 +476,12 @@ impl<'a> CoverageApp<'a> {
             }
             debug!(
                 self.logger,
-                "For sample {} -- processed {}, skipped {} records",
+                "For sample {} -- processed {}, skipped {} records ({:.2}% are off-target)",
                 self.input.samples[i],
                 aggregators[i].num_processed().separated_string(),
                 aggregators[i].num_skipped().separated_string(),
+                100.0 * (aggregators[i].num_processed() - aggregators[i].num_skipped()) as f64 /
+                aggregators[i].num_processed() as f64,
             );
         }
 

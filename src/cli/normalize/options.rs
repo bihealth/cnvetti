@@ -9,6 +9,7 @@ pub struct Options {
     pub output: String,
     pub count_kind: CountKind,
     pub min_gc_window_count: i32,
+    pub io_threads: u32,
 }
 
 
@@ -27,6 +28,11 @@ impl Options {
                 .value_of("min_gc_window_count")
                 .unwrap()
                 .parse::<i32>()
+                .unwrap(),
+            io_threads: matches
+                .value_of("io_threads")
+                .unwrap()
+                .parse::<u32>()
                 .unwrap(),
         };
 

@@ -20,6 +20,7 @@ pub struct Options {
     pub pile_min_depth: i32,
     pub pile_max_gap: u32,
     pub pile_mask_window_size: u32,
+    pub io_threads: u32,
 }
 
 
@@ -78,6 +79,11 @@ impl Options {
                 .unwrap(),
             pile_mask_window_size: matches
                 .value_of("pile_mask_window_size")
+                .unwrap()
+                .parse::<u32>()
+                .unwrap(),
+            io_threads: matches
+                .value_of("io_threads")
                 .unwrap()
                 .parse::<u32>()
                 .unwrap(),

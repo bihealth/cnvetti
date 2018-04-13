@@ -117,7 +117,8 @@ impl<'a> CountAlignmentsAggregator<'a> {
 
     // Skip `record` because of flags.
     fn skip_flags(&self, record: &bam::Record) -> bool {
-        record.is_secondary() || record.is_supplementary() || record.is_duplicate()
+        record.is_secondary() || record.is_supplementary() || record.is_duplicate() ||
+            record.is_quality_check_failed()
     }
 
     /// Skip `record` because of discordant alignment?
@@ -156,7 +157,7 @@ impl<'a> CountAlignmentsAggregator<'a> {
 
     // Skip `record` because it is paired and not the first fragment?
     fn skip_paired_and_all_but_first(&self, record: &bam::Record) -> bool {
-        !record.is_paired() && !record.is_first_in_template()
+        record.is_paired() && !record.is_first_in_template()
     }
 }
 
@@ -173,6 +174,11 @@ impl<'a> BamRecordAggregator for CountAlignmentsAggregator<'a> {
             let window_length = self.base.options.window_length as usize;
             let bin = record.pos() as usize / window_length;
             if self.tree.find(pos).next().is_none() {
+                // if bin == 16320/20 {
+                //     use std::str;
+                //     println!("Counting {}", str::from_utf8(record.qname()).unwrap());
+                // }
+
                 self.counters[bin] += 1;
             } else {
                 self.base.num_skipped += 1;

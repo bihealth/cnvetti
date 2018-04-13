@@ -24,6 +24,7 @@ pub use self::options::*;
 
 // TODO: check input file.
 // TODO: use index-based readers, is nicer for progress display...
+// TODO: could normalize already in coverage step by writing raw coverage to temporary file
 
 
 /// Perform the actual processing.
@@ -60,8 +61,7 @@ fn process(
                 .unwrap_or(&[0])
                 [0];
             if gc_windows < options.min_gc_window_count {
-                // XXX should be push_filter
-                record.push_info_integer(b"FEW_GCWINDOWS", &[0]).expect(
+                record.push_filter(b"FEW_GCWINDOWS").expect(
                     "Could not write INFO/FEW_GCWINDOWS",
                 );
             }
@@ -139,6 +139,9 @@ pub fn call(logger: &mut Logger, options: &Options) -> Result<(), String> {
     debug!(logger, "Opening input file");
     let mut reader =
         bcf::Reader::from_path(options.input.clone()).expect("Could not open input BCF file");
+    reader.set_threads(options.io_threads as usize).expect(
+        "Could not set I/O thread count",
+    );
 
     // Open the output file in its own block so we can close before creating the index.
     {
@@ -172,6 +175,9 @@ pub fn call(logger: &mut Logger, options: &Options) -> Result<(), String> {
             bcf::Writer::from_path(options.output.clone(), &header, uncompressed, vcf)
                 .expect("Could not open output BCF file")
         };
+        writer.set_threads(options.io_threads as usize).expect(
+            "Could not set I/O thread count",
+        );
 
         info!(logger, "Processing...");
         process(&mut reader, &mut writer, logger, stats, &options);

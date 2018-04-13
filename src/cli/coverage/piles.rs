@@ -74,9 +74,10 @@ impl<'a> PileCollector<'a> {
                 .alignments()
                 .filter(|alignment| {
                     let record = alignment.record();
-                    !record.is_duplicate() && !record.is_quality_check_failed() &&
-                        (!record.is_paired() || record.is_first_in_template()) &&
-                        (record.mapq() > options.min_mapq)
+                    !record.is_duplicate() && !record.is_supplementary() &&
+                        !record.is_duplicate() &&
+                        !record.is_quality_check_failed() &&
+                        (record.mapq() >= options.min_mapq)
                 })
                 .count() as i32;
 
@@ -86,11 +87,12 @@ impl<'a> PileCollector<'a> {
                 Some((start, end, max_depth)) => {
                     if end + options.pile_max_gap >= pos {
                         // Extend previous interval.
-                        Some((start, pos, max(depth, max_depth)))
+                        Some((start, pos + 1, max(depth, max_depth)))
                     } else {
                         // Store old interval and start new one.
                         if max_depth >= options.pile_min_depth {
                             intervals.push((start, end, max_depth));
+                            // println!("raw block {}-{}", start + 1, end);
                         }
                         Some((pos, pos + 1, depth))
                     }
@@ -103,6 +105,7 @@ impl<'a> PileCollector<'a> {
         if let Some((start, end, max_depth)) = prev {
             if max_depth >= options.pile_min_depth {
                 intervals.push((start, end, max_depth));
+                // println!("raw block {}-{}", start + 1, end);
             }
         }
 
@@ -118,6 +121,7 @@ impl<'a> PileCollector<'a> {
             let end = ((end + wlen - 1) / wlen) * wlen;
 
             // Insert one joint interval and count towards sum.
+            // println!("Pile-masking {}-{}", start + 1, end);
             tree.insert(start..end, max_depth);
             len_sum += end - start;
 
