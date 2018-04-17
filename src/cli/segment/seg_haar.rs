@@ -31,15 +31,17 @@ fn haar_convolution(
     logger: &Logger,
 ) -> Vec<f64> {
     let signal_size = signal.len();
-    debug!(
-        logger,
-        "signal_size = {}, signal = {:?}", signal_size, signal
-    );
+    if signal_size < 50 {
+        debug!(
+            logger,
+            "signal_size = {}, signal = {:?}", signal_size, signal
+        );
+    }
 
     let mut result = vec![0.0; signal_size];
 
     if step_half_size > signal_size {
-        error!(
+        warn!(
             logger,
             "Error? step_half_size = {}, signal_size = {}", step_half_size, signal_size
         );
@@ -65,7 +67,7 @@ fn haar_convolution(
     for k in 1..signal_size {
         // This loop is the hotspot.
         let high_end = if k + step_half_size >= signal_size + 1 {
-            2 * signal_size - k + step_half_size
+            2 * signal_size - k - step_half_size
         } else {
             k + step_half_size - 1
         };
@@ -180,7 +182,7 @@ fn merge_breakpoints(
 // Perform pulse convolution.
 fn pulse_convolution(signal: &[f64], pulse_size: usize) -> Vec<f64> {
     let signal_size = signal.len();
-    assert!(pulse_size <= signal_size);
+    assert!(pulse_size <= signal_size, "pulse_size = {}, signal_size = {}", pulse_size, signal_size);
     let pulse_height: f64 = 1.0 / pulse_size as f64;
 
     // Initialize circular paddig.
@@ -266,8 +268,9 @@ struct SigmaEstimates {
     // the raw values for correcting non-stationary variance.
     noise_est: f64,
     // Mask where the raw values are < thresh_nsv (b[n] in the HaarSeg paper).
-    var_mask: Vec<f64>,
+    var_mask: Option<Vec<f64>>,
 }
+
 
 // Perform estimation of sigmas and compute other values used when raw values are available
 // for compensation of non-stationary variance compensation
@@ -300,12 +303,12 @@ fn estimate_sigmas(vals: &[f64], raw_vals: Option<&[f64]>, logger: &Logger) -> S
         }
 
         (
-            var_mask,
+            Some(var_mask),
             median_abs_dev(for_peak.as_slice()),
             median_abs_dev(for_noise.as_slice()),
         )
     } else {
-        (Vec::new(), median_abs_dev(&diff_vals), 0.0)
+        (None, median_abs_dev(&diff_vals), 0.0)
     };
 
     SigmaEstimates {
@@ -321,22 +324,24 @@ fn perform_nsv_compensation(
     conv_res: &mut [f64],
     step_half_size: usize,
 ) {
-    let conv_res_tmp = pulse_convolution(&sigma_est.var_mask, 2 * step_half_size);
-    let conv_mask: Vec<f64> = conv_res_tmp
-        .iter()
-        .map(|x| if *x >= 0.5 { 1.0 } else { 0.0 })
-        .collect();
-
-    let mut sigma_est_vec: Vec<f64> = Vec::with_capacity(conv_mask.len());
-    sigma_est_vec.extend(
-        conv_mask
+    if let Some(ref var_mask) = sigma_est.var_mask {
+        let conv_res_tmp = pulse_convolution(var_mask, 2 * step_half_size);
+        let conv_mask: Vec<f64> = conv_res_tmp
             .iter()
-            .map(|x| (1.0 - *x) * sigma_est.peak_est + *x * sigma_est.noise_est),
-    );
-    for (x, y) in conv_res.iter_mut().zip(sigma_est_vec.iter()) {
-        *x /= *y;
+            .map(|x| if *x >= 0.5 { 1.0 } else { 0.0 })
+            .collect();
+
+        let mut sigma_est_vec: Vec<f64> = Vec::with_capacity(conv_mask.len());
+        sigma_est_vec.extend(
+            conv_mask
+                .iter()
+                .map(|x| (1.0 - *x) * sigma_est.peak_est + *x * sigma_est.noise_est),
+        );
+        for (x, y) in conv_res.iter_mut().zip(sigma_est_vec.iter()) {
+            *x /= *y;
+        }
+        sigma_est.peak_est = 1.0;
     }
-    sigma_est.peak_est = 1.0;
 }
 
 /// Implementation of Haar segmentation.
@@ -368,6 +373,9 @@ pub fn segment_haar_seg(
             local_peak_positions.len(),
             level
         );
+        if local_peak_positions.len() < 50 {
+            debug!(logger, "== {:?}", local_peak_positions);
+        }
 
         // Perform compensation of non-stationary variance.
         perform_nsv_compensation(&mut sigma_est, &mut conv_res, step_half_size);
@@ -388,14 +396,55 @@ pub fn segment_haar_seg(
             .iter()
             .enumerate()
             .filter(|(_pos, val)| val.abs() >= t)
-            .map(|(pos, _val)| pos)
+            .map(|(pos, _val)| local_peak_positions[pos])
             .collect();
 
+        if breakpoints.len() < 50 && addon_peaks.len() < 50 {
+            debug!(logger, "breakpoints = {:?}, addon_peaks = {:?}", breakpoints, addon_peaks);
+        }
         breakpoints = merge_breakpoints(&breakpoints, &addon_peaks, 2_usize.pow(level as u32 - 1));
+        if breakpoints.len() < 50 {
+            debug!(logger, "==merge_breakpoints==> {:?}", breakpoints);
+        }
     }
 
     // Add first and last element and return result breakpoints vector.
-    breakpoints.insert(0, 0);
-    breakpoints.push(vals.len());
+    if *breakpoints.first().unwrap_or(&1_usize) != 0 {
+        breakpoints.insert(0, 0);
+    }
+    if *breakpoints.last().unwrap_or(&1_usize) != vals.len() {
+        breakpoints.push(vals.len());
+    }
     breakpoints
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    extern crate slog;
+    extern crate slog_async;
+    extern crate slog_term;
+    use slog::Logger;
+    use slog::Drain;
+
+    fn _logger() -> Logger {
+        let decorator = slog_term::TermDecorator::new().build();
+        let drain = slog_term::FullFormat::new(decorator).build().fuse();
+        let drain = slog_async::Async::new(drain).build().fuse();
+        slog::Logger::root(drain, o!())
+    }
+
+    #[test]
+    fn call_haar_seg() {
+        let logger = _logger();
+
+        let mut vals: Vec<f64> = vec![0.0; 50];
+        for i in 20..30 {
+            vals[i] = 2.0;
+        }
+        let breakpoints = segment_haar_seg(&vals, None, None, 1e-7, 1, 5, &logger);
+        assert_eq!(breakpoints, vec![0, 20, 30, 50]);
+    }
 }

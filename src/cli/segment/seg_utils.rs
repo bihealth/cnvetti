@@ -18,7 +18,7 @@ pub fn replace_with_segment_medians(values: &[f64], breakpoints: &[usize]) -> Ve
 
     for i in 0..(breakpoints.len() - 1) {
         let x = median(&values[breakpoints[i]..breakpoints[i + 1]]);
-        for pos in breakpoints[i]..breakpoints[i + 1] {
+        for _pos in breakpoints[i]..breakpoints[i + 1] {
             result.push(x);
         }
     }

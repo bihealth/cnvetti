@@ -13,5 +13,6 @@ extern crate separator;
 extern crate shlex;
 #[macro_use]
 extern crate slog;
+extern crate statrs;
 
 pub mod cli;
