@@ -4,7 +4,7 @@ include!(concat!(env!("OUT_DIR"), "/version.rs"));
 
 mod math;
 mod options;
-pub mod seg_haar;  // XXX should not be pub
+pub mod seg_haar; // XXX should not be pub
 pub mod seg_utils; // XXX should not be pub
 
 // use std::env;

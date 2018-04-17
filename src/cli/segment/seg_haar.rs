@@ -182,7 +182,12 @@ fn merge_breakpoints(
 // Perform pulse convolution.
 fn pulse_convolution(signal: &[f64], pulse_size: usize) -> Vec<f64> {
     let signal_size = signal.len();
-    assert!(pulse_size <= signal_size, "pulse_size = {}, signal_size = {}", pulse_size, signal_size);
+    assert!(
+        pulse_size <= signal_size,
+        "pulse_size = {}, signal_size = {}",
+        pulse_size,
+        signal_size
+    );
     let pulse_height: f64 = 1.0 / pulse_size as f64;
 
     // Initialize circular paddig.
@@ -270,7 +275,6 @@ struct SigmaEstimates {
     // Mask where the raw values are < thresh_nsv (b[n] in the HaarSeg paper).
     var_mask: Option<Vec<f64>>,
 }
-
 
 // Perform estimation of sigmas and compute other values used when raw values are available
 // for compensation of non-stationary variance compensation
@@ -400,7 +404,10 @@ pub fn segment_haar_seg(
             .collect();
 
         if breakpoints.len() < 50 && addon_peaks.len() < 50 {
-            debug!(logger, "breakpoints = {:?}, addon_peaks = {:?}", breakpoints, addon_peaks);
+            debug!(
+                logger,
+                "breakpoints = {:?}, addon_peaks = {:?}", breakpoints, addon_peaks
+            );
         }
         breakpoints = merge_breakpoints(&breakpoints, &addon_peaks, 2_usize.pow(level as u32 - 1));
         if breakpoints.len() < 50 {
@@ -418,7 +425,6 @@ pub fn segment_haar_seg(
     breakpoints
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -426,8 +432,8 @@ mod tests {
     extern crate slog;
     extern crate slog_async;
     extern crate slog_term;
-    use slog::Logger;
     use slog::Drain;
+    use slog::Logger;
 
     fn _logger() -> Logger {
         let decorator = slog_term::TermDecorator::new().build();
