@@ -175,7 +175,7 @@ subcommands:
             If set, discordant alignments (not both reads aligned or not
             inwards-pointing) will be skipped.
 
-# Sub Command: coverage =======================================================
+# Sub Command: normalize ======================================================
 - normalize:
     about: Normalize per-sample coverage information
     args:
@@ -230,3 +230,83 @@ subcommands:
         - WesOffTarget
         - WesOnTarget
         help: Select one of the pre-defined preset modes.
+
+# Sub Command: segment ========================================================
+- segment:
+    about: Segment normalized coverage/count information
+    args:
+    # Input/Output File Arguments ---------------------------------------------
+    - input:
+        long: input
+        short: i
+        multiple: false
+        takes_value: true
+        required: true
+        value_name: INPUT.bcf
+        help: >
+            Path to indexed input BCF or VCF file resulting from `cnvetti
+            normalize`.
+    - output:
+        long: output
+        short: o
+        takes_value: true
+        required: true
+        value_name: OUT.bcf
+        help: Path to output BCF file (will also write .csi file)
+
+    # Window Selection --------------------------------------------------------
+    - min_mapability:
+        long: min-mapability
+        takes_value: true
+        default_value: '0.99'
+        value_name: FRAC
+        help: Minimal mapability to require as fraction.
+    - min_gc:
+        long: min-gc
+        takes_value: true
+        default_value: '0.20'
+        value_name: FRAC
+        help: Minimal GC to require as fraction.
+    - max_gc:
+        long: max-gc
+        takes_value: true
+        default_value: '0.70'
+        value_name: FRAC
+        help: Maximal GC to allow as fraction.
+    - max_iqr:
+        long: max-iqr
+        takes_value: true
+        default_value: '0.25'
+        value_name: FRAC
+        help: Maximal IQR in relative count/coverage in overall cohort to allow.
+
+    # Selection of Segmentation Algorithm -------------------------------------
+    - segmentation:
+        long: segmentation
+        takes_value: true
+        default_value: HaarSeg
+        value_name: ALGO
+        possible_values:
+        - HaarSeg
+        - CircularBinarySegmentation
+        help: Algorithm to use for segmentation.
+
+    # HaarSeq Parameters ------------------------------------------------------
+    - haar_seg_l_min:
+        long: haar-seg-l-min
+        takes_value: true
+        default_value: '1'
+        value_name: L_MIN
+        help: Value for L_min in HaarSeg.
+    - haar_seg_l_max:
+        long: haar-seg-l-max
+        takes_value: true
+        default_value: '5'
+        value_name: L_MAX
+        help: Value for L_max in HaarSeg.
+    - haar_seg_breaks_fdr_q:
+        long: haar-seg-breaks-fdr-q
+        takes_value: true
+        default_value: '1e-7'
+        value_name: PROB
+        help: Value for `q` in the HaarSeg FDR computation.

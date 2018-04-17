@@ -43,3 +43,27 @@ impl fmt::Display for CountKind {
         write!(f, "{:?}", self)
     }
 }
+
+/// Enum for selecting the segmentation type.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Segmentation {
+    HaarSeg,
+    CircularBinarySegmentation,
+}
+
+impl Segmentation {
+    /// Parse `Segmentation` from `&str`.
+    pub fn from_str(s: &str) -> Option<Segmentation> {
+        match s {
+            "HaarSeg" => Some(Segmentation::HaarSeg),
+            "CircularBinarySegmentation" => Some(Segmentation::CircularBinarySegmentation),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for Segmentation {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}

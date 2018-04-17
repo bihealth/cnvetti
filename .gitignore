@@ -2,6 +2,12 @@
 .idea/
 *.iml
 
+# VIM
+.*.sw?
+
 # Rust
 /target
 **/*.rs.bk
+
+# NFS
+.nfs*
