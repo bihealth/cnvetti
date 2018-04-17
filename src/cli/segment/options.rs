@@ -38,7 +38,7 @@ impl Options {
     pub fn new(matches: &ArgMatches) -> Options {
         let segmentation = matches.value_of("segmentation").unwrap();
 
-        let mut options = Options {
+        Options {
             input: matches.value_of("input").unwrap().to_string(),
             output: matches.value_of("output").unwrap().to_string(),
             segmentation: Segmentation::from_str(segmentation)
@@ -71,8 +71,6 @@ impl Options {
                 .unwrap()
                 .parse::<f64>()
                 .unwrap(),
-        };
-
-        options
+        }
     }
 }

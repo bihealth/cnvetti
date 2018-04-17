@@ -137,9 +137,11 @@ pub fn call(logger: &mut Logger, options: &Options) -> Result<(), String> {
     debug!(logger, "Opening input file");
     let mut reader =
         bcf::Reader::from_path(options.input.clone()).expect("Could not open input BCF file");
-    reader
-        .set_threads(options.io_threads as usize)
-        .expect("Could not set I/O thread count");
+    if options.io_threads > 0 {
+        reader
+            .set_threads(options.io_threads as usize)
+            .expect("Could not set I/O thread count");
+    }
 
     // Open the output file in its own block so we can close before creating the index.
     {
@@ -147,8 +149,6 @@ pub fn call(logger: &mut Logger, options: &Options) -> Result<(), String> {
             // Construct extended header.
             let mut header = bcf::Header::with_template(reader.header());
             let lines = vec![
-                "##FILTER=<ID=FEW_GCWINDOWS,Description=\"Masked because of few windows with \
-                 this GC content\">",
                 "##FORMAT=<ID=NRC,Number=1,Type=Float,Description=\"Normalized number of \
                  aligning reads\">",
             ];
@@ -173,9 +173,11 @@ pub fn call(logger: &mut Logger, options: &Options) -> Result<(), String> {
             bcf::Writer::from_path(options.output.clone(), &header, uncompressed, vcf)
                 .expect("Could not open output BCF file")
         };
-        writer
-            .set_threads(options.io_threads as usize)
-            .expect("Could not set I/O thread count");
+        if options.io_threads > 0 {
+            writer
+                .set_threads(options.io_threads as usize)
+                .expect("Could not set I/O thread count");
+        }
 
         info!(logger, "Processing...");
         process(&mut reader, &mut writer, logger, stats, &options);

@@ -40,6 +40,8 @@ use self::summary::CoverageSummarizer;
 use cli::shared;
 
 // TODO: remove restriction to same-length windows.
+// TODO: implement overlapping windows
+// TODO: filter to autosomal + sex chromosomes, ignore the rest
 
 /// Structure holding the input files readers and related data structures.
 struct CoverageInput {
@@ -188,9 +190,11 @@ impl CoverageInput {
             tbx_reader: match &options.mapability_bed {
                 &Some(ref path) => match tbx::Reader::from_path(&path) {
                     Ok(mut reader) => {
-                        reader
-                            .set_threads(options.io_threads as usize)
-                            .expect("Could not set I/O thread count");
+                        if options.io_threads > 0 {
+                            reader
+                                .set_threads(options.io_threads as usize)
+                                .expect("Could not set I/O thread count");
+                        }
                         Some(reader)
                     }
                     Err(error) => {
@@ -237,9 +241,11 @@ impl CoverageOutput {
         CoverageOutput {
             bcf_writer: match bcf::Writer::from_path(&options.output, &header, uncompressed, vcf) {
                 Ok(mut writer) => {
-                    writer
-                        .set_threads(options.io_threads as usize)
-                        .expect("Could not set I/O thread count");
+                    if options.io_threads > 0 {
+                        writer
+                            .set_threads(options.io_threads as usize)
+                            .expect("Could not set I/O thread count");
+                    }
                     writer
                 }
                 Err(error) => {
@@ -308,6 +314,9 @@ impl CoverageOutput {
             "##FORMAT=<ID=MS,Number=1,Type=Integer,Description=\"Number of bases in window \
              masked because of read piles\">",
             "##ALT=<ID=COUNT,Description=\"Record describes a window for read counting\">",
+            // TODO: FEW_GCWINDOWS should go into normalize but then cannot be found?
+            "##FILTER=<ID=FEW_GCWINDOWS,Description=\"Masked because of few windows with \
+                this GC content\">",
         ];
         for line in lines {
             header.push_record(line.as_bytes());
