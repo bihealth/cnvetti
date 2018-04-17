@@ -21,7 +21,7 @@ pub struct Options {
     pub max_gc: f32,
     /// Maximal relative coverage/count IQR to allow.
     pub max_iqr: f32,
-   
+
     /// Segmentation algorithm to use.
     pub segmentation: Segmentation,
 
@@ -41,7 +41,8 @@ impl Options {
         let mut options = Options {
             input: matches.value_of("input").unwrap().to_string(),
             output: matches.value_of("output").unwrap().to_string(),
-            segmentation: Segmentation::from_str(segmentation).expect("Unknown segmentation algorithm"),
+            segmentation: Segmentation::from_str(segmentation)
+                .expect("Unknown segmentation algorithm"),
             io_threads: matches
                 .value_of("io_threads")
                 .unwrap()
@@ -52,21 +53,9 @@ impl Options {
                 .unwrap()
                 .parse::<f32>()
                 .unwrap(),
-            min_gc: matches
-                .value_of("min_gc")
-                .unwrap()
-                .parse::<f32>()
-                .unwrap(),
-            max_gc: matches
-                .value_of("max_gc")
-                .unwrap()
-                .parse::<f32>()
-                .unwrap(),
-            max_iqr: matches
-                .value_of("max_iqr")
-                .unwrap()
-                .parse::<f32>()
-                .unwrap(),
+            min_gc: matches.value_of("min_gc").unwrap().parse::<f32>().unwrap(),
+            max_gc: matches.value_of("max_gc").unwrap().parse::<f32>().unwrap(),
+            max_iqr: matches.value_of("max_iqr").unwrap().parse::<f32>().unwrap(),
             haar_seg_l_min: matches
                 .value_of("haar_seg_l_min")
                 .unwrap()
