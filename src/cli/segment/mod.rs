@@ -19,25 +19,89 @@ use slog::Logger;
 pub use self::options::*;
 use cli::shared;
 
+use separator::Separatable;
+
 /// Generate list of all contigs from BCF header.
 fn build_chroms(header: &bcf::header::HeaderView) -> Vec<(String, u32)> {
-    Vec::new()
+    let mut result = Vec::new();
+
+    for ref record in header.header_records() {
+        if let bcf::HeaderRecord::Contig {
+            key,
+            key_value_pairs,
+        } = record
+        {
+            assert_eq!(key, "contig");
+            let mut name: Option<String> = None;
+            let mut length: Option<u32> = None;
+            for &(ref key, ref value) in key_value_pairs {
+                if key == "ID" {
+                    name = Some(value.clone());
+                } else if key == "length" {
+                    length = Some(value.parse::<u32>().unwrap());
+                }
+            }
+            if let (Some(ref name), Some(length)) = (&name, length) {
+                result.push((name.clone(), length));
+            } else {
+                panic!(
+                    "Could not parse both name/length from {:?}/{:?}",
+                    name, length
+                );
+            }
+        }
+    }
+
+    result
 }
 
 /// Process one region.
 fn process_region(
-    reader: &mut bcf::Reader,
+    reader: &mut bcf::IndexedReader,
     writer: &mut bcf::Writer,
     logger: &mut Logger,
     options: &Options,
     (chrom, start, end): &(String, u32, u32),
 ) {
-    info!(logger, "Processing {}:{}-{}", chrom, start + 1, end);
+    info!(
+        logger,
+        "Processing {}:{}-{}",
+        chrom,
+        (start + 1).separated_string(),
+        end.separated_string()
+    );
+
+    // Resolve contig name to contig index.
+    let rid = reader
+        .header()
+        .name2rid(chrom.as_bytes())
+        .expect("Could not resolve contig name to index");
+
+    // First pass, collect normalized coverage and filtered-out mask.
+    debug!(logger, "First pass over region (collect coverage)...");
+    reader
+        .fetch(rid, *start, *end)
+        .expect("Could not fetch region from BCF file");
+    let mut record = reader.empty_record();
+    while reader.read(&mut record).is_ok() {
+    }
+
+    debug!(logger, "Performing segmentation...");
+
+    // Second pass, write segmentation
+    debug!(logger, "Second pass over region (write segmentation)...");
+    reader
+        .fetch(rid, *start, *end)
+        .expect("Could not fetch region from BCF file");
+    while reader.read(&mut record).is_ok() {
+        writer.translate(&mut record);
+        writer.write(&record).expect("Writing the record failed!");
+    }
 }
 
 /// Perform the actual processing.
 fn process(
-    reader: &mut bcf::Reader,
+    reader: &mut bcf::IndexedReader,
     writer: &mut bcf::Writer,
     logger: &mut Logger,
     options: &Options,
@@ -63,8 +127,8 @@ pub fn call(logger: &mut Logger, options: &Options) -> Result<(), String> {
     info!(logger, "Configuration: {:?}", &options);
 
     debug!(logger, "Opening input file");
-    let mut reader =
-        bcf::Reader::from_path(options.input.clone()).expect("Could not open input BCF file");
+    let mut reader = bcf::IndexedReader::from_path(options.input.clone())
+        .expect("Could not open input BCF file");
     if options.io_threads > 0 {
         reader
             .set_threads(options.io_threads as usize)

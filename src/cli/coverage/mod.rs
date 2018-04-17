@@ -316,7 +316,7 @@ impl CoverageOutput {
             "##ALT=<ID=COUNT,Description=\"Record describes a window for read counting\">",
             // TODO: FEW_GCWINDOWS should go into normalize but then cannot be found?
             "##FILTER=<ID=FEW_GCWINDOWS,Description=\"Masked because of few windows with \
-                this GC content\">",
+             this GC content\">",
         ];
         for line in lines {
             header.push_record(line.as_bytes());

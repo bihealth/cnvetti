@@ -5,7 +5,8 @@ authors = ["Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>"]
 
 [dependencies]
 bio = "*"
-rust-htslib = {git = "https://github.com/rust-bio/rust-htslib.git", branch = "master" }
+#rust-htslib = {git = "https://github.com/rust-bio/rust-htslib.git", branch = "master" }
+rust-htslib = {path = "../rust-htslib"}
 clap = {version = "*", features = ["yaml", "color", "suggestions"]}
 slog = "*"
 slog-term = "*"
