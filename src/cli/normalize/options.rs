@@ -12,7 +12,6 @@ pub struct Options {
     pub io_threads: u32,
 }
 
-
 impl Options {
     /// Build options from ArgMatches.
     pub fn new(matches: &ArgMatches) -> Options {

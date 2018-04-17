@@ -12,12 +12,12 @@ extern crate slog_term;
 
 use slog::Drain;
 
-use std::sync::{atomic, Arc};
-use std::sync::atomic::Ordering;
 use std::result;
+use std::sync::atomic::Ordering;
+use std::sync::{atomic, Arc};
 
-use std::process;
 use clap::{App, ArgMatches};
+use std::process;
 
 use cnvetti::cli::coverage;
 use cnvetti::cli::normalize;

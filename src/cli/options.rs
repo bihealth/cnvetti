@@ -1,6 +1,5 @@
 use std::fmt;
 
-
 /// Enum for selecting preset.
 #[derive(Clone, Debug, PartialEq)]
 pub enum OptionsPreset {
@@ -8,7 +7,6 @@ pub enum OptionsPreset {
     WesOffTarget,
     WesOnTarget,
 }
-
 
 impl OptionsPreset {
     /// Parse `CountKind` from `&str`.
@@ -18,11 +16,9 @@ impl OptionsPreset {
             "WesOffTarget" => Some(OptionsPreset::WesOffTarget),
             "WesOnTarget" => Some(OptionsPreset::WesOnTarget),
             _ => None,
-
         }
     }
 }
-
 
 /// Enum for selecting count type.
 #[derive(Clone, Debug, PartialEq)]
@@ -30,7 +26,6 @@ pub enum CountKind {
     Coverage,
     Alignments,
 }
-
 
 impl CountKind {
     /// Parse `CountKind` from `&str`.
@@ -42,7 +37,6 @@ impl CountKind {
         }
     }
 }
-
 
 impl fmt::Display for CountKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

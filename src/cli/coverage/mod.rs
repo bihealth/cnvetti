@@ -2,22 +2,22 @@
 
 include!(concat!(env!("OUT_DIR"), "/version.rs"));
 
-use std::collections::HashMap;
 use std::cmp::{max, min};
+use std::collections::HashMap;
 use std::env;
+use std::fs::File;
 use std::io::Write;
 use std::iter;
-use std::fs::File;
 
+use bio::data_structures::interval_tree;
 use bio::io::fasta;
 use bio::utils::Text;
-use bio::data_structures::interval_tree;
 
 use chrono;
 
+use rust_htslib::bam::{self, Read as BamRead};
 use rust_htslib::bcf;
 use rust_htslib::tbx::{self, Read as TbxRead};
-use rust_htslib::bam::{self, Read as BamRead};
 
 use separator::Separatable;
 
@@ -27,21 +27,19 @@ use shlex;
 
 use slog::Logger;
 
-mod piles;
-mod options;
 mod agg;
+mod options;
+mod piles;
 pub mod summary; // TODO: move into mod shared?
 
-use self::piles::PileCollector;
-pub use self::options::*;
 use self::agg::*;
+pub use self::options::*;
+use self::piles::PileCollector;
 use self::summary::CoverageSummarizer;
 
 use cli::shared;
 
-
 // TODO: remove restriction to same-length windows.
-
 
 /// Structure holding the input files readers and related data structures.
 struct CoverageInput {
@@ -188,19 +186,17 @@ impl CoverageInput {
             },
             // Create reader for mapability BED file, if any.
             tbx_reader: match &options.mapability_bed {
-                &Some(ref path) => {
-                    match tbx::Reader::from_path(&path) {
-                        Ok(mut reader) => {
-                            reader.set_threads(options.io_threads as usize).expect(
-                                "Could not set I/O thread count",
-                            );
-                            Some(reader)
-                        }
-                        Err(error) => {
-                            panic!("Could create BED reader {:?}", error);
-                        }
+                &Some(ref path) => match tbx::Reader::from_path(&path) {
+                    Ok(mut reader) => {
+                        reader
+                            .set_threads(options.io_threads as usize)
+                            .expect("Could not set I/O thread count");
+                        Some(reader)
                     }
-                }
+                    Err(error) => {
+                        panic!("Could create BED reader {:?}", error);
+                    }
+                },
                 &None => None,
             },
             // Parse out the genomic regions.
@@ -231,8 +227,8 @@ impl CoverageOutput {
         input: &CoverageInput,
         logger: &mut Logger,
     ) -> CoverageOutput {
-        let uncompressed = !options.output.ends_with(".bcf") &&
-            !options.output.ends_with(".vcf.gz");
+        let uncompressed =
+            !options.output.ends_with(".bcf") && !options.output.ends_with(".vcf.gz");
         let vcf = options.output.ends_with(".vcf") || options.output.ends_with(".vcf.gz");
 
         let header = CoverageOutput::build_header(&input);
@@ -241,16 +237,15 @@ impl CoverageOutput {
         CoverageOutput {
             bcf_writer: match bcf::Writer::from_path(&options.output, &header, uncompressed, vcf) {
                 Ok(mut writer) => {
-                    writer.set_threads(options.io_threads as usize).expect(
-                        "Could not set I/O thread count",
-                    );
+                    writer
+                        .set_threads(options.io_threads as usize)
+                        .expect("Could not set I/O thread count");
                     writer
                 }
                 Err(error) => {
                     panic!(
                         "Could not open BCF file for output {}. {:?}",
-                        options.output,
-                        error
+                        options.output, error
                     );
                 }
             },
@@ -267,9 +262,7 @@ impl CoverageOutput {
 
         // Put overall meta information into the BCF header.
         let now = chrono::Utc::now();
-        header.push_record(
-            format!("##fileDate={}", now.format("%Y%m%d").to_string()).as_bytes(),
-        );
+        header.push_record(format!("##fileDate={}", now.format("%Y%m%d").to_string()).as_bytes());
 
         // Put creating tool version an dcall into file.
         header.push_record(format!("##cnvetti_coverageVersion={}", VERSION).as_bytes());
@@ -285,9 +278,7 @@ impl CoverageOutput {
 
         // Put contig information into BCF header.
         for seq in input.ref_reader.index.sequences() {
-            header.push_record(
-                format!("##contig=<ID={},length={}>", seq.name, seq.len).as_bytes(),
-            );
+            header.push_record(format!("##contig=<ID={},length={}>", seq.name, seq.len).as_bytes());
         }
 
         // Add samples to BCF header.
@@ -301,21 +292,21 @@ impl CoverageOutput {
             "##INFO=<ID=END,Number=1,Type=Integer,Description=\"Window end\">",
             "##INFO=<ID=GC,Number=1,Type=Float,Description=\"Reference GC content in percent\">",
             "##INFO=<ID=MAPABILITY,Number=1,Type=Float,Description=\"Mean mapability in the \
-            window\">",
+             window\">",
             "##INFO=<ID=GAP,Number=0,Type=Flag,Description=\"Window overlaps with N in reference \
-            (gap)\">",
+             (gap)\">",
             "##INFO=<ID=GCWINDOWS,Number=1,Type=Integer,Description=\"Number of windows with same \
-            GC content\">",
+             GC content\">",
             "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">",
             "##FORMAT=<ID=COV,Number=1,Type=Float,Description=\"Average coverage\">",
             "##FORMAT=<ID=WINSD,Number=1,Type=Float,Description=\"Per-window coverage SD)\">",
             "##FORMAT=<ID=MP,Description=\"Masked for sample because too much masked because of \
-            piles\",Type=Integer,Number=1>",
+             piles\",Type=Integer,Number=1>",
             "##FORMAT=<ID=RC,Number=1,Type=Integer,Description=\"Number of aligning reads, \
-            scaled in the case of pile-masking\">",
+             scaled in the case of pile-masking\">",
             "##FORMAT=<ID=RRC,Number=1,Type=Integer,Description=\"Raw number of aligning reads\">",
             "##FORMAT=<ID=MS,Number=1,Type=Integer,Description=\"Number of bases in window \
-            masked because of read piles\">",
+             masked because of read piles\">",
             "##ALT=<ID=COUNT,Description=\"Record describes a window for read counting\">",
         ];
         for line in lines {
@@ -325,7 +316,6 @@ impl CoverageOutput {
         header
     }
 }
-
 
 /// Implementation of the `cnvetti coverage` command.
 pub struct CoverageApp<'a> {
@@ -341,7 +331,6 @@ pub struct CoverageApp<'a> {
     /// Summariser.
     summariser: CoverageSummarizer,
 }
-
 
 impl<'a> CoverageApp<'a> {
     /// Construct and initialize new `CoverageApp` instance.
@@ -430,12 +419,13 @@ impl<'a> CoverageApp<'a> {
         info!(self.logger, "Computing coverage...");
         // Seek to region in readers.
         for bam_reader in &mut self.input.bam_readers {
-            let tid = bam_reader.header().tid(chrom.as_bytes()).expect(
-                "Could not resolve contig name to integer",
-            );
-            bam_reader.fetch(tid, begin, end).expect(
-                "Could not fetch region!",
-            );
+            let tid = bam_reader
+                .header()
+                .tid(chrom.as_bytes())
+                .expect("Could not resolve contig name to integer");
+            bam_reader
+                .fetch(tid, begin, end)
+                .expect("Could not fetch region!");
         }
 
         // Initialize the BAM aggregation.
@@ -480,8 +470,8 @@ impl<'a> CoverageApp<'a> {
                 self.input.samples[i],
                 aggregators[i].num_processed().separated_string(),
                 aggregators[i].num_skipped().separated_string(),
-                100.0 * (aggregators[i].num_processed() - aggregators[i].num_skipped()) as f64 /
-                aggregators[i].num_processed() as f64,
+                100.0 * (aggregators[i].num_processed() - aggregators[i].num_skipped()) as f64
+                    / aggregators[i].num_processed() as f64,
             );
         }
 
@@ -520,22 +510,20 @@ impl<'a> CoverageApp<'a> {
                 (wid + 1) * self.options.window_length as usize,
             ) as i32;
             record
-                .set_id(
-                    format!("WIN_{}_{}_{}", chrom, pos + 1, window_end).as_bytes(),
-                )
+                .set_id(format!("WIN_{}_{}_{}", chrom, pos + 1, window_end).as_bytes())
                 .expect("Could not update ID");
             let alleles = &[Vec::from("N"), Vec::from("<COUNT>")];
-            record.set_alleles(alleles).expect(
-                "Could not update alleles!",
-            );
+            record
+                .set_alleles(alleles)
+                .expect("Could not update alleles!");
 
             // INFO fields
-            record.push_info_integer(b"END", &[window_end]).expect(
-                "Could not write INFO/END",
-            );
-            record.push_info_float(b"GC", &[*gc]).expect(
-                "Could not write INFO/GC",
-            );
+            record
+                .push_info_integer(b"END", &[window_end])
+                .expect("Could not write INFO/END");
+            record
+                .push_info_float(b"GC", &[*gc])
+                .expect("Could not write INFO/GC");
             record
                 .push_info_integer(b"GAP", &[has_gap[wid] as i32])
                 .expect("Could not write INFO/GAP");
@@ -558,9 +546,7 @@ impl<'a> CoverageApp<'a> {
             for field in aggregators[0].integer_field_names() {
                 let values: Vec<i32> = aggregators
                     .iter()
-                    .map(|ref agg| {
-                        *agg.integer_values(wid as u32).get(&field).unwrap()
-                    })
+                    .map(|ref agg| *agg.integer_values(wid as u32).get(&field).unwrap())
                     .collect();
                 record
                     .push_format_integer(field.as_bytes(), values.as_slice())
@@ -588,9 +574,10 @@ impl<'a> CoverageApp<'a> {
             }
 
             // Actually write the record.
-            output.bcf_writer.write(&record).expect(
-                "Could not write record!",
-            );
+            output
+                .bcf_writer
+                .write(&record)
+                .expect("Could not write record!");
         }
     }
 
@@ -610,9 +597,10 @@ impl<'a> CoverageApp<'a> {
         match self.input.tbx_reader {
             Some(_) => {
                 info!(self.logger, "Loading mapability...");
-                Some(self.load_mapability(&chrom, chrom_len).expect(
-                    "loading mapability failed",
-                ))
+                Some(
+                    self.load_mapability(&chrom, chrom_len)
+                        .expect("loading mapability failed"),
+                )
             }
             None => {
                 info!(self.logger, "Mapability is not considered.");
@@ -638,7 +626,8 @@ impl<'a> CoverageApp<'a> {
             .tbx_reader
             .as_mut()
             .map(|reader| reader.fetch(tid, 0, chrom_len as u32))
-            .unwrap() {
+            .unwrap()
+        {
             Err(x) => panic!("Could not fetch in mapability BED file {:?}", x),
             _ => (),
         };
@@ -774,7 +763,6 @@ impl<'a> CoverageApp<'a> {
         Ok((end as u64, result, has_gap))
     }
 }
-
 
 /// Main entry point for the "coverage" command.
 pub fn call(logger: &mut Logger, options: &Options) -> Result<(), String> {

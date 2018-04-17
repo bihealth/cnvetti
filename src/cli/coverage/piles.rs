@@ -6,7 +6,6 @@ use bio::data_structures::interval_tree;
 
 use rust_htslib::bam::{self, Read as BamRead};
 
-
 /// Configuration for pile collection for black listing.
 #[derive(Clone, Debug)]
 struct PileCollectorOptions {
@@ -16,14 +15,12 @@ struct PileCollectorOptions {
     min_mapq: u8,
 }
 
-
 /// Collection of read piles for black listing.
 #[derive(Debug)]
 pub struct PileCollector<'a> {
     bam_reader: &'a mut bam::IndexedReader,
     options: PileCollectorOptions,
 }
-
 
 impl<'a> PileCollector<'a> {
     /// Construct new `PileCollector`.
@@ -50,9 +47,9 @@ impl<'a> PileCollector<'a> {
         // Fetch whole contig.
         let tid = self.bam_reader.header().tid(chrom.as_bytes()).unwrap();
         let end = self.bam_reader.header().target_len(tid).unwrap();
-        self.bam_reader.fetch(tid, 0, end).expect(
-            "Could not fetch contig",
-        );
+        self.bam_reader
+            .fetch(tid, 0, end)
+            .expect("Could not fetch contig");
 
         // Intervals for the result.
         let mut intervals = Vec::new();
@@ -74,10 +71,9 @@ impl<'a> PileCollector<'a> {
                 .alignments()
                 .filter(|alignment| {
                     let record = alignment.record();
-                    !record.is_duplicate() && !record.is_supplementary() &&
-                        !record.is_duplicate() &&
-                        !record.is_quality_check_failed() &&
-                        (record.mapq() >= options.min_mapq)
+                    !record.is_duplicate() && !record.is_supplementary() && !record.is_duplicate()
+                        && !record.is_quality_check_failed()
+                        && (record.mapq() >= options.min_mapq)
                 })
                 .count() as i32;
 

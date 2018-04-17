@@ -1,6 +1,6 @@
+use std::cmp::{max, min};
 use std::collections::HashMap;
 use std::ops::Range;
-use std::cmp::{max, min};
 
 use cli::coverage::options::*;
 
@@ -8,11 +8,9 @@ use bio::data_structures::interval_tree;
 
 use rust_htslib::bam;
 
-
 // TODO: make this configurable in options.
 /// Largest fraction of pile-masked windows before ignoring.
 const MAX_MS: f64 = 0.5;
-
 
 /// Struct with common information for aggregator.
 #[derive(Debug)]
@@ -65,7 +63,6 @@ pub trait BamRecordAggregator {
     fn get_coverage(&self, window_id: u32) -> i32;
 }
 
-
 /// Struct for aggregating as alignment counts.
 #[derive(Debug)]
 pub struct CountAlignmentsAggregator<'a> {
@@ -79,7 +76,6 @@ pub struct CountAlignmentsAggregator<'a> {
     /// Per-sample read counts (each bin is a `u32`).
     counters: Vec<u32>,
 }
-
 
 impl<'a> CountAlignmentsAggregator<'a> {
     /// Construct new aggregator with the given BAM `header`.  This information is
@@ -108,7 +104,6 @@ impl<'a> CountAlignmentsAggregator<'a> {
     }
 }
 
-
 impl<'a> CountAlignmentsAggregator<'a> {
     // Skip `record` based on `MAPQ`?
     fn skip_mapq(&self, record: &bam::Record) -> bool {
@@ -117,8 +112,8 @@ impl<'a> CountAlignmentsAggregator<'a> {
 
     // Skip `record` because of flags.
     fn skip_flags(&self, record: &bam::Record) -> bool {
-        record.is_secondary() || record.is_supplementary() || record.is_duplicate() ||
-            record.is_quality_check_failed()
+        record.is_secondary() || record.is_supplementary() || record.is_duplicate()
+            || record.is_quality_check_failed()
     }
 
     /// Skip `record` because of discordant alignment?
@@ -128,8 +123,8 @@ impl<'a> CountAlignmentsAggregator<'a> {
         } else if !record.is_paired() {
             false // unpaired cannot be discordant
         } else {
-            record.tid() != record.mtid() || record.is_reverse() == record.is_mate_reverse() ||
-                record.is_unmapped() || record.is_mate_unmapped()
+            record.tid() != record.mtid() || record.is_reverse() == record.is_mate_reverse()
+                || record.is_unmapped() || record.is_mate_unmapped()
         }
     }
 
@@ -151,8 +146,8 @@ impl<'a> CountAlignmentsAggregator<'a> {
             }
         }
 
-        (num_unclipped as f32) / ((num_clipped + num_unclipped) as f32) <
-            self.base.options.min_unclipped
+        (num_unclipped as f32) / ((num_clipped + num_unclipped) as f32)
+            < self.base.options.min_unclipped
     }
 
     // Skip `record` because it is paired and not the first fragment?
@@ -161,12 +156,10 @@ impl<'a> CountAlignmentsAggregator<'a> {
     }
 }
 
-
 impl<'a> BamRecordAggregator for CountAlignmentsAggregator<'a> {
     fn put_bam_record(&mut self, record: &bam::Record) {
-        if !self.skip_mapq(record) && !self.skip_flags(record) &&
-            !self.skip_discordant(record) && !self.skip_clipping(record) &&
-            !self.skip_paired_and_all_but_first(record)
+        if !self.skip_mapq(record) && !self.skip_flags(record) && !self.skip_discordant(record)
+            && !self.skip_clipping(record) && !self.skip_paired_and_all_but_first(record)
         {
             self.base.num_processed += 1;
 
@@ -283,11 +276,9 @@ impl<'a> BamRecordAggregator for CountAlignmentsAggregator<'a> {
     }
 }
 
-
 /// Bin for coverage aggregation.
 #[derive(Debug)]
 pub struct CoverageBin {}
-
 
 /// Struct for aggregating as coverage.
 #[derive(Debug)]
@@ -297,7 +288,6 @@ pub struct CoverageAggregator {
     /// Number of bases for each base in the current bin for the one sample in the BAM file.
     pub coverage: Vec<CoverageBin>,
 }
-
 
 impl CoverageAggregator {
     pub fn new(

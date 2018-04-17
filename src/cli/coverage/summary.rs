@@ -5,7 +5,6 @@ use std::iter::FromIterator;
 
 use histogram::Histogram;
 
-
 /// Summary of the coverage distribution of.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DistributionSummary {
@@ -28,7 +27,6 @@ pub struct SummarisedMetric {
     pub summaries: BTreeMap<i32, DistributionSummary>,
 }
 
-
 // Coverage summary.
 pub struct CoverageSummarizer {
     // The name of the metric.
@@ -42,7 +40,6 @@ pub struct CoverageSummarizer {
     // Histograms to use for summarizing.
     histograms: BTreeMap<String, BTreeMap<i32, Histogram>>,
 }
-
 
 impl CoverageSummarizer {
     /// Construct with `Vec` of sample names.
@@ -58,9 +55,11 @@ impl CoverageSummarizer {
             histograms: BTreeMap::from_iter(samples.iter().map(|sample| {
                 (
                     sample.clone(),
-                    BTreeMap::from_iter((0..101).step_by(bucket_size as usize).map(|bucket| {
-                        (bucket, Histogram::new())
-                    })),
+                    BTreeMap::from_iter(
+                        (0..101)
+                            .step_by(bucket_size as usize)
+                            .map(|bucket| (bucket, Histogram::new())),
+                    ),
                 )
             })),
         }
