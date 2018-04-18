@@ -13,6 +13,9 @@ pub struct Options {
     /// Number of threads to use in I/O.
     pub io_threads: u32,
 
+    /// The metric that is segmented.
+    pub count_kind: CountKind,
+
     /// Minimal mapability to require.
     pub min_mapability: f32,
     /// Minimal GC content to require.
@@ -26,9 +29,9 @@ pub struct Options {
     pub segmentation: Segmentation,
 
     /// HaarSeg: value for L_min.
-    pub haar_seg_l_min: i32,
+    pub haar_seg_l_min: usize,
     /// HaarSeg: value for L_max.
-    pub haar_seg_l_max: i32,
+    pub haar_seg_l_max: usize,
     /// HaarSeg: value for the FDR "Q" value.
     pub haar_seg_breaks_fdr_q: f64,
 }
@@ -37,6 +40,7 @@ impl Options {
     /// Build options from ArgMatches.
     pub fn new(matches: &ArgMatches) -> Options {
         let segmentation = matches.value_of("segmentation").unwrap();
+        let count_kind = matches.value_of("count_kind").unwrap();
 
         Options {
             input: matches.value_of("input").unwrap().to_string(),
@@ -48,6 +52,7 @@ impl Options {
                 .unwrap()
                 .parse::<u32>()
                 .unwrap(),
+            count_kind: CountKind::from_str(count_kind).expect("Unknown count kind"),
             min_mapability: matches
                 .value_of("min_mapability")
                 .unwrap()
@@ -59,12 +64,12 @@ impl Options {
             haar_seg_l_min: matches
                 .value_of("haar_seg_l_min")
                 .unwrap()
-                .parse::<i32>()
+                .parse::<usize>()
                 .unwrap(),
             haar_seg_l_max: matches
                 .value_of("haar_seg_l_max")
                 .unwrap()
-                .parse::<i32>()
+                .parse::<usize>()
                 .unwrap(),
             haar_seg_breaks_fdr_q: matches
                 .value_of("haar_seg_breaks_fdr_q")

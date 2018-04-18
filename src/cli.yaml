@@ -280,6 +280,17 @@ subcommands:
         value_name: FRAC
         help: Maximal IQR in relative count/coverage in overall cohort to allow.
 
+    # Statistics-Related Arguments --------------------------------------------
+    - count_kind:
+        long: count-kind
+        takes_value: true
+        default_value: Coverage
+        value_name: COUNT
+        possible_values:
+        - Coverage
+        - Alignments
+        help: Whether to consider coverage or read count statistics.
+
     # Selection of Segmentation Algorithm -------------------------------------
     - segmentation:
         long: segmentation

@@ -360,6 +360,11 @@ pub fn segment_haar_seg(
 ) -> Vec<usize> {
     let haar_end_level = haar_last_level + 1;
 
+    // Short-circuit in the case of empty input.
+    if vals.is_empty() {
+        return vec![0, 1];
+    }
+
     // Estimate sigma and compute the data necessary for non-stationary variance compenstation.
     let mut sigma_est = estimate_sigmas(vals, raw_vals, logger);
 

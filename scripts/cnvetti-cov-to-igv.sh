@@ -4,7 +4,7 @@
 # more than one sample into a ".igv" file for convertion to TGF and ultimately
 # display in IGV.
 
-usage() { >&2 echo "Usage: $0 [-m RC|RRC|NRC] IN.bcf OUT.igv"; }
+usage() { >&2 echo "Usage: $0 [-m RC|RRC|NRC|SRC] IN.bcf OUT.igv"; }
 
 METRIC=
 
@@ -21,7 +21,7 @@ while getopts ":hm:" flag; do
 done
 
 case "$METRIC" in
-    RC|RRC|NRC);;
+    RC|RRC|NRC|SRC);;
     *) >&2 echo "ERROR: Invalid metric '$METRIC'"; usage; exit 1;;
 esac
 
