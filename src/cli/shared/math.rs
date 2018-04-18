@@ -45,7 +45,7 @@ fn percentile_of_sorted(sorted_samples: &[f64], pct: f64) -> f64 {
     lo + (hi - lo) * d
 }
 
-fn percentile(vals: &[f64], pct: f64) -> f64 {
+pub fn percentile(vals: &[f64], pct: f64) -> f64 {
     let mut tmp = vals.to_vec();
     local_sort(&mut tmp);
     percentile_of_sorted(&tmp, pct)

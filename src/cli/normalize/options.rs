@@ -10,6 +10,7 @@ pub struct Options {
     pub count_kind: CountKind,
     pub min_gc_window_count: i32,
     pub io_threads: u32,
+    pub gc_step: f64,
 }
 
 impl Options {
@@ -33,6 +34,7 @@ impl Options {
                 .unwrap()
                 .parse::<u32>()
                 .unwrap(),
+            gc_step: matches.value_of("gc_step").unwrap().parse::<f64>().unwrap(),
         };
 
         if let Some(preset) = matches.value_of("preset") {

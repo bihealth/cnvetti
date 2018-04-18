@@ -44,19 +44,19 @@ pub struct CoverageSummarizer {
 impl CoverageSummarizer {
     /// Construct with `Vec` of sample names.
     pub fn new(bucket_size: i32, samples: &Vec<String>, metric: &String) -> CoverageSummarizer {
-        if 100 % bucket_size != 0 {
-            panic!("100 must be divisible by bucket_size");
+        if 1000 % bucket_size != 0 {
+            panic!("1000 must be divisible by bucket_size");
         }
         CoverageSummarizer {
             metric: metric.clone(),
             bucket_size: bucket_size,
-            bucket_size_float: (bucket_size as f32 / 100.0),
+            bucket_size_float: (bucket_size as f32 / 1000.0),
             samples: samples.clone(),
             histograms: BTreeMap::from_iter(samples.iter().map(|sample| {
                 (
                     sample.clone(),
                     BTreeMap::from_iter(
-                        (0..101)
+                        (0..1001)
                             .step_by(bucket_size as usize)
                             .map(|bucket| (bucket, Histogram::new())),
                     ),

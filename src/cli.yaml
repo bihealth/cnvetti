@@ -78,6 +78,12 @@ subcommands:
         takes_value: true
         value_name: MAP.bed.gz
         help: Path to bgziped and tabix-indexed mapability BED file.
+    - gc_step:
+        long: gc-step
+        takes_value: true
+        default_value: '0.01'
+        value_name: GC_STEP
+        help: Step in GC to use for normalizing.
 
     # Preset-Selecting Arguments ----------------------------------------------
     - preset:
@@ -118,12 +124,12 @@ subcommands:
             (2) at least at one position the depth is >= `--pile-min-depth`.
             In this case, any alignment overlapping with the pile will be
             ignored.
-    - pile_min_depth:
-        long: pile-min-depth
+    - pile_depth_percentile:
+        long: pile-depth-percentile
         takes_value: true
-        default_value: '3'
-        value_name: DEPTH
-        help: Piles with a depth of >= `DEPTH` will be masked.
+        default_value: '95'
+        value_name: NUM
+        help: Only keep piles with depth in the lower NUM-th percentiles.
     - pile_max_gap:
         long: pile-max-gap
         takes_value: true
@@ -219,6 +225,12 @@ subcommands:
         - Coverage
         - Alignments
         help: Whether to consider coverage or read count statistics.
+    - gc_step:
+        long: gc-step
+        takes_value: true
+        default_value: '0.01'
+        value_name: GC_STEP
+        help: Step in GC to use for normalizing.
 
     # Preset-Selecting Arguments ----------------------------------------------
     - preset:

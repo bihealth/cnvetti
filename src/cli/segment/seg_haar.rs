@@ -22,7 +22,7 @@ use statrs::function::erf;
 
 use slog::Logger;
 
-use cli::segment::math::median_abs_dev;
+use cli::shared::math::median_abs_dev;
 
 fn haar_convolution(
     signal: &[f64],

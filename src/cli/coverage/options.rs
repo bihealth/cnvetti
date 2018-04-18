@@ -17,10 +17,11 @@ pub struct Options {
     pub min_unclipped: f32,
     pub skip_discordant: bool,
     pub mask_piles: bool,
-    pub pile_min_depth: i32,
+    pub pile_depth_percentile: f64,
     pub pile_max_gap: u32,
     pub pile_mask_window_size: u32,
     pub io_threads: u32,
+    pub gc_step: f64,
 }
 
 impl Options {
@@ -66,10 +67,10 @@ impl Options {
                 .unwrap(),
             skip_discordant: matches.is_present("skip_discordant"),
             mask_piles: matches.is_present("mask_piles"),
-            pile_min_depth: matches
-                .value_of("pile_min_depth")
+            pile_depth_percentile: matches
+                .value_of("pile_depth_percentile")
                 .unwrap()
-                .parse::<i32>()
+                .parse::<f64>()
                 .unwrap(),
             pile_max_gap: matches
                 .value_of("pile_max_gap")
@@ -85,6 +86,11 @@ impl Options {
                 .value_of("io_threads")
                 .unwrap()
                 .parse::<u32>()
+                .unwrap(),
+            gc_step: matches
+                .value_of("gc_step")
+                .unwrap()
+                .parse::<f64>()
                 .unwrap(),
         };
 
@@ -102,8 +108,8 @@ impl Options {
                     options.window_length = 20_000;
 
                     options.mask_piles = true;
-                    options.pile_mask_window_size = 500;
-                    options.pile_min_depth = 3;
+                    options.pile_mask_window_size = 1;
+                    options.pile_depth_percentile = 90.0;
                     options.pile_max_gap = 5;
 
                     options.count_kind = CountKind::Alignments;

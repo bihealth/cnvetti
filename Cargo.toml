@@ -8,7 +8,7 @@ bio = "*"
 #rust-htslib = {git = "https://github.com/rust-bio/rust-htslib.git", branch = "master" }
 rust-htslib = {path = "../rust-htslib"}
 clap = {version = "*", features = ["yaml", "color", "suggestions"]}
-slog = "*"
+slog = {version = "*", features = ["max_level_trace", "release_max_level_debug"] }
 slog-term = "*"
 slog-async = "*"
 chrono = "*"

@@ -71,7 +71,7 @@ pub struct CountAlignmentsAggregator<'a> {
 
     // TODO: lifetime not necessary?
     /// The `IntervalTree` with black-listed intervals.
-    tree: &'a interval_tree::IntervalTree<u32, i32>,
+    tree: &'a interval_tree::IntervalTree<u32, u32>,
 
     /// Per-sample read counts (each bin is a `u32`).
     counters: Vec<u32>,
@@ -81,7 +81,7 @@ impl<'a> CountAlignmentsAggregator<'a> {
     /// Construct new aggregator with the given BAM `header`.  This information is
     /// necessary to appropriately allocate buffers for all samples in the header.
     pub fn new(
-        tree: &'a interval_tree::IntervalTree<u32, i32>,
+        tree: &'a interval_tree::IntervalTree<u32, u32>,
         samples: Vec<String>,
         read_group_to_sample: HashMap<String, String>,
         sample_to_idx: HashMap<String, u32>,
@@ -158,23 +158,40 @@ impl<'a> CountAlignmentsAggregator<'a> {
 
 impl<'a> BamRecordAggregator for CountAlignmentsAggregator<'a> {
     fn put_bam_record(&mut self, record: &bam::Record) {
+        use std::str;
+        let log =
+            (record.tid() == 0) && (record.pos() >= 74_440_000) && (record.pos() <= 74_460_000);
+        if log {
+            println!("Record {}", str::from_utf8(record.qname()).unwrap());
+        }
+
         if !self.skip_mapq(record) && !self.skip_flags(record) && !self.skip_discordant(record)
             && !self.skip_clipping(record) && !self.skip_paired_and_all_but_first(record)
         {
+            if log {
+                println!("=> considering for counting");
+            }
             self.base.num_processed += 1;
 
             let pos = (record.pos() as u32)..((record.pos() + 1) as u32);
             let window_length = self.base.options.window_length as usize;
             let bin = record.pos() as usize / window_length;
             if self.tree.find(pos).next().is_none() {
-                // if bin == 16320/20 {
-                //     use std::str;
-                //     println!("Counting {}", str::from_utf8(record.qname()).unwrap());
-                // }
+                if log {
+                    // bin == 94_860/20 {
+                    println!("-> Counting {}", str::from_utf8(record.qname()).unwrap());
+                }
 
                 self.counters[bin] += 1;
             } else {
+                if log {
+                    println!("  -> Skipping {}", str::from_utf8(record.qname()).unwrap());
+                }
                 self.base.num_skipped += 1;
+            }
+        } else {
+            if log {
+                println!("=> NOT considering for counting");
             }
         }
     }

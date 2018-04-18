@@ -2,7 +2,6 @@
 
 include!(concat!(env!("OUT_DIR"), "/version.rs"));
 
-mod math;
 mod options;
 mod seg_haar;
 mod seg_utils;

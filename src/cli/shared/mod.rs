@@ -1,3 +1,5 @@
+pub mod math;
+
 use slog::Logger;
 
 /// Build index file for the VCF/BCF file at `path`.

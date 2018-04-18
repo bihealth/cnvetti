@@ -1,5 +1,5 @@
 /// Various utility code for segmentation.
-use cli::segment::math::median;
+use cli::shared::math::median;
 
 // TODO: implement outlier detection
 // TODO: implement segmentation refinement

@@ -21,6 +21,8 @@ pub use self::options::*;
 use cli::coverage::summary::SummarisedMetric;
 use cli::shared;
 
+use histogram::Histogram;
+
 // TODO: check input file.
 // TODO: use index-based readers, is nicer for progress display...
 // TODO: could normalize already in coverage step by writing raw coverage to temporary file
@@ -37,6 +39,9 @@ fn process(
     let mut prev_rid = Option::None;
 
     let header = reader.header().clone();
+
+    let sample_count = reader.header().sample_count() as usize;
+    let mut hists = vec![Histogram::new(); sample_count];
 
     while reader.read(&mut record).is_ok() {
         if prev_rid.is_some() && prev_rid.unwrap() != record.rid() {
@@ -74,9 +79,7 @@ fn process(
                 .expect("Could not read INFO/GC")
                 .expect("INFO/GC was empty")[0]
         };
-        // TODO: gc_step should come frome file header...
-        let gc_step: f32 = 0.02;
-        let bucket = ((gc as f32 / gc_step).floor() * 100.0 * gc_step) as i32;
+        let bucket = ((gc as f64 / options.gc_step).floor() * 1000.0 * options.gc_step) as i32;
 
         let sample_id = 0;
 
@@ -86,25 +89,34 @@ fn process(
                 panic!("Not implemented yet!");
             }
             CountKind::Alignments => {
-                let summary = &summaries[sample_id].summaries.get(&bucket).unwrap();
-                let median = summary.summary5[2] as f32;
-                let nrcs: Vec<f32> = record
-                    .format(b"RC")
-                    .integer()
-                    .expect("Cannot access FORMAT/RC")
-                    .iter()
-                    .map(|slice| {
-                        if median < 0.001 {
-                            // guard against NaN
-                            0.0
-                        } else {
-                            slice[0] as f32 / median
-                        }
-                    })
-                    .collect();
-                record
-                    .push_format_float(b"NRC", nrcs.as_slice())
-                    .expect("Could not write FORMAT/NRC");
+                if let Some(summary) = &summaries[sample_id].summaries.get(&bucket) {
+                    let median = summary.summary5[2] as f32;
+                    let nrcs: Vec<f32> = record
+                        .format(b"RC")
+                        .integer()
+                        .expect("Cannot access FORMAT/RC")
+                        .iter()
+                        .map(|slice| {
+                            if median < 0.001 {
+                                // guard against NaN
+                                0.0
+                            } else {
+                                slice[0] as f32 / median
+                            }
+                        })
+                        .collect();
+                    for (idx, nrc) in nrcs.iter().enumerate() {
+                        let val = (nrc * 1000.0) as u64;
+                        hists[idx].increment(val + 1).unwrap();
+                    }
+                    record
+                        .push_format_float(b"NRC", nrcs.as_slice())
+                        .expect("Could not write FORMAT/NRC");
+                } else { 
+                    record
+                        .push_format_float(b"NRC", vec![0.0_f32; sample_count].as_slice())
+                        .expect("Could not write FORMAT/NRC");
+                }
             }
         }
 
@@ -112,6 +124,23 @@ fn process(
         writer.write(&record).expect("Could not write BCF record!");
 
         prev_rid = Some(record.rid());
+    }
+
+    info!(logger, "Maximal absolute deviations");
+    for (idx, hist) in hists.iter().enumerate() {
+        let median = hist.mean().unwrap(); // TODO: should be median
+        let mut hist2 = Histogram::new();
+        for bucket in hist {
+            let val = (bucket.value() as i64 - median as i64).abs() as u64;
+            hist2.increment_by(val + 1, bucket.count()).unwrap();
+        }
+
+        info!(
+            logger,
+            "{} => {}",
+            idx,
+            (hist2.mean().unwrap() - 1) as f64 / 1000.0
+        );
     }
 }
 

@@ -126,7 +126,14 @@ impl CoverageInput {
             .input
             .iter()
             .map(|path| match bam::IndexedReader::from_path(path) {
-                Ok(reader) => reader,
+                Ok(mut reader) => {
+                    if options.io_threads > 0 {
+                        reader
+                            .set_threads(options.io_threads as usize)
+                            .expect("Could not set I/O thread count");
+                    }
+                    reader
+                }
                 Err(error) => {
                     panic!("Could create BAM reader for path {}! {:?}", path, error);
                 }
@@ -339,6 +346,9 @@ pub struct CoverageApp<'a> {
 
     /// Summariser.
     summariser: CoverageSummarizer,
+
+    /// Depth threshold.
+    depth_threshold: Option<usize>,
 }
 
 impl<'a> CoverageApp<'a> {
@@ -354,10 +364,11 @@ impl<'a> CoverageApp<'a> {
 
         // Computation of summaries.
         CoverageApp {
-            summariser: CoverageSummarizer::new(2, &input.samples, &options.count_kind.to_string()),
+            summariser: CoverageSummarizer::new((options.gc_step * 1000.0) as i32, &input.samples, &options.count_kind.to_string()),
             logger,
             options,
             input,
+            depth_threshold: None,
         }
     }
 
@@ -485,11 +496,10 @@ impl<'a> CoverageApp<'a> {
         }
 
         // Compute histogram of GC contents.
-        // TODO: allow giving step size via command line.
-        let gc_step: f32 = 0.02;
+        let gc_step = self.options.gc_step;
         let mut gc_histo: HashMap<i32, i32> = HashMap::new();
         for gc in gc_content.iter() {
-            let rounded_gc: i32 = (*gc / gc_step) as i32;
+            let rounded_gc: i32 = (*gc as f64 / gc_step) as i32;
             let count = gc_histo.entry(rounded_gc).or_insert(0);
             *count += 1;
         }
@@ -507,7 +517,7 @@ impl<'a> CoverageApp<'a> {
             .name2rid(chrom.as_bytes())
             .unwrap() as i32;
         for (wid, gc) in gc_content.iter().enumerate() {
-            let rounded_gc = (*gc / gc_step) as i32;
+            let rounded_gc = (*gc as f64 as f64 / gc_step) as i32;
 
             let mut record = output.bcf_writer.empty_record();
             // Columns: CHROM, POS, ID, REF, ALT, FILTER
@@ -641,14 +651,7 @@ impl<'a> CoverageApp<'a> {
             _ => (),
         };
 
-        // Load line by line.
-        // let mut buf = Vec::new();
-        // // TODO: can we make this loop tighter without unwrapping all the time?
-        // while self.input
-        //     .tbx_reader
-        //     .as_mut()
-        //     .map(|reader| reader.read(&mut buf).is_ok())
-        //     .unwrap()
+        // TODO: can we make this loop tighter without unwrapping all the time?
         for buf in self.input.tbx_reader.as_mut().unwrap().records() {
             // TODO: mapability is shifted by 1/2*k to the right?
             // Parse begin/end/mapability from BED file.
@@ -676,7 +679,7 @@ impl<'a> CoverageApp<'a> {
     }
 
     /// Load piles for black-listing or an empty `IntervalTree` for each sample.
-    fn maybe_collect_piles(&mut self, chrom: &str) -> Vec<interval_tree::IntervalTree<u32, i32>> {
+    fn maybe_collect_piles(&mut self, chrom: &str) -> Vec<interval_tree::IntervalTree<u32, u32>> {
         // Only collect piles when masking by pile and counting alignments.
         if self.options.mask_piles && self.options.count_kind == CountKind::Alignments {
             info!(self.logger, "Computing piles for black listing");
@@ -687,18 +690,22 @@ impl<'a> CoverageApp<'a> {
             for (i, bam_reader) in self.input.bam_readers.iter_mut().enumerate() {
                 let mut collector = PileCollector::new(
                     bam_reader,
-                    options.pile_min_depth,
+                    options.pile_depth_percentile,
                     options.pile_max_gap,
                     options.min_mapq,
                     options.pile_mask_window_size,
                 );
-                let (len_sum, tree) = collector.collect_piles(chrom);
+                let (depth_threshold, len_sum, tree) =
+                    collector.collect_piles(chrom, self.logger, self.depth_threshold);
                 debug!(
                     self.logger,
                     "Black listed {} bp for {}",
                     len_sum.separated_string(),
                     samples[i]
                 );
+                if let None = self.depth_threshold {
+                    self.depth_threshold = Some(depth_threshold);
+                }
 
                 result.push(tree);
             }
