@@ -239,17 +239,8 @@ pub fn call_binned_gc(logger: &mut Logger, options: &Options) -> Result<(), Stri
     Ok(())
 }
 
-/// Main entry point for GC-based normalization.
-pub fn call_loess_gc(logger: &mut Logger, _options: &Options) -> Result<(), String> {
-    info!(logger, "Normalizing by LOESS on GC content via R...");
-
-    panic!("Not implemented yet :(");
-
-    // Ok(())
-}
-
-/// Main entry point for GC-based normalization.
-pub fn call_loess_gc_mapability(logger: &mut Logger, options: &Options) -> Result<(), String> {
+/// Main entry point for LOESS-based normalization.
+pub fn call_loess(logger: &mut Logger, options: &Options) -> Result<(), String> {
     info!(logger, "Normalizing by LOESS via R...");
 
     debug!(logger, "Opening input BCF file for writing LOESS input");
@@ -330,6 +321,7 @@ pub fn call_loess_gc_mapability(logger: &mut Logger, options: &Options) -> Resul
                     .expect("Could not read INFO/GC")
                     .expect("INFO/GC was empty")[0]
             };
+            // TODO: add switch whether mapability is desired, also for when writing out script above.
             // Get INFO/MAPABILITY
             let mapability = {
                 match record.info(b"MAPABILITY").float() {
@@ -390,11 +382,8 @@ pub fn call(logger: &mut Logger, options: &Options) -> Result<(), String> {
         Normalization::BinnedGc => {
             call_binned_gc(logger, &options)?;
         }
-        Normalization::LoessGc => {
-            call_loess_gc(logger, &options)?;
-        }
-        Normalization::LoessGcMapability => {
-            call_loess_gc_mapability(logger, &options)?;
+        Normalization::LoessGc|Normalization::LoessGcMapability => {
+            call_loess(logger, &options)?;
         }
     }
 
