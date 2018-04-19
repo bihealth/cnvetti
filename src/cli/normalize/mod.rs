@@ -80,6 +80,7 @@ fn process(
                 .expect("INFO/GC was empty")[0]
         };
         let bucket = ((gc as f64 / options.gc_step).floor() * 1000.0 * options.gc_step) as i32;
+        println!("Bucket for {} is {}", gc, bucket);
 
         let sample_id = 0;
 
@@ -101,6 +102,12 @@ fn process(
                                 // guard against NaN
                                 0.0
                             } else {
+                                println!(
+                                    "RC={}, median={}, RC/median={}",
+                                    slice[0],
+                                    median,
+                                    slice[0] as f32 / median
+                                );
                                 slice[0] as f32 / median
                             }
                         })
@@ -112,7 +119,7 @@ fn process(
                     record
                         .push_format_float(b"NRC", nrcs.as_slice())
                         .expect("Could not write FORMAT/NRC");
-                } else { 
+                } else {
                     record
                         .push_format_float(b"NRC", vec![0.0_f32; sample_count].as_slice())
                         .expect("Could not write FORMAT/NRC");

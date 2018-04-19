@@ -84,6 +84,12 @@ subcommands:
         default_value: '0.01'
         value_name: GC_STEP
         help: Step in GC to use for normalizing.
+    - contig_regex:
+        long: contig-regex
+        takes_value: true
+        default_value: '^(chr)?\d\d?$'
+        value_name: 'regex'
+        help: Regular expression for contigs taking part in statistics.
 
     # Preset-Selecting Arguments ----------------------------------------------
     - preset:
@@ -124,7 +130,7 @@ subcommands:
             (2) at least at one position the depth is >= `--pile-min-depth`.
             In this case, any alignment overlapping with the pile will be
             ignored.
-    - pile_depth_percentile:
+    - pile_depth_percentile:  # TODO: rename to "--pile-area-percentile"?
         long: pile-depth-percentile
         takes_value: true
         default_value: '95'
@@ -136,10 +142,10 @@ subcommands:
         default_value: '20'
         value_name: VAL
         help: Merge intervals for piles if distance is <= `VAL`.
-    - pile_mask_window_size:
+    - pile_mask_window_size:  # TODO: remove?
         long: pile-mask-window-size
         takes_value: true
-        default_value: '500'
+        default_value: '1'
         value_name: SIZE
         help: >
             Mask windows of length `SIZE` when a pile occurs.  Set to `1` to

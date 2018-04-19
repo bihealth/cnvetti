@@ -125,6 +125,7 @@ impl<'a> CountAlignmentsAggregator<'a> {
         } else {
             record.tid() != record.mtid() || record.is_reverse() == record.is_mate_reverse()
                 || record.is_unmapped() || record.is_mate_unmapped()
+                || !record.is_proper_pair()
         }
     }
 
@@ -161,6 +162,7 @@ impl<'a> BamRecordAggregator for CountAlignmentsAggregator<'a> {
         use std::str;
         let log =
             (record.tid() == 0) && (record.pos() >= 74_440_000) && (record.pos() <= 74_460_000);
+        let log = false;
         if log {
             println!("Record {}", str::from_utf8(record.qname()).unwrap());
         }

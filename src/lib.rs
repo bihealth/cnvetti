@@ -8,6 +8,7 @@ extern crate bio;
 extern crate chrono;
 extern crate clap;
 extern crate histogram;
+extern crate regex;
 extern crate rust_htslib;
 extern crate separator;
 extern crate shlex;

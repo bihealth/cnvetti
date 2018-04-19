@@ -15,6 +15,8 @@ use bio::utils::Text;
 
 use chrono;
 
+use regex::Regex;
+
 use rust_htslib::bam::{self, Read as BamRead};
 use rust_htslib::bcf;
 use rust_htslib::tbx::{self, Read as TbxRead};
@@ -364,7 +366,11 @@ impl<'a> CoverageApp<'a> {
 
         // Computation of summaries.
         CoverageApp {
-            summariser: CoverageSummarizer::new((options.gc_step * 1000.0) as i32, &input.samples, &options.count_kind.to_string()),
+            summariser: CoverageSummarizer::new(
+                (options.gc_step * 1000.0) as i32,
+                &input.samples,
+                &options.count_kind.to_string(),
+            ),
             logger,
             options,
             input,
@@ -380,6 +386,7 @@ impl<'a> CoverageApp<'a> {
         } else {
             self.input.genome_regions.clone()
         };
+
         // Open output files and start processing in its own scope.
         {
             // The output file has to be opened here so it can go out of scope and be closed
@@ -427,13 +434,26 @@ impl<'a> CoverageApp<'a> {
             end.separated_string()
         );
 
+        // Determin whether or not to collect statistics.
+        let re = Regex::new(&self.options.contig_regex).unwrap();
+        let collect_stats = re.is_match(&chrom);
+        debug!(
+            self.logger,
+            "{} statistics for from {}",
+            if collect_stats {
+                "Collect"
+            } else {
+                "Do not collect"
+            },
+            chrom
+        );
+
         // Get `u32` 0-based coordinates.
         let begin = (start - 1) as u32;
         let end = end as u32;
 
         let (chrom_len, gc_content, has_gap) = self.analyze_reference(chrom).unwrap();
-        // TODO: write out mapability
-        let _mapability = self.maybe_load_mapability(chrom, chrom_len);
+        let mapability = self.maybe_load_mapability(chrom, chrom_len);
         let piles = self.maybe_collect_piles(chrom);
 
         info!(self.logger, "Computing coverage...");
@@ -543,6 +563,11 @@ impl<'a> CoverageApp<'a> {
             record
                 .push_info_float(b"GC", &[*gc])
                 .expect("Could not write INFO/GC");
+            if let Some(ref mapability) = &mapability {
+                record
+                    .push_info_float(b"MAPABILITY", &[mapability[wid] as f32])
+                    .expect("Could not write INFO/MAPABILITY");
+            }
             record
                 .push_info_integer(b"GAP", &[has_gap[wid] as i32])
                 .expect("Could not write INFO/GAP");
@@ -582,13 +607,15 @@ impl<'a> CoverageApp<'a> {
             }
 
             // Update summary statistics.
-            for (sample_id, agg) in aggregators.iter().enumerate() {
-                if !agg.is_masked(wid as u32) {
-                    self.summariser.increment(
-                        &self.input.samples[sample_id],
-                        *gc,
-                        agg.get_coverage(wid as u32),
-                    );
+            if collect_stats {
+                for (sample_id, agg) in aggregators.iter().enumerate() {
+                    if !agg.is_masked(wid as u32) {
+                        self.summariser.increment(
+                            &self.input.samples[sample_id],
+                            *gc,
+                            agg.get_coverage(wid as u32),
+                        );
+                    }
                 }
             }
 
@@ -612,28 +639,34 @@ impl<'a> CoverageApp<'a> {
     }
 
     /// Load mapability if configured to do so.
-    fn maybe_load_mapability(&mut self, chrom: &str, chrom_len: u64) -> Option<Vec<f32>> {
-        match self.input.tbx_reader {
-            Some(_) => {
-                info!(self.logger, "Loading mapability...");
-                Some(
-                    self.load_mapability(&chrom, chrom_len)
-                        .expect("loading mapability failed"),
-                )
+    fn maybe_load_mapability(&mut self, chrom: &str, chrom_len: u64) -> Option<Vec<f64>> {
+        if self.input.tbx_reader.is_some() {
+            let tid = self.input.tbx_reader.as_ref().unwrap().tid(chrom);
+            match tid {
+                Ok(_) => {
+                    info!(self.logger, "Loading mapability...");
+                    Some(
+                        self.load_mapability(&chrom, chrom_len)
+                            .expect("loading mapability failed"),
+                    )
+                }
+                _ => {
+                    info!(self.logger, "No mapability for chrom {}", chrom);
+                    None
+                }
             }
-            None => {
-                info!(self.logger, "Mapability is not considered.");
-                None
-            }
+        } else {
+            info!(self.logger, "Mapability is not considered.");
+            None
         }
     }
 
     /// Load mapability of `chrom` from BED file.
-    fn load_mapability(&mut self, chrom: &str, chrom_len: u64) -> Result<Vec<f32>, String> {
+    fn load_mapability(&mut self, chrom: &str, chrom_len: u64) -> Result<Vec<f64>, String> {
         // Compute number of buckets and allocate array.
         let window_length = self.options.window_length as u64;
         let num_buckets = ((chrom_len + window_length - 1) / window_length) as usize;
-        let mut result = vec![0 as f32; num_buckets];
+        let mut result = vec![0_f64; num_buckets];
 
         // Get numeric index of chrom and fetch region.
         let tid = self.input
@@ -662,7 +695,7 @@ impl<'a> CoverageApp<'a> {
             }
             let begin = arr[1].parse::<u64>().unwrap();
             let end = arr[2].parse::<u64>().unwrap();
-            let mapability = arr[3].parse::<f32>().unwrap();
+            let mapability = arr[3].parse::<f64>().unwrap();
 
             // Modify buckets in `result`.
             let mut window_id = begin as u64 / window_length;
@@ -670,8 +703,8 @@ impl<'a> CoverageApp<'a> {
             let window_end = |window_id: u64| window_begin(window_id) + window_length;
             while window_begin(window_id) < end {
                 let len = min(window_end(window_id), end) - max(window_begin(window_id), begin);
+                result[window_id as usize] += (len as f64 / window_length as f64) * mapability;
                 window_id += 1;
-                result[window_id as usize] += (len as f32 / window_length as f32) * mapability;
             }
         }
 
