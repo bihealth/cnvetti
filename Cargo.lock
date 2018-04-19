@@ -183,6 +183,7 @@ dependencies = [
  "clap 2.31.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "git-build-version 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "histogram 0.6.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "itertools 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex 0.2.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "rust-htslib 0.17.0",
  "separator 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",

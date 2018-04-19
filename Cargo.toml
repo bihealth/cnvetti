@@ -12,6 +12,7 @@ slog = {version = "*", features = ["max_level_trace", "release_max_level_debug"]
 slog-term = "*"
 slog-async = "*"
 chrono = "*"
+itertools = "*"
 shlex = "*"
 separator = "*"
 histogram = "*"

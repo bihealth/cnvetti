@@ -22,6 +22,7 @@ pub struct Options {
     pub pile_mask_window_size: u32,
     pub io_threads: u32,
     pub gc_step: f64,
+    pub mapability_step: f64,
     pub contig_regex: String,
 }
 
@@ -90,6 +91,11 @@ impl Options {
                 .parse::<u32>()
                 .unwrap(),
             gc_step: matches.value_of("gc_step").unwrap().parse::<f64>().unwrap(),
+            mapability_step: matches
+                .value_of("mapability_step")
+                .unwrap()
+                .parse::<f64>()
+                .unwrap(),
         };
 
         if let Some(preset) = matches.value_of("preset") {

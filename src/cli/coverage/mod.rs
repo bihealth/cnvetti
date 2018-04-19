@@ -312,6 +312,8 @@ impl CoverageOutput {
              (gap)\">",
             "##INFO=<ID=GCWINDOWS,Number=1,Type=Integer,Description=\"Number of windows with same \
              GC content\">",
+            "##INFO=<ID=GCMAPWINDOWS,Number=1,Type=Integer,Description=\"Number of windows with \
+             same GC content and mapability\">",
             "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">",
             "##FORMAT=<ID=COV,Number=1,Type=Float,Description=\"Average coverage\">",
             "##FORMAT=<ID=WINSD,Number=1,Type=Float,Description=\"Per-window coverage SD)\">",
@@ -368,6 +370,7 @@ impl<'a> CoverageApp<'a> {
         CoverageApp {
             summariser: CoverageSummarizer::new(
                 (options.gc_step * 1000.0) as i32,
+                (options.mapability_step * 1000.0) as i32,
                 &input.samples,
                 &options.count_kind.to_string(),
             ),
@@ -524,6 +527,21 @@ impl<'a> CoverageApp<'a> {
             *count += 1;
         }
 
+        // Compute combined histogram of GC content and mapability.
+        let mapability_step = self.options.mapability_step;
+        let gc_map_histo = mapability.as_ref().map(|mapability| {
+            let mut result: HashMap<(i32, i32), i32> = HashMap::new();
+            for gc in gc_content.iter() {
+                let rounded_gc: i32 = (*gc as f64 / gc_step) as i32;
+                for map in mapability.iter() {
+                    let rounded_map: i32 = (*map as f64 / mapability_step) as i32;
+                    let count = result.entry((rounded_gc, rounded_map)).or_insert(0);
+                    *count += 1;
+                }
+            }
+            result
+        });
+
         // Write out records to BCF file.
         let num_windows = gc_content.len();
         info!(
@@ -537,7 +555,14 @@ impl<'a> CoverageApp<'a> {
             .name2rid(chrom.as_bytes())
             .unwrap() as i32;
         for (wid, gc) in gc_content.iter().enumerate() {
-            let rounded_gc = (*gc as f64 as f64 / gc_step) as i32;
+            let rounded_gc = (*gc as f64 / gc_step) as i32;
+            let rounded_map = mapability
+                .as_ref()
+                .map(|mapability| {
+                    let map = mapability[wid];
+                    (map as f64 / mapability_step) as i32
+                })
+                .unwrap_or(1);
 
             let mut record = output.bcf_writer.empty_record();
             // Columns: CHROM, POS, ID, REF, ALT, FILTER
@@ -574,6 +599,14 @@ impl<'a> CoverageApp<'a> {
             record
                 .push_info_integer(b"GCWINDOWS", &[*gc_histo.get(&rounded_gc).unwrap_or(&0)])
                 .expect("Could not write INFO/GCWINDOWS");
+            if let Some(ref gc_map_histo) = &gc_map_histo {
+                record
+                    .push_info_integer(
+                        b"GCMAPWINDOWS",
+                        &[*gc_map_histo.get(&(rounded_gc, rounded_map)).unwrap_or(&0)],
+                    )
+                    .expect("Could not write INFO/GCMAPWINDOWS");
+            }
 
             // FORMAT/GT
             record
@@ -610,9 +643,14 @@ impl<'a> CoverageApp<'a> {
             if collect_stats {
                 for (sample_id, agg) in aggregators.iter().enumerate() {
                     if !agg.is_masked(wid as u32) {
+                        let mapability = mapability
+                            .as_ref()
+                            .map(|ref mapability| mapability[wid])
+                            .unwrap_or(1_f64);
                         self.summariser.increment(
                             &self.input.samples[sample_id],
                             *gc,
+                            mapability as f32,
                             agg.get_coverage(wid as u32),
                         );
                     }

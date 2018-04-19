@@ -79,8 +79,17 @@ fn process(
                 .expect("Could not read INFO/GC")
                 .expect("INFO/GC was empty")[0]
         };
-        let bucket = ((gc as f64 / options.gc_step).floor() * 1000.0 * options.gc_step) as i32;
-        println!("Bucket for {} is {}", gc, bucket);
+        let gc_bucket = ((gc as f64 / options.gc_step).floor() * 1000.0 * options.gc_step) as i32;
+
+        // Get INFO/MAPABILITY.
+        let mapability = {
+            match record.info(b"MAPABILITY").float() {
+                Ok(ref mapability) => mapability.expect("INFO/MAPABILITY was empty")[0],
+                Err(_) => 1_f32, // default mapability
+            }
+        };
+        let map_bucket = ((mapability as f64 / options.mapability_step).floor() * 1000.0
+            * options.mapability_step) as i32;
 
         let sample_id = 0;
 
@@ -90,6 +99,7 @@ fn process(
                 panic!("Not implemented yet!");
             }
             CountKind::Alignments => {
+                let bucket = (gc_bucket, map_bucket);
                 if let Some(summary) = &summaries[sample_id].summaries.get(&bucket) {
                     let median = summary.summary5[2] as f32;
                     let nrcs: Vec<f32> = record

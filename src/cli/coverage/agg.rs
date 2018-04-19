@@ -160,8 +160,8 @@ impl<'a> CountAlignmentsAggregator<'a> {
 impl<'a> BamRecordAggregator for CountAlignmentsAggregator<'a> {
     fn put_bam_record(&mut self, record: &bam::Record) {
         use std::str;
-        let log =
-            (record.tid() == 0) && (record.pos() >= 74_440_000) && (record.pos() <= 74_460_000);
+        // let log =
+        //     (record.tid() == 0) && (record.pos() >= 74_440_000) && (record.pos() <= 74_460_000);
         let log = false;
         if log {
             println!("Record {}", str::from_utf8(record.qname()).unwrap());
