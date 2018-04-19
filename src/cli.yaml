@@ -84,6 +84,12 @@ subcommands:
         default_value: '0.01'
         value_name: GC_STEP
         help: Step in GC to use for normalizing.
+    - mapability_step:
+        long: mapability-step
+        takes_value: true
+        default_value: '0.01'
+        value_name: MAPABILITY_STEP
+        help: Step in mapability to use for normalizing.
     - contig_regex:
         long: contig-regex
         takes_value: true
@@ -222,6 +228,24 @@ subcommands:
             as `INFO/FEW_GCWINDOWS`.
 
     # Statistics-Related Arguments --------------------------------------------
+    - contig_regex:
+        long: contig-regex
+        takes_value: true
+        default_value: '^(chr)?\d\d?$'
+        value_name: 'regex'
+        help: Regular expression for contigs taking part in statistics.
+    - normalization:
+        long: normalization
+        takes_value: true
+        default_value: BinnedGc
+        value_name: TYPE
+        possible_values:
+        - BinnedGc
+        - LoessGc
+        - LoessGcMapability
+        help: >
+            The method to use for read count/coverage normalization.  Note that
+            the LOESS variants require R installed (base R is enough).
     - count_kind:
         long: count-kind
         takes_value: true
@@ -237,6 +261,12 @@ subcommands:
         default_value: '0.01'
         value_name: GC_STEP
         help: Step in GC to use for normalizing.
+    - mapability_step:
+        long: mapability-step
+        takes_value: true
+        default_value: '0.01'
+        value_name: MAPABILITY_STEP
+        help: Step in mapability to use for normalizing.
 
     # Preset-Selecting Arguments ----------------------------------------------
     - preset:

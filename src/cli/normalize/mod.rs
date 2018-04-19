@@ -3,13 +3,17 @@
 include!(concat!(env!("OUT_DIR"), "/version.rs"));
 
 mod options;
+mod r_scripts;
 
 use std::env;
 use std::fs::File;
-use std::io::Read as IoRead;
+use std::io::Write as IoWrite;
+use std::process::Command;
 use std::str;
 
 use rust_htslib::bcf::{self, Read as BcfRead};
+
+use regex::Regex;
 
 use serde_json;
 
@@ -17,18 +21,37 @@ use shlex;
 
 use slog::Logger;
 
+use handlebars::Handlebars;
+
+use tempdir::TempDir;
+
 pub use self::options::*;
 use cli::coverage::summary::SummarisedMetric;
 use cli::shared;
 
 use histogram::Histogram;
 
+use std::io;
+use std::io::prelude::*;
+
+fn pause() {
+    let mut stdin = io::stdin();
+    let mut stdout = io::stdout();
+
+    // We want the cursor to stay at the end of the line, so we print without a newline and flush manually.
+    write!(stdout, "Press any key to continue...").unwrap();
+    stdout.flush().unwrap();
+
+    // Read a single byte and discard
+    let _ = stdin.read(&mut [0u8]).unwrap();
+}
+
 // TODO: check input file.
 // TODO: use index-based readers, is nicer for progress display...
 // TODO: could normalize already in coverage step by writing raw coverage to temporary file
 
-/// Perform the actual processing.
-fn process(
+/// Perform the actual processing for binned GC content.
+fn process_binned_gc(
     reader: &mut bcf::Reader,
     writer: &mut bcf::Writer,
     logger: &mut Logger,
@@ -81,16 +104,6 @@ fn process(
         };
         let gc_bucket = ((gc as f64 / options.gc_step).floor() * 1000.0 * options.gc_step) as i32;
 
-        // Get INFO/MAPABILITY.
-        let mapability = {
-            match record.info(b"MAPABILITY").float() {
-                Ok(ref mapability) => mapability.expect("INFO/MAPABILITY was empty")[0],
-                Err(_) => 1_f32, // default mapability
-            }
-        };
-        let map_bucket = ((mapability as f64 / options.mapability_step).floor() * 1000.0
-            * options.mapability_step) as i32;
-
         let sample_id = 0;
 
         // Normalize FORMAT/RC and FORMAT/{COV,SD}.
@@ -99,8 +112,7 @@ fn process(
                 panic!("Not implemented yet!");
             }
             CountKind::Alignments => {
-                let bucket = (gc_bucket, map_bucket);
-                if let Some(summary) = &summaries[sample_id].summaries.get(&bucket) {
+                if let Some(summary) = &summaries[sample_id].summaries.get(&gc_bucket) {
                     let median = summary.summary5[2] as f32;
                     let nrcs: Vec<f32> = record
                         .format(b"RC")
@@ -161,14 +173,9 @@ fn process(
     }
 }
 
-/// Main entry point for the "normalize" command.
-pub fn call(logger: &mut Logger, options: &Options) -> Result<(), String> {
-    let options = options.clone();
-
-    // let mut app = CoverageApp::new(logger, options);
-    info!(logger, "Running cnvetti normalize");
-    info!(logger, "Configuration: {:?}", &options);
-
+/// Run normalization with binned GC content.
+pub fn call_binned_gc(logger: &mut Logger, options: &Options) -> Result<(), String> {
+    info!(logger, "Normalizing by binned GC count...");
     info!(logger, "Opening input and output files...");
     debug!(logger, "Loading statistics");
     let stats: Vec<SummarisedMetric> = {
@@ -226,7 +233,169 @@ pub fn call(logger: &mut Logger, options: &Options) -> Result<(), String> {
         }
 
         info!(logger, "Processing...");
-        process(&mut reader, &mut writer, logger, stats, &options);
+        process_binned_gc(&mut reader, &mut writer, logger, stats, &options);
+    }
+
+    Ok(())
+}
+
+/// Main entry point for GC-based normalization.
+pub fn call_loess_gc(logger: &mut Logger, _options: &Options) -> Result<(), String> {
+    info!(logger, "Normalizing by LOESS on GC content via R...");
+
+    panic!("Not implemented yet :(");
+
+    // Ok(())
+}
+
+/// Main entry point for GC-based normalization.
+pub fn call_loess_gc_mapability(logger: &mut Logger, options: &Options) -> Result<(), String> {
+    info!(logger, "Normalizing by LOESS via R...");
+
+    debug!(logger, "Opening input BCF file for writing LOESS input");
+    let mut reader =
+        bcf::Reader::from_path(options.input.clone()).expect("Could not open input BCF file");
+    if options.io_threads > 0 {
+        reader
+            .set_threads(options.io_threads as usize)
+            .expect("Could not set I/O thread count");
+    }
+
+    // TODO: Remove limitation to one sample only!
+
+    let tmp_dir = TempDir::new("cnvetti_normalize").expect("Could not create temporary directory");
+    // TODO: explicitely drop tmp_dir and look whether tmp_dir is properly cleaned
+    let tsv_path = tmp_dir.path().join("input.tsv"); // TODO: rename to input_path
+    let output_path = tmp_dir.path().join("output.tsv");
+    debug!(logger, "output path is {}", output_path.to_str().unwrap());
+    let script_path = tmp_dir.path().join("loess.R");
+
+    info!(logger, "Writing script file");
+    debug!(
+        logger,
+        "Script file path is {}",
+        script_path.to_str().unwrap()
+    );
+    // Block for script file writer.
+    {
+        let mut script_file =
+            File::create(script_path.clone()).expect("Could not create temporary R script file");
+        let mut handlebars = Handlebars::new();
+        handlebars
+            .register_template_string("loess.R", r_scripts::LOESS_R)
+            .expect("Could not register loess_map templates");
+        handlebars
+            .render_to_write(
+                "loess.R",
+                &json!({
+                    "input_file": tsv_path,
+                    "output_file": output_path,
+                    "loess_mapability": "TRUE",
+                }),
+                &mut script_file,
+            )
+            .expect("Could not write script file");
+    }
+
+    info!(logger, "Writing data file");
+    debug!(logger, "TSV file path is {}", tsv_path.to_str().unwrap());
+    // Block for data file writer.
+    {
+        let mut tsv_file = File::create(tsv_path).expect("Could not create temporary TSV file");
+        // let samples: Vec<String> = reader
+        //     .header()
+        //     .samples()
+        //     .iter()
+        //     .map(|slice| str::from_utf8(slice).unwrap().to_string())
+        //     .collect();
+
+        writeln!(tsv_file, "use_loess\tgc_content\tmapability\tcount")
+            .expect("Could not write TSV header");
+
+        let re = Regex::new(&options.contig_regex).unwrap();
+
+        let mut record = reader.empty_record();
+        while reader.read(&mut record).is_ok() {
+            // Check whether we should be used in LOESS.
+            let chrom = str::from_utf8(reader.header().rid2name(record.rid().unwrap()))
+                .unwrap()
+                .to_string();
+            let use_loess = if re.is_match(&chrom) { "T" } else { "F" };
+
+            // Get INFO/GC.
+            let gc_content = {
+                record
+                    .info(b"GC")
+                    .float()
+                    .expect("Could not read INFO/GC")
+                    .expect("INFO/GC was empty")[0]
+            };
+            // Get INFO/MAPABILITY
+            let mapability = {
+                match record.info(b"MAPABILITY").float() {
+                    Ok(ref mapability) => match mapability {
+                        Some(ref mapability) => {
+                            if mapability.len() > 0 {
+                                mapability[0]
+                            } else {
+                                0_f32
+                            }
+                        }
+                        None => 0_f32,
+                    },
+                    Err(_) => 0_f32,
+                }
+            };
+
+            write!(tsv_file, "{}\t{}\t{}\t", use_loess, gc_content, mapability)
+                .expect("Could not write to file");
+
+            match options.count_kind {
+                CountKind::Coverage => {
+                    panic!("Not implemented yet!");
+                }
+                CountKind::Alignments => {
+                    let rc = record
+                        .format(b"RC")
+                        .integer()
+                        .expect("FORMAT/RC not found!");
+                    let vals: Vec<String> = rc.iter().map(|ref rcs| rcs[0].to_string()).collect();
+                    writeln!(tsv_file, "{}", vals.join("\t")).expect("Could not write to file");
+                }
+            }
+        }
+    }
+
+    // Call out to R.
+    Command::new("Rscript")
+        .args(&["--vanilla", "--verbose", &script_path.to_str().unwrap()])
+        .spawn()
+        .expect("Failed to start loess.R script")
+        .wait()
+        .expect("loess.R script stopped with an error");
+
+    pause();
+
+    Ok(())
+}
+
+/// Main entry point for the "normalize" command.
+pub fn call(logger: &mut Logger, options: &Options) -> Result<(), String> {
+    // let mut app = CoverageApp::new(logger, options);
+    info!(logger, "Running cnvetti normalize");
+    info!(logger, "Configuration: {:?}", &options);
+
+    // TODO: check availability of R.
+    match &options.normalization {
+        Normalization::BinnedGc => {
+            call_binned_gc(logger, &options)?;
+        }
+        Normalization::LoessGc => {
+            call_loess_gc(logger, &options)?;
+        }
+        Normalization::LoessGcMapability => {
+            call_loess_gc_mapability(logger, &options)?;
+        }
     }
 
     // Build index on the output file.

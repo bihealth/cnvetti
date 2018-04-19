@@ -2,6 +2,26 @@ use clap::ArgMatches;
 
 pub use cli::options::*;
 
+/// Define the normalization count.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Normalization {
+    BinnedGc,
+    LoessGc,
+    LoessGcMapability,
+}
+
+impl Normalization {
+    /// Parse `Normalization` from `&str`.
+    pub fn from_str(s: &str) -> Option<Normalization> {
+        match s {
+            "BinnedGc" => Some(Normalization::BinnedGc),
+            "LoessGc" => Some(Normalization::LoessGc),
+            "LoessGcMapability" => Some(Normalization::LoessGcMapability),
+            _ => None,
+        }
+    }
+}
+
 /// Options for the "coverage" command.
 #[derive(Clone, Debug)]
 pub struct Options {
@@ -10,8 +30,10 @@ pub struct Options {
     pub count_kind: CountKind,
     pub min_gc_window_count: i32,
     pub io_threads: u32,
-    pub gc_step: f64,
-    pub mapability_step: f64,
+    pub gc_step: f64,         // should come from stats file
+    pub mapability_step: f64, // can go away
+    pub normalization: Normalization,
+    pub contig_regex: String,
 }
 
 impl Options {
@@ -20,6 +42,7 @@ impl Options {
         // TODO: interpret `--preset`
 
         let count_kind = matches.value_of("count_kind").unwrap();
+        let normalization = matches.value_of("normalization").unwrap();
 
         let mut options = Options {
             input: matches.value_of("input").unwrap().to_string(),
@@ -36,11 +59,13 @@ impl Options {
                 .parse::<u32>()
                 .unwrap(),
             gc_step: matches.value_of("gc_step").unwrap().parse::<f64>().unwrap(),
+            contig_regex: matches.value_of("contig_regex").unwrap().to_string(),
             mapability_step: matches
                 .value_of("mapability_step")
                 .unwrap()
                 .parse::<f64>()
                 .unwrap(),
+            normalization: Normalization::from_str(normalization).expect("Unknown normalization"),
         };
 
         if let Some(preset) = matches.value_of("preset") {
