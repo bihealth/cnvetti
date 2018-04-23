@@ -123,9 +123,9 @@ impl<'a> CountAlignmentsAggregator<'a> {
         } else if !record.is_paired() {
             false // unpaired cannot be discordant
         } else {
-            record.tid() != record.mtid() || record.is_reverse() == record.is_mate_reverse()
-                || record.is_unmapped() || record.is_mate_unmapped()
-                || !record.is_proper_pair()
+            // record.tid() != record.mtid() || record.is_reverse() == record.is_mate_reverse()
+            //     || record.is_unmapped() || record.is_mate_unmapped() ||
+            !record.is_proper_pair()
         }
     }
 
@@ -160,9 +160,9 @@ impl<'a> CountAlignmentsAggregator<'a> {
 impl<'a> BamRecordAggregator for CountAlignmentsAggregator<'a> {
     fn put_bam_record(&mut self, record: &bam::Record) {
         use std::str;
-        // let log =
-        //     (record.tid() == 0) && (record.pos() >= 74_440_000) && (record.pos() <= 74_460_000);
-        let log = false;
+        let log =
+            (record.tid() == 0) && (record.pos() >= 62_160_000) && (record.pos() <= 62_180_000);
+        // let log = false;
         if log {
             println!("Record {}", str::from_utf8(record.qname()).unwrap());
         }
@@ -252,6 +252,10 @@ impl<'a> BamRecordAggregator for CountAlignmentsAggregator<'a> {
                 0
             },
         );
+
+        if window_id == 62_160_000 / 20_000 {
+            println!("windows_id = {}, counts = {:?}", window_id, result);
+        }
 
         result
     }

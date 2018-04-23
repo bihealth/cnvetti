@@ -308,8 +308,8 @@ impl CoverageOutput {
             "##INFO=<ID=GC,Number=1,Type=Float,Description=\"Reference GC content in percent\">",
             "##INFO=<ID=MAPABILITY,Number=1,Type=Float,Description=\"Mean mapability in the \
              window\">",
-            "##INFO=<ID=GAP,Number=0,Type=Flag,Description=\"Window overlaps with N in reference \
-             (gap)\">",
+            "##INFO=<ID=GAP,Number=1,Type=Integer,Description=\"Window overlaps with N in \
+            reference (gap)\">",
             "##INFO=<ID=GCWINDOWS,Number=1,Type=Integer,Description=\"Number of windows with same \
              GC content\">",
             "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">",

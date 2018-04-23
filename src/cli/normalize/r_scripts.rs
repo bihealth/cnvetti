@@ -127,6 +127,21 @@ if ({{loess_mapability}}) {
     # forplot = forplot[!is.na(forplot$mapability) && !is.na(normv)];
     # points(forplot$mapability, normv[!is.na(forplot$mapability) && !is.na(normv)],
     #        col = "red", pch = ".")
+
+    df$count_loess_map = log2(
+        df$count_loess_map / median(df$count_loess_map[use_gc], na.rm = TRUE));
+}
+
+df$count_loess_gc = log2(
+    df$count_loess_gc / median(df$count_loess_gc[use_gc], na.rm = TRUE));
+
+write(sprintf("MAD GC    : %.4f",
+    mad(df$count_loess_gc[use_gc], na.rm = TRUE)), stderr());
+if ({{loess_mapability}}) {
+    write(
+        sprintf("MAD GC+MAP: %.4f",
+            mad(df$count_loess_map[use_gc], na.rm = TRUE)),
+        stderr());
 }
 
 # Final Step: Write out results -----------------------------------------------

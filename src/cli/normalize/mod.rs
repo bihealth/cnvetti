@@ -12,10 +12,13 @@ use std::process::Command;
 use std::str;
 
 use rust_htslib::bcf::{self, Read as BcfRead};
+use rust_htslib::bcf::record::Numeric;
 
 use regex::Regex;
 
 use serde_json;
+
+use csv;
 
 use shlex;
 
@@ -243,15 +246,6 @@ pub fn call_binned_gc(logger: &mut Logger, options: &Options) -> Result<(), Stri
 pub fn call_loess(logger: &mut Logger, options: &Options) -> Result<(), String> {
     info!(logger, "Normalizing by LOESS via R...");
 
-    debug!(logger, "Opening input BCF file for writing LOESS input");
-    let mut reader =
-        bcf::Reader::from_path(options.input.clone()).expect("Could not open input BCF file");
-    if options.io_threads > 0 {
-        reader
-            .set_threads(options.io_threads as usize)
-            .expect("Could not set I/O thread count");
-    }
-
     // TODO: Remove limitation to one sample only!
 
     let tmp_dir = TempDir::new("cnvetti_normalize").expect("Could not create temporary directory");
@@ -290,8 +284,17 @@ pub fn call_loess(logger: &mut Logger, options: &Options) -> Result<(), String> 
 
     info!(logger, "Writing data file");
     debug!(logger, "TSV file path is {}", tsv_path.to_str().unwrap());
-    // Block for data file writer.
+    // Block for BCF reader and data file writer.
     {
+        debug!(logger, "Opening input BCF file for writing LOESS input");
+        let mut reader =
+            bcf::Reader::from_path(options.input.clone()).expect("Could not open input BCF file");
+        if options.io_threads > 0 {
+            reader
+                .set_threads(options.io_threads as usize)
+                .expect("Could not set I/O thread count");
+        }
+
         let mut tsv_file = File::create(tsv_path).expect("Could not create temporary TSV file");
         // let samples: Vec<String> = reader
         //     .header()
@@ -307,11 +310,19 @@ pub fn call_loess(logger: &mut Logger, options: &Options) -> Result<(), String> 
 
         let mut record = reader.empty_record();
         while reader.read(&mut record).is_ok() {
-            // Check whether we should be used in LOESS.
+            // Get "is gap" flag.
+            let is_gap = {
+                record.info(b"GAP").integer().expect("Could not read INFO/GAP").expect("INFO/GAP was empty")[0] != 0
+            };
+
+            // Check whether window should be used in LOESS.
             let chrom = str::from_utf8(reader.header().rid2name(record.rid().unwrap()))
                 .unwrap()
                 .to_string();
-            let use_loess = if re.is_match(&chrom) { "T" } else { "F" };
+            let use_chrom = re.is_match(&chrom);
+
+            let use_loess = use_chrom && !is_gap;
+            let use_loess = if use_loess { "T" } else { "F" };
 
             // Get INFO/GC.
             let gc_content = {
@@ -368,6 +379,106 @@ pub fn call_loess(logger: &mut Logger, options: &Options) -> Result<(), String> 
 
     pause();
 
+    // Block for BCF file reader and writer.
+    {
+        debug!(
+            logger,
+            "Opening input BCF file for generating final BCF file"
+        );
+        let mut reader =
+            bcf::Reader::from_path(options.input.clone()).expect("Could not open input BCF file");
+        if options.io_threads > 0 {
+            reader
+                .set_threads(options.io_threads as usize)
+                .expect("Could not set I/O thread count");
+        }
+
+        let mut writer = {
+            // Construct extended header.
+            let mut header = bcf::Header::with_template(reader.header());
+            let lines = vec![
+                "##FORMAT=<ID=NRC,Number=1,Type=Float,Description=\"Normalized number of \
+                 aligning reads\">",
+            ];
+            for line in lines {
+                header.push_record(line.as_bytes());
+            }
+            header.push_record(format!("##cnvetti_normalizeVersion={}", VERSION).as_bytes());
+            header.push_record(
+                format!(
+                    "##cnvetti_normalizeCommand={}",
+                    env::args()
+                        .map(|s| shlex::quote(&s).to_string())
+                        .collect::<Vec<String>>()
+                        .join(" ")
+                ).as_bytes(),
+            );
+
+            let uncompressed =
+                !options.output.ends_with(".bcf") && !options.output.ends_with(".vcf.gz");
+            let vcf = options.output.ends_with(".vcf") || options.output.ends_with(".vcf.gz");
+
+            bcf::Writer::from_path(options.output.clone(), &header, uncompressed, vcf)
+                .expect("Could not open output BCF file")
+        };
+        if options.io_threads > 0 {
+            writer
+                .set_threads(options.io_threads as usize)
+                .expect("Could not set I/O thread count");
+        }
+
+        let mut record = reader.empty_record();
+        let mut prev_rid = Option::None;
+
+        let header = reader.header().clone();
+
+        let mut tsv_reader = csv::ReaderBuilder::new()
+            .delimiter(b'\t')
+            .has_headers(true)
+            .from_path(output_path)
+            .expect("Could not open TSV file");
+
+        while reader.read(&mut record).is_ok() {
+            if prev_rid.is_some() && prev_rid.unwrap() != record.rid() {
+                info!(
+                    logger,
+                    "Starting on contig {}",
+                    str::from_utf8(header.rid2name(record.rid().unwrap())).unwrap()
+                );
+            }
+
+            let tsv_record: Vec<String> = tsv_reader
+                .records()
+                .next()
+                .expect("Could not read next TSV record")
+                .expect("Problem parsing TSV record")
+                .iter()
+                .map(|x| x.to_string())
+                .collect();
+            let nrc = tsv_record.last().expect("Empty TSV record");
+            // println!("nrc = {}", nrc);
+            let nrc = if nrc == "NA" || nrc == "Inf" || nrc == "-Inf" {
+                f32::missing()
+            } else {
+                nrc.parse::<f32>().expect("Could not parse NRC")
+            };
+
+            // Translate to output header.
+            writer.translate(&mut record);
+
+            // TODO: remove restriction to one sample here
+            let nrcs: Vec<f32> = vec![nrc; 1]; // XXX
+            record
+                .push_format_float(b"NRC", nrcs.as_slice())
+                .expect("Could not write FORMAT/NRC");
+
+            // Finally, write out record again.
+            writer.write(&record).expect("Could not write BCF record!");
+
+            prev_rid = Some(record.rid());
+        }
+    }
+
     Ok(())
 }
 
@@ -382,7 +493,7 @@ pub fn call(logger: &mut Logger, options: &Options) -> Result<(), String> {
         Normalization::BinnedGc => {
             call_binned_gc(logger, &options)?;
         }
-        Normalization::LoessGc|Normalization::LoessGcMapability => {
+        Normalization::LoessGc | Normalization::LoessGcMapability => {
             call_loess(logger, &options)?;
         }
     }

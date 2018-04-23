@@ -16,6 +16,7 @@ extern crate separator;
 extern crate shlex;
 #[macro_use]
 extern crate slog;
+extern crate csv;
 extern crate statrs;
 extern crate tempdir;
 

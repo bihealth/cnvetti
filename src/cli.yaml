@@ -139,7 +139,7 @@ subcommands:
     - pile_depth_percentile:  # TODO: rename to "--pile-area-percentile"?
         long: pile-depth-percentile
         takes_value: true
-        default_value: '95'
+        default_value: '90'
         value_name: NUM
         help: Only keep piles with depth in the lower NUM-th percentiles.
     - pile_max_gap:

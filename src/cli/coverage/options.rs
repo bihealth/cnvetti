@@ -107,7 +107,7 @@ impl Options {
 
                     options.mask_piles = true;
                     options.pile_mask_window_size = 1;
-                    options.pile_depth_percentile = 95.0;
+                    options.pile_depth_percentile = 90.0;
                     options.pile_max_gap = 5;
                     options.skip_discordant = true;
 
