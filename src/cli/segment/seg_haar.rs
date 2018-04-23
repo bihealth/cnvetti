@@ -72,7 +72,7 @@ fn haar_convolution(
             k + step_half_size - 1
         };
         let low_end = if step_half_size + 1 > k {
-            step_half_size + 1 - k
+            step_half_size - k
         } else {
             k - step_half_size - 1
         };
