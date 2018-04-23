@@ -11,8 +11,8 @@ use std::io::Write as IoWrite;
 use std::process::Command;
 use std::str;
 
-use rust_htslib::bcf::{self, Read as BcfRead};
 use rust_htslib::bcf::record::Numeric;
+use rust_htslib::bcf::{self, Read as BcfRead};
 
 use regex::Regex;
 
@@ -312,7 +312,11 @@ pub fn call_loess(logger: &mut Logger, options: &Options) -> Result<(), String> 
         while reader.read(&mut record).is_ok() {
             // Get "is gap" flag.
             let is_gap = {
-                record.info(b"GAP").integer().expect("Could not read INFO/GAP").expect("INFO/GAP was empty")[0] != 0
+                record
+                    .info(b"GAP")
+                    .integer()
+                    .expect("Could not read INFO/GAP")
+                    .expect("INFO/GAP was empty")[0] != 0
             };
 
             // Check whether window should be used in LOESS.

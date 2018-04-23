@@ -1,6 +1,8 @@
 // Pile-collecting related.
 
 use std::cmp::max;
+use std::fs;
+use std::io::Write as IoWrite;
 
 use bio::data_structures::interval_tree;
 
@@ -15,14 +17,14 @@ use slog::Logger;
 struct PileCollectorOptions {
     pile_depth_percentile: f64,
     pile_max_gap: u32,
-    pile_mask_window_size: u32,
     min_mapq: u8,
 }
 
 /// Collection of read piles for black listing.
 #[derive(Debug)]
 pub struct PileCollector<'a> {
-    bam_reader: &'a mut bam::IndexedReader,
+    bam_reader: bam::IndexedReader,
+    bed_file: Option<&'a mut fs::File>,
     options: PileCollectorOptions,
 }
 
@@ -102,21 +104,22 @@ fn collect_piles(depths: &Vec<u32>, options: &PileCollectorOptions) -> Vec<(u32,
 impl<'a> PileCollector<'a> {
     /// Construct new `PileCollector`.
     pub fn new(
-        bam_reader: &'a mut bam::IndexedReader,
+        bam_path: &str,
+        bed_file: Option<&'a mut fs::File>,
         pile_depth_percentile: f64,
         pile_max_gap: u32,
         min_mapq: u8,
-        pile_mask_window_size: u32,
-    ) -> PileCollector<'a> {
-        PileCollector {
-            bam_reader,
+    ) -> Result<Self, PilesError> {
+        Ok(PileCollector {
+            bam_reader: bam::IndexedReader::from_path(&bam_path)
+                .map_err(|e| PilesError::InvalidPath)?,
+            bed_file,
             options: PileCollectorOptions {
                 pile_depth_percentile,
                 pile_max_gap,
-                pile_mask_window_size,
                 min_mapq,
             },
-        }
+        })
     }
 
     /// Collect the piles to black list.
@@ -165,29 +168,28 @@ impl<'a> PileCollector<'a> {
             }
         };
 
-        if chrom == "1" {
-            use std::fs::File;
-            use std::io::Write;
-            let mut f = File::create("blocked.bed").unwrap();
+        // Write out blocked intervals if output path given.
+        if let Some(bed_file) = self.bed_file {
             for (start, end, num_bases) in &intervals {
                 if (*num_bases as usize) > num_bases_thresh {
-                    f.write_all(
-                        format!("{}\t{}\t{}\t{}\n", chrom, start, end, num_bases).as_bytes(),
-                    ).unwrap();
+                    bed_file
+                        .write_all(
+                            format!("{}\t{}\t{}\t{}\n", chrom, start, end, num_bases).as_bytes(),
+                        )
+                        .expect("Could not write interval to BED file");
                 }
             }
         }
 
         // Build resulting interval tree.
         let mut tree = interval_tree::IntervalTree::new();
-        let wlen = self.options.pile_mask_window_size;
 
         let mut len_sum = 0;
         let mut prev_end = 0;
         for (start, end, num_bases) in intervals {
             // Compute bucket number of bucket size `wlen`.
-            let start = max((start / wlen) * wlen, prev_end);
-            let end = ((end + wlen - 1) / wlen) * wlen;
+            let start = max(start, prev_end);
+            let end = end;
 
             // Insert one joint interval and count towards sum.
             if (num_bases as usize) > num_bases_thresh {
@@ -199,5 +201,17 @@ impl<'a> PileCollector<'a> {
         }
 
         (num_bases_thresh, len_sum, tree)
+    }
+}
+
+quick_error! {
+    #[derive(Debug, Clone)]
+    pub enum PilesError {
+        InvalidPath {
+            description("invalid path")
+        }
+        LoadingFailed {
+            description("loading failed")
+        }
     }
 }

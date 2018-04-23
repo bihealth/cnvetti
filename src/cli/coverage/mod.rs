@@ -18,6 +18,7 @@ use chrono;
 use regex::Regex;
 
 use rust_htslib::bam::{self, Read as BamRead};
+use rust_htslib::bam::{self, Write as BamWrite};
 use rust_htslib::bcf;
 use rust_htslib::tbx::{self, Read as TbxRead};
 
@@ -31,13 +32,19 @@ use slog::Logger;
 
 mod agg;
 mod options;
+mod output;
 mod piles;
+mod reference;
+mod regions;
 pub mod summary; // TODO: move into mod shared?
 
 use self::agg::*;
 pub use self::options::*;
 use self::piles::PileCollector;
 use self::summary::CoverageSummarizer;
+
+use self::reference::ReferenceStats;
+use self::regions::GenomeRegions;
 
 use cli::shared;
 
@@ -87,37 +94,6 @@ fn parse_line_rg(line: String) -> Option<(String, String)> {
         (Some(id), Some(sm)) => Some((id, sm)),
         _ => None,
     }
-}
-
-/// Tokenize genome region strings with 1-based positions.
-fn tokenize_genome_regions(regions: &Vec<String>) -> Vec<(String, u64, u64)> {
-    regions
-        .iter()
-        .map(|region| {
-            let region_split = region.split(":").collect::<Vec<&str>>();
-            if region_split.len() != 2 {
-                panic!("Invalid region: {}", region);
-            }
-
-            let number_split = region_split[1].split("-").collect::<Vec<&str>>();
-            if number_split.len() != 2 {
-                panic!("Invalid region: {}", region);
-            }
-
-            let begin = number_split[0]
-                .to_string()
-                .replace(",", "")
-                .parse::<u64>()
-                .unwrap();
-            let end = number_split[1]
-                .to_string()
-                .replace(",", "")
-                .parse::<u64>()
-                .unwrap();
-
-            (region_split[0].to_string(), begin, end)
-        })
-        .collect()
 }
 
 impl CoverageInput {
@@ -213,7 +189,7 @@ impl CoverageInput {
                 &None => None,
             },
             // Parse out the genomic regions.
-            genome_regions: tokenize_genome_regions(&options.genome_regions),
+            genome_regions: shared::tokenize_genome_regions(&options.genome_regions),
             // Create readers for BAM files.
             bam_readers: bam_readers,
             // The samples in the order defined in input files.
@@ -309,7 +285,7 @@ impl CoverageOutput {
             "##INFO=<ID=MAPABILITY,Number=1,Type=Float,Description=\"Mean mapability in the \
              window\">",
             "##INFO=<ID=GAP,Number=1,Type=Integer,Description=\"Window overlaps with N in \
-            reference (gap)\">",
+             reference (gap)\">",
             "##INFO=<ID=GCWINDOWS,Number=1,Type=Integer,Description=\"Number of windows with same \
              GC content\">",
             "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">",
@@ -813,8 +789,200 @@ impl<'a> CoverageApp<'a> {
     }
 }
 
+/// Load mapability if any.
+fn load_mapability(
+    logger: &mut Logger,
+    options: &Options,
+    chrom: &str,
+    end: usize,
+) -> Result<Option<Vec<f64>>, String> {
+    // Open tabix reader when mapability BED file is given, otherwise return early with `None`.
+    if options.mapability_bed.is_none() {
+        return Ok(None);
+    }
+    let mut tbx_reader = tbx::Reader::from_path(options.mapability_bed.unwrap().as_ref())
+        .map_err(|x| x.to_string())?;
+    if options.io_threads > 0 {
+        tbx_reader
+            .set_threads(options.io_threads as usize)
+            .expect("Could not set I/O thread count");
+    }
+
+    // Compute number of buckets and allocate array.
+    let window_length = options.window_length as usize;
+    let num_buckets = ((end + window_length - 1) / window_length) as usize;
+    let mut result = vec![0_f64; num_buckets];
+
+    // Get numeric index of chrom and fetch region.
+    let tid = tbx_reader
+        .tid(chrom)
+        .map_err(|e| format!("Reference {} not found", chrom))?;
+    tbx_reader
+        .fetch(tid, 0, end as u32)
+        .map_err(|e| format!("Could not fetch chrom {}", chrom))?;
+
+    // TODO: can we make this loop tighter without unwrapping all the time?
+    for buf in tbx_reader.records() {
+        // TODO: mapability is shifted by 1/2*k to the right?
+        // Parse begin/end/mapability from BED file.
+        let s = String::from_utf8(buf.unwrap()).unwrap();
+        let arr: Vec<&str> = s.split('\t').collect();
+        if arr.len() != 4 {
+            panic!("Mapability BED file had {} instead of 4 columns", arr.len());
+        }
+        let begin = arr[1].parse::<usize>().unwrap();
+        let end = arr[2].parse::<usize>().unwrap();
+        let mapability = arr[3].parse::<f64>().unwrap();
+
+        // Modify buckets in `result`.
+        let mut window_id = begin as usize / window_length;
+        let window_begin = |window_id: usize| window_id * window_length;
+        let window_end = |window_id: usize| window_begin(window_id) + window_length;
+        while window_begin(window_id) < end {
+            let len = min(window_end(window_id), end) - max(window_begin(window_id), begin);
+            result[window_id as usize] += (len as f64 / window_length as f64) * mapability;
+            window_id += 1;
+        }
+    }
+
+    Ok(Some(result))
+}
+
+/// Collect pile information if any.
+fn collect_pile_info(
+    logger: &mut Logger,
+    options: &Options,
+    chrom: &str,
+    out_bed: Option<&mut File>,
+    depth_threshold: Option<usize>,
+) -> Result<(usize, interval_tree::IntervalTree<u32, u32>), String> {
+    debug!(logger, "Collecting piles on reference {}...", chrom);
+    let mut collector = PileCollector::new(
+        &options.input,
+        out_bed,
+        options.pile_depth_percentile,
+        options.pile_max_gap,
+        options.min_mapq,
+    ).map_err(|e| e.to_string())?;
+    let threshold_empty = depth_threshold.is_none();
+    let (depth_threshold, len_sum, tree) = collector.collect_piles(chrom, logger, depth_threshold);
+
+    debug!(
+        logger,
+        "Black-listed {} bp on ref seq {}",
+        len_sum.separated_string(),
+        chrom
+    );
+    if threshold_empty {
+        debug!(
+            logger,
+            "Setting threshold to {}",
+            depth_threshold.separated_string()
+        );
+    }
+
+    (depth_threshold, tree)
+}
+
+/// Process one region.
+fn process_region(
+    logger: &mut Logger,
+    options: &Options,
+    (chrom, start, end): &(String, usize, usize),
+    out_bcf: &CoverageBcfSink,
+    out_bed: Option<&mut File>,
+    out_bam: Option<&mut bam::Writer>,
+    pile_threshold: Option<usize>,
+) -> Result<Option<usize>, String> {
+    // Load statistics for the given contig.
+    let ref_stats = ReferenceStats::from_path(
+        options.reference,
+        chrom,
+        options.window_length as usize,
+        logger,
+    ).map_err(|e| e.to_string())?;
+
+    // Collect pile information, if requested and counting alignments.
+    let (depth_threshold, tree) =
+        if options.mask_piles && options.count_kind == CountKind::Alignments {
+            let (depth_threshold, tree) =
+                collect_pile_info(logger, options, chrom, out_bed, pile_threshold)?;
+            (Some(depth_threshold), Some(tree))
+        } else {
+            (None, None)
+        };
+
+    // Collect mapability information, if any.
+    let mapability = load_mapability(logger, options, chrom, *end);
+
+    // Construct aggregator for the records.
+    // TODO: here is where we can add more aggregators.
+    let mut aggregator: BamRecordAggregator = CountAlignmentsAggregator::new(tree, options, end);
+
+    // Main loop for region: pass all BAM records in region through aggregator.
+    let bam_reader = bam::IndexedReader::from_path(options.input).map_err(|e| e.to_string())?;
+    if options.io_threads > 0 {
+        bam_reader
+            .set_threads(options.io_threads as usize)
+            .map_err(|e| e.to_string())?;
+    }
+    let mut record = bam::Record::new();
+    while bam_reader.read(&mut record).is_ok() {
+        aggregator.put_bam_record(&record);
+        debug!(
+            logger,
+            "Processed {}, skipped {} records ({:.2}% are off-target)",
+            aggregator.num_processed().separated_string(),
+            aggregator.num_skipped().separated_string(),
+            100.0 * (aggregator.num_processed() - aggregator.num_skipped()) as f64
+                / aggregator.num_processed() as f64,
+        );
+    }
+
+    // Finally, create the BCF records for this region.
+
+    Ok(depth_threshold)
+}
+
 /// Main entry point for the "coverage" command.
 pub fn call(logger: &mut Logger, options: &Options) -> Result<(), String> {
-    let mut app = CoverageApp::new(logger, options);
-    app.run()
+    /// Get list of regions to process.
+    let regions = GenomeRegions::from_list_or_path(options.genome_regions, options.reference)
+        .map_err(|e| e.to_string())?;
+
+    // Open output file (in its own block so we can create the index below).
+    {
+        let mut out_bcf = CoverageBcfSink::from_path(options.output);
+        // Output file for writing BED file with blocked regions.
+        let mut out_bed = match options.output_bed {
+            Some(ref path) => Some(File::create(&path).map_err(|e| e.to_string())?),
+            None => None,
+        };
+        // Output file for writing BAM file with passing alignments.
+        let mut out_bam = match options.output_bam {
+            Some(ref path) => Some(bcf::Writer::from_path(&path).map_err(|e| e.to_string())?),
+            None => None,
+        };
+
+        // The threshold for pileup masking is estimated from chr1.
+        let mut pileup_threshold = None;
+
+        // Process each region.
+        for region in regions {
+            pileup_threshold = process_region(
+                logger,
+                options,
+                region,
+                out_bcf,
+                out_bed,
+                out_bam,
+                pileup_threshold,
+            ).map_err(|e| e.to_string())?;
+        }
+    }
+
+    // Build index on the output file.
+    shared::build_index(&mut logger, &options.output);
+
+    Ok(())
 }

@@ -5,6 +5,9 @@ extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
 
+#[macro_use]
+extern crate quick_error;
+
 extern crate bio;
 extern crate chrono;
 extern crate clap;

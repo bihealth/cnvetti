@@ -119,12 +119,6 @@ subcommands:
             Length of window for initial coverage computation.  When counting
             on target regions then targets greater than two times `LENGTH`
             will be split into (overlapping) windows of length `LENGTH`.
-    - window_overlap:
-        long: window-overlap
-        takes_value: true
-        default_value: '0'
-        value_name: OVL
-        help: Additional overlap for windows.
 
     # Pile-Finding and Masking Arguments --------------------------------------
     - mask_piles:
@@ -216,6 +210,18 @@ subcommands:
         required: true
         value_name: OUT.bcf
         help: Path to output BCF file (will also write .csi file)
+    - output_bam:
+        long: output-bam
+        takes_value: true
+        required: false
+        value_name: OUT.bam
+        help: Optional path to BAM file to write counted reads to.
+    - output_bed:
+        long: output-bed
+        takes_value: true
+        required: false
+        value_name: OUT.bed
+        help: Optional path to BED file to write blocked intervals to.
 
     # Filtration-Related Arguments --------------------------------------------
     - min_gc_window_count:

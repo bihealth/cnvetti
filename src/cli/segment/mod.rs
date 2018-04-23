@@ -9,6 +9,7 @@ mod seg_utils;
 use std::env;
 use std::str;
 
+use rust_htslib::bcf::record::Numeric;
 use rust_htslib::bcf::{self, Read as BcfRead};
 
 use shlex;
@@ -95,6 +96,7 @@ fn process_region(
         // TODO: skip on mapability, cohort IQR
         // TODO: record should not be mut, see rust-bio/rust-htslib#78
 
+        let is_missing = record.format(b"NRC").float().unwrap()[0][0].is_missing();
         let gap = record
             .info(b"GAP")
             .integer()
@@ -107,7 +109,7 @@ fn process_region(
             .expect("INFO/GC empty")[0];
         let few_gc_windows = record.has_filter(b"FEW_GCWINDOWS");
 
-        (gc < options.min_gc) || (gc > options.max_gc) || few_gc_windows || gap
+        (gc < options.min_gc) || (gc > options.max_gc) || few_gc_windows || gap || is_missing
     }
 
     // First pass, collect normalized coverage and filtered-out mask.

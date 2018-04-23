@@ -2,26 +2,58 @@ use clap::{ArgMatches, Values};
 
 pub use cli::options::*;
 
+// TODO: add back multi-input file mode.
+// TODO: use window overlap
+
 /// Options for the "coverage" command.
 #[derive(Clone, Debug)]
 pub struct Options {
+    /// Path to reference FASTA file.
     pub reference: String,
-    pub input: Vec<String>,
+    /// Path to sample BAM file.
+    pub input: String,
+    /// Path to coverage depth BCF file.
     pub output: String,
-    pub genome_regions: Vec<String>,
+
+    /// Optional path to BAM file to write counted reads to.
+    pub output_bam: Option<String>,
+    /// Optional path to BED file to write masked regions to.
+    pub output_bed: Option<String>,
+
+    /// Path to tabix-indexed BED file with mapability information in the fourth column.
     pub mapability_bed: Option<String>,
+
+    /// List of genome regions to limit analysis to.
+    pub genome_regions: Vec<String>,
+
+    /// The length of the windows.
     pub window_length: u64,
-    pub window_overlap: u64,
+    /// Whether to count coverage/bases or alignments.
     pub count_kind: CountKind,
+
+    /// Minimal MAPQ of a read to count.
     pub min_mapq: u8,
+    /// Minimal ratio of clipped bases a read must have to be considered.
     pub min_unclipped: f32,
+
+    /// Whether or not to skip discordant reads (BAM flag).
     pub skip_discordant: bool,
+
+    /// Whether or not to mask based on overlap with large read piles.
     pub mask_piles: bool,
+    /// Read must not be part of a pile in a percentile above this one (ordered by pile size in
+    /// number of bases).
     pub pile_depth_percentile: f64,
+    /// Join piles closer than this number.
     pub pile_max_gap: u32,
-    pub pile_mask_window_size: u32,
+
+    /// Number of background threads to use for compression/decompression in I/O.
     pub io_threads: u32,
+
+    /// GC bin size when using simple GC normalization.
     pub gc_step: f64,
+
+    /// Regular expression the contigs have to match to be considered.
     pub contig_regex: String,
 }
 
@@ -49,14 +81,17 @@ impl Options {
                 Some(x) => Some(x.to_string()),
                 None => None,
             },
+            output_bam: match matches.value_of("output_bam") {
+                Some(x) => Some(x.to_string()),
+                None => None,
+            },
+            output_bed: match matches.value_of("output_bed") {
+                Some(x) => Some(x.to_string()),
+                None => None,
+            },
             contig_regex: matches.value_of("contig_regex").unwrap().to_string(),
             window_length: matches
                 .value_of("window_length")
-                .unwrap()
-                .parse::<u64>()
-                .unwrap(),
-            window_overlap: matches
-                .value_of("window_overlap")
                 .unwrap()
                 .parse::<u64>()
                 .unwrap(),
@@ -76,11 +111,6 @@ impl Options {
                 .unwrap(),
             pile_max_gap: matches
                 .value_of("pile_max_gap")
-                .unwrap()
-                .parse::<u32>()
-                .unwrap(),
-            pile_mask_window_size: matches
-                .value_of("pile_mask_window_size")
                 .unwrap()
                 .parse::<u32>()
                 .unwrap(),
@@ -106,7 +136,6 @@ impl Options {
                     options.window_length = 20_000;
 
                     options.mask_piles = true;
-                    options.pile_mask_window_size = 1;
                     options.pile_depth_percentile = 90.0;
                     options.pile_max_gap = 5;
                     options.skip_discordant = true;

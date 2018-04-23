@@ -39,3 +39,34 @@ pub fn build_index(logger: &mut Logger, path: &String) {
         );
     }
 }
+
+/// Tokenize genome region strings with 1-based positions.
+pub fn tokenize_genome_regions(regions: &Vec<String>) -> Vec<(String, u64, u64)> {
+    regions
+        .iter()
+        .map(|region| {
+            let region_split = region.split(":").collect::<Vec<&str>>();
+            if region_split.len() != 2 {
+                panic!("Invalid region: {}", region);
+            }
+
+            let number_split = region_split[1].split("-").collect::<Vec<&str>>();
+            if number_split.len() != 2 {
+                panic!("Invalid region: {}", region);
+            }
+
+            let begin = number_split[0]
+                .to_string()
+                .replace(",", "")
+                .parse::<u64>()
+                .unwrap();
+            let end = number_split[1]
+                .to_string()
+                .replace(",", "")
+                .parse::<u64>()
+                .unwrap();
+
+            (region_split[0].to_string(), begin, end)
+        })
+        .collect()
+}
