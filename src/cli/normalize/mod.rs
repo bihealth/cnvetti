@@ -33,20 +33,20 @@ use cli::shared;
 
 use histogram::Histogram;
 
-use std::io;
+// use std::io;
 use std::io::prelude::*;
 
-fn pause() {
-    let mut stdin = io::stdin();
-    let mut stdout = io::stdout();
+// fn pause() {
+//     let mut stdin = io::stdin();
+//     let mut stdout = io::stdout();
 
-    // We want the cursor to stay at the end of the line, so we print without a newline and flush manually.
-    write!(stdout, "Press any key to continue...").unwrap();
-    stdout.flush().unwrap();
+//     // We want the cursor to stay at the end of the line, so we print without a newline and flush manually.
+//     write!(stdout, "Press any key to continue...").unwrap();
+//     stdout.flush().unwrap();
 
-    // Read a single byte and discard
-    let _ = stdin.read(&mut [0u8]).unwrap();
-}
+//     // Read a single byte and discard
+//     let _ = stdin.read(&mut [0u8]).unwrap();
+// }
 
 // TODO: check input file.
 // TODO: use index-based readers, is nicer for progress display...
@@ -275,6 +275,7 @@ pub fn call_loess(logger: &mut Logger, options: &Options) -> Result<(), String> 
                     "input_file": tsv_path,
                     "output_file": output_path,
                     "loess_mapability": "TRUE",
+                    "LOG2_TRANSFORM": "FALSE",
                 }),
                 &mut script_file,
             )
@@ -380,7 +381,7 @@ pub fn call_loess(logger: &mut Logger, options: &Options) -> Result<(), String> 
         .wait()
         .expect("loess.R script stopped with an error");
 
-    pause();
+    // pause();
 
     // Block for BCF file reader and writer.
     {
