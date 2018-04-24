@@ -98,6 +98,57 @@ fn load_mapability(
     Ok(Some(result))
 }
 
+/// Load blacklist if any.
+fn load_blacklist(
+    logger: &mut Logger,
+    options: &Options,
+    chrom: &str,
+    end: usize,
+) -> Result<Option<interval_tree::IntervalTree<usize, bool>>, String> {
+    // Open tabix reader when blacklist BED file is given, otherwise return early with `None`.
+    if options.blacklist_bed.is_none() {
+        return Ok(None);
+    }
+    let mut tbx_reader =
+        tbx::Reader::from_path(options.blacklist_bed.as_ref().unwrap()).map_err(|x| x.to_string())?;
+    if options.io_threads > 0 {
+        tbx_reader
+            .set_threads(options.io_threads as usize)
+            .expect("Could not set I/O thread count");
+    }
+
+    // Compute number of buckets and allocate array.
+    let mut result = interval_tree::IntervalTree::new();
+
+    // Get numeric index of chrom and fetch region.
+    let tid = match tbx_reader.tid(chrom) {
+        Ok(tid) => tid,
+        Err(_) => {
+            info!(logger, "No blacklist information for {}", chrom);
+            return Ok(Some(result));
+        }
+    };
+    tbx_reader
+        .fetch(tid, 0, end as u32)
+        .map_err(|e| format!("Could not fetch chrom {}: {}", chrom, e))?;
+
+    // TODO: can we make this loop tighter without unwrapping all the time?
+    for buf in tbx_reader.records() {
+        // TODO: mapability is shifted by 1/2*k to the right?
+        // Parse begin/end from BED file.
+        let s = String::from_utf8(buf.unwrap()).unwrap();
+        let arr: Vec<&str> = s.split('\t').collect();
+        if arr.len() != 3 {
+            panic!("Blacklist BED file had {} instead of 3 columns", arr.len());
+        }
+        let begin = arr[1].parse::<usize>().unwrap();
+        let end = arr[2].parse::<usize>().unwrap();
+        result.insert(begin..end, true);
+    }
+
+    Ok(Some(result))
+}
+
 /// Collect pile information if any.
 fn collect_pile_info(
     logger: &mut Logger,
@@ -169,6 +220,10 @@ fn process_region(
     // Collect mapability information, if any.
     debug!(logger, "Collecting mapability...");
     let mapability = load_mapability(logger, options, chrom, *end)?;
+
+    // Collect blacklist information, if any.
+    debug!(logger, "Collecting blacklist...");
+    let blacklist = load_blacklist(logger, options, chrom, *end)?;
 
     // Construct aggregator for the records.
     // TODO: here is where we can add more aggregators.
@@ -251,6 +306,13 @@ fn process_region(
             record
                 .push_info_float(b"MAPABILITY", &[mapability[wid] as f32])
                 .map_err(|e| format!("Could not write INFO/MAPABILITY: {}", e))?;
+        }
+        if let Some(ref blacklist) = &blacklist {
+            if blacklist.find(pos..window_end).peekable().peek().is_some() {
+                record
+                    .push_info_integer(b"BLACKLIST", &[1])
+                    .map_err(|e| format!("Could not write INFO/BLACKLIST: {}", e))?;
+            }
         }
 
         // Columns: FORMAT/GT

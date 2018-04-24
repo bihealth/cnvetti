@@ -134,6 +134,8 @@ impl CoverageBcfSink {
             "##INFO=<ID=GC,Number=1,Type=Float,Description=\"Reference GC content in percent\">",
             "##INFO=<ID=MAPABILITY,Number=1,Type=Float,Description=\"Mean mapability in the \
              window\">",
+            "##INFO=<ID=BLACKLIST,Number=1,Type=Float,Description=\"Interval overlaps with \
+             blacklist site\">",
             "##INFO=<ID=GAP,Number=1,Type=Integer,Description=\"Window overlaps with N in \
              reference (gap)\">",
             // Generic FORMAT fields

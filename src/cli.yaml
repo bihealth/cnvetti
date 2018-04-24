@@ -90,6 +90,12 @@ subcommands:
         takes_value: true
         value_name: MAP.bed.gz
         help: Path to bgziped and tabix-indexed mapability BED file.
+    - blacklist_bed:
+        long: blacklist-bed
+        multiple: false
+        takes_value: true
+        value_name: MASKED.bed.gz
+        help: Path to bgziped and tabix-indexed blacklist BED file.
     - gc_step:
         long: gc-step
         takes_value: true

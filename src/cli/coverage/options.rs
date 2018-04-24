@@ -22,6 +22,8 @@ pub struct Options {
 
     /// Path to tabix-indexed BED file with mapability information in the fourth column.
     pub mapability_bed: Option<String>,
+    /// Path to tabix-indexed BED file with black-listed regions.
+    pub blacklist_bed: Option<String>,
 
     /// List of genome regions to limit analysis to.
     pub genome_regions: Vec<String>,
@@ -75,6 +77,10 @@ impl Options {
                 .map(|res| res.to_string())
                 .collect(),
             mapability_bed: match matches.value_of("mapability_bed") {
+                Some(x) => Some(x.to_string()),
+                None => None,
+            },
+            blacklist_bed: match matches.value_of("blacklist_bed") {
                 Some(x) => Some(x.to_string()),
                 None => None,
             },
