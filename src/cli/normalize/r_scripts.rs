@@ -137,17 +137,27 @@ if ({{loess_mapability}}) {
 
 df$count_loess_gc = df$count_loess_gc / median(
     df$count_loess_gc[use_gc], na.rm = TRUE);
-if ({{LOG2_TRANSFORM}}) {
+if (!{{LOG2_TRANSFORM}}) {
     df$count_loess_gc = log2(df$count_loess_gc);
 }
 
 write(sprintf("MAD GC    : %.4f",
     mad(df$count_loess_gc[use_gc], na.rm = TRUE)), stderr());
+if (!{{LOG2_TRANSFORM}}) {
+    write(sprintf("MAD GC    : %.4f (log2)",
+        mad(log2(df$count_loess_gc[use_gc]), na.rm = TRUE)), stderr());
+}
 if ({{loess_mapability}}) {
     write(
         sprintf("MAD GC+MAP: %.4f",
             mad(df$count_loess_map[use_gc], na.rm = TRUE)),
         stderr());
+    if (!{{LOG2_TRANSFORM}}) {
+        write(
+            sprintf("MAD GC+MAP: %.4f (log2)",
+                mad(log2(df$count_loess_map[use_gc]), na.rm = TRUE)),
+            stderr());
+    }
 }
 
 # Final Step: Write out results -----------------------------------------------

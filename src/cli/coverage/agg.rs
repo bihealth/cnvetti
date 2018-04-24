@@ -151,59 +151,31 @@ impl<'a> CountAlignmentsAggregator<'a> {
 
 impl<'a> BamRecordAggregator for CountAlignmentsAggregator<'a> {
     fn put_bam_record(&mut self, record: &bam::Record) {
-        use std::str;
-        let log =
-            (record.tid() == 0) && (record.pos() >= 62_160_000) && (record.pos() <= 62_180_000);
-        // let log = false;
-        if log {
-            println!("Record {}", str::from_utf8(record.qname()).unwrap());
-        }
-
         if !self.skip_mapq(record) && !self.skip_flags(record) && !self.skip_discordant(record)
             && !self.skip_clipping(record) && !self.skip_paired_and_all_but_first(record)
         {
-            if log {
-                println!("=> considering for counting");
-            }
             self.base.num_processed += 1;
 
             let pos = (record.pos() as u32)..((record.pos() + 1) as u32);
             let window_length = self.base.options.window_length as usize;
             let bin = record.pos() as usize / window_length;
             if self.tree.is_some() && self.tree.unwrap().find(pos).next().is_none() {
-                if log {
-                    // bin == 94_860/20 {
-                    println!("-> Counting {}", str::from_utf8(record.qname()).unwrap());
-                }
-
                 self.out_bam.as_mut().map(|ref mut out_bam| {
                     out_bam.write(record).expect("Could not write BAM record.")
                 });
                 self.counters[bin] += 1;
             } else {
-                if log {
-                    println!("  -> Skipping {}", str::from_utf8(record.qname()).unwrap());
-                }
                 self.base.num_skipped += 1;
-            }
-        } else {
-            if log {
-                println!("=> NOT considering for counting");
             }
         }
     }
 
     fn integer_field_names(&self) -> Vec<String> {
-        vec![
-            String::from("RRC"),
-            String::from("RC"),
-            String::from("MS"),
-            String::from("MP"),
-        ]
+        vec![String::from("RCOV"), String::from("MS"), String::from("MP")]
     }
 
     fn float_field_names(&self) -> Vec<String> {
-        Vec::new()
+        vec![String::from("COV")]
     }
 
     fn integer_values(&self, window_id: u32) -> HashMap<String, i32> {
@@ -230,7 +202,7 @@ impl<'a> BamRecordAggregator for CountAlignmentsAggregator<'a> {
 
         // Raw read counts.
         result.insert(
-            String::from("RRC"),
+            String::from("RCOV"),
             self.counters[window_id as usize] as i32,
         );
 
@@ -239,26 +211,45 @@ impl<'a> BamRecordAggregator for CountAlignmentsAggregator<'a> {
         let ratio = (len - ms) as f64 / len as f64;
         result.insert(String::from("MP"), (ratio < MAX_MS) as i32);
 
-        // TODO: maybe better use floats for RC after all?
-        result.insert(
-            String::from("RC"),
-            if ratio > 0.001 {
-                // guard against NaN...
-                (self.counters[window_id as usize] as f64 / ratio).round() as i32
-            } else {
-                0
-            },
-        );
-
-        if window_id == 62_160_000 / 20_000 {
-            println!("windows_id = {}, counts = {:?}", window_id, result);
-        }
-
         result
     }
 
-    fn float_values(&self, _window_id: u32) -> HashMap<String, f32> {
-        HashMap::new()
+    fn float_values(&self, window_id: u32) -> HashMap<String, f32> {
+        let window = Range {
+            start: (window_id * self.base.options.window_length as u32) as u32,
+            end: ((window_id + 1) * self.base.options.window_length as u32) as u32,
+        };
+
+        // Pile-masked bases.
+        let ms = match self.tree {
+            Some(ref tree) => tree.find(window.clone())
+                .map(|entry| {
+                    let end = min(window.end, entry.interval().end) as i32;
+                    let start = max(window.start, entry.interval().start) as i32;
+                    assert!(end >= start, "Should overlap, come from tree query");
+                    end - start
+                })
+                .sum::<i32>(),
+            None => 0_i32,
+        };
+
+        // Ratio for scaling up to the read count.
+        let len = (window.end - window.start) as i32;
+        let ratio = (len - ms) as f64 / len as f64;
+
+        let mut result = HashMap::new();
+
+        result.insert(
+            String::from("COV"),
+            if ratio > 0.001 {
+                // guard against NaN...
+                (self.counters[window_id as usize] as f64 / ratio) as f32
+            } else {
+                0_f32
+            },
+        );
+
+        result
     }
 
     fn num_processed(&self) -> u32 {

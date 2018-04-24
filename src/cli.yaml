@@ -66,6 +66,18 @@ subcommands:
         help: >
             Path to output BCF file (cnvetti coverage will also write .csi
             and .stats.json file).
+    - output_bed:
+        long: output-bed
+        takes_value: true
+        required: false
+        value_name: OUT.bed
+        help: Path to output BED file with masked regions.
+    - output_bam:
+        long: output-bam
+        takes_value: true
+        required: false
+        value_name: OUT.bam
+        help: Path to output file with considered reads.
     - genome_regions:
         long: genome-region
         multiple: true
@@ -237,7 +249,7 @@ subcommands:
     - normalization:
         long: normalization
         takes_value: true
-        default_value: BinnedGc
+        default_value: LoessGcMapability
         value_name: TYPE
         possible_values:
         - BinnedGc
@@ -246,15 +258,6 @@ subcommands:
         help: >
             The method to use for read count/coverage normalization.  Note that
             the LOESS variants require R installed (base R is enough).
-    - count_kind:
-        long: count-kind
-        takes_value: true
-        default_value: Coverage
-        value_name: COUNT
-        possible_values:
-        - Coverage
-        - Alignments
-        help: Whether to consider coverage or read count statistics.
     - gc_step:
         long: gc-step
         takes_value: true
@@ -267,17 +270,6 @@ subcommands:
         default_value: '0.01'
         value_name: MAPABILITY_STEP
         help: Step in mapability to use for normalizing.
-
-    # Preset-Selecting Arguments ----------------------------------------------
-    - preset:
-        long: preset
-        takes_value: true
-        value_name: PRESET
-        possible_values:
-        - Wgs
-        - WesOffTarget
-        - WesOnTarget
-        help: Select one of the pre-defined preset modes.
 
 # Sub Command: segment ========================================================
 - segment:

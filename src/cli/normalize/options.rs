@@ -27,7 +27,6 @@ impl Normalization {
 pub struct Options {
     pub input: String,
     pub output: String,
-    pub count_kind: CountKind,
     pub min_gc_window_count: i32,
     pub io_threads: u32,
     pub gc_step: f64,         // should come from stats file
@@ -39,15 +38,11 @@ pub struct Options {
 impl Options {
     /// Build options from ArgMatches.
     pub fn new(matches: &ArgMatches) -> Options {
-        // TODO: interpret `--preset`
-
-        let count_kind = matches.value_of("count_kind").unwrap();
         let normalization = matches.value_of("normalization").unwrap();
 
-        let mut options = Options {
+        Options {
             input: matches.value_of("input").unwrap().to_string(),
             output: matches.value_of("output").unwrap().to_string(),
-            count_kind: CountKind::from_str(count_kind).expect("Unknown count kind"),
             min_gc_window_count: matches
                 .value_of("min_gc_window_count")
                 .unwrap()
@@ -66,26 +61,6 @@ impl Options {
                 .parse::<f64>()
                 .unwrap(),
             normalization: Normalization::from_str(normalization).expect("Unknown normalization"),
-        };
-
-        if let Some(preset) = matches.value_of("preset") {
-            match OptionsPreset::from_str(preset).expect("Unknown --preset") {
-                OptionsPreset::Wgs => {
-                    panic!("Wgs preset not implemented yet!");
-                }
-                OptionsPreset::WesOnTarget => {
-                    panic!("WesOnTarget preset not implemented yet!");
-                }
-                OptionsPreset::WesOffTarget => {
-                    // For WES off-target, we are counting reads and require
-                    // at least 50 windows per GC content.
-
-                    options.count_kind = CountKind::Alignments;
-                    options.min_gc_window_count = 50;
-                }
-            }
         }
-
-        options
     }
 }

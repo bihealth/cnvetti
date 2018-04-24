@@ -122,6 +122,7 @@ impl CoverageBcfSink {
         }
 
         // TODO: GAP should be a Flag
+        // TODO: Change description based on configured count.
         let lines = vec![
             // Misc fields
             "##ALT=<ID=COUNT,Description=\"Record describes a window for read counting\">",

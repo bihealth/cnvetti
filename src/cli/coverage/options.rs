@@ -89,6 +89,8 @@ impl Options {
             window_length: matches
                 .value_of("window_length")
                 .unwrap()
+                .replace(",", "")
+                .replace("_", "")
                 .parse::<u64>()
                 .unwrap(),
             count_kind: CountKind::from_str(count_kind).expect("Unknown count kind"),

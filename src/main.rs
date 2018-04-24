@@ -20,7 +20,7 @@ use clap::{App, ArgMatches};
 use std::process;
 
 use cnvetti::cli::coverage;
-// use cnvetti::cli::normalize;
+use cnvetti::cli::normalize;
 // use cnvetti::cli::segment;
 
 /// Custom Drain logic
@@ -84,7 +84,7 @@ fn run(matches: ArgMatches) -> Result<(), String> {
 
     match matches.subcommand() {
         ("coverage", Some(m)) => coverage::call(&mut logger, &coverage::Options::new(&m)),
-        // ("normalize", Some(m)) => normalize::call(&mut logger, &normalize::Options::new(&m)),
+        ("normalize", Some(m)) => normalize::call(&mut logger, &normalize::Options::new(&m)),
         // ("segment", Some(m)) => segment::call(&mut logger, &segment::Options::new(&m)),
         _ => Err("Invalid command".to_string()),
     }

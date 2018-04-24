@@ -17,7 +17,6 @@ use slog::Logger;
 mod agg;
 mod bcf_sink;
 mod options;
-mod output;
 mod piles;
 mod reference;
 mod regions;
@@ -38,7 +37,7 @@ use cli::shared;
 
 /// Load mapability if any.
 fn load_mapability(
-    _logger: &mut Logger,
+    logger: &mut Logger,
     options: &Options,
     chrom: &str,
     end: usize,
@@ -61,9 +60,13 @@ fn load_mapability(
     let mut result = vec![0_f64; num_buckets];
 
     // Get numeric index of chrom and fetch region.
-    let tid = tbx_reader
-        .tid(chrom)
-        .map_err(|e| format!("Reference {} not found: {}", chrom, e))?;
+    let tid = match tbx_reader.tid(chrom) {
+        Ok(tid) => tid,
+        Err(_) => {
+            info!(logger, "No mapability information for {}", chrom);
+            return Ok(Some(result));
+        }
+    };
     tbx_reader
         .fetch(tid, 0, end as u32)
         .map_err(|e| format!("Could not fetch chrom {}: {}", chrom, e))?;
@@ -136,11 +139,13 @@ fn process_region(
     logger: &mut Logger,
     options: &Options,
     (chrom, start, end): &(String, usize, usize),
-    out_bcf: &CoverageBcfSink,
+    out_bcf: &mut CoverageBcfSink,
     out_bed: Option<&mut File>,
     out_bam: Option<&mut bam::Writer>,
     pile_threshold: Option<usize>,
 ) -> Result<Option<usize>, String> {
+    info!(logger, "Processing region {}:{}-{}", chrom, start, end);
+
     // Load statistics for the given contig.
     let ref_stats = ReferenceStats::from_path(
         &options.reference,
@@ -152,14 +157,17 @@ fn process_region(
     // Collect pile information, if requested and counting alignments.
     let (depth_threshold, tree) =
         if options.mask_piles && options.count_kind == CountKind::Alignments {
+            debug!(logger, "Collecting piles...");
             let (depth_threshold, tree) =
                 collect_pile_info(logger, options, chrom, out_bed, pile_threshold)?;
             (Some(depth_threshold), Some(tree))
         } else {
+            debug!(logger, "Not collecting piles...");
             (None, None)
         };
 
     // Collect mapability information, if any.
+    debug!(logger, "Collecting mapability...");
     let mapability = load_mapability(logger, options, chrom, *end)?;
 
     // Construct aggregator for the records.
@@ -189,18 +197,19 @@ fn process_region(
         })?;
 
     // Main loop for region: pass all BAM records in region through aggregator.
+    info!(logger, "Computing coverage...");
     let mut record = bam::Record::new();
     while bam_reader.read(&mut record).is_ok() {
         aggregator.put_bam_record(&record);
-        debug!(
-            logger,
-            "Processed {}, skipped {} records ({:.2}% are off-target)",
-            aggregator.num_processed().separated_string(),
-            aggregator.num_skipped().separated_string(),
-            100.0 * (aggregator.num_processed() - aggregator.num_skipped()) as f64
-                / aggregator.num_processed() as f64,
-        );
     }
+    debug!(
+        logger,
+        "Processed {}, skipped {} records ({:.2}% are off-target)",
+        aggregator.num_processed().separated_string(),
+        aggregator.num_skipped().separated_string(),
+        100.0 * (aggregator.num_processed() - aggregator.num_skipped()) as f64
+            / aggregator.num_processed() as f64,
+    );
 
     // Create the BCF records for this region.
 
@@ -262,6 +271,11 @@ fn process_region(
                 .push_format_float(field.as_bytes(), &[value])
                 .map_err(|e| format!("Could not write FORMAT/{}: {}", field, e))?;
         }
+
+        out_bcf
+            .writer
+            .write(&record)
+            .map_err(|e| format!("Could not write BCF record: {}", e))?;
     }
 
     Ok(depth_threshold)
@@ -269,6 +283,8 @@ fn process_region(
 
 /// Main entry point for the "coverage" command.
 pub fn call(logger: &mut Logger, options: &Options) -> Result<(), String> {
+    info!(logger, "Configuration: {:?}", options);
+
     // Get list of regions to process.
     let regions = GenomeRegions::from_list_or_path(&options.genome_regions, &options.reference)
         .map_err(|e| e.to_string())?;
@@ -277,7 +293,7 @@ pub fn call(logger: &mut Logger, options: &Options) -> Result<(), String> {
     {
         let index = fasta::Index::from_file(&format!("{}.fai", options.reference))
             .map_err(|e| format!("Could not read fasta index: {}", e.to_string()))?;
-        let out_bcf = CoverageBcfSink::from_path(
+        let mut out_bcf = CoverageBcfSink::from_path(
             &options.output,
             &sample_from_bam(&options.input)?,
             &index,
@@ -308,7 +324,7 @@ pub fn call(logger: &mut Logger, options: &Options) -> Result<(), String> {
                 logger,
                 &options,
                 &region,
-                &out_bcf,
+                &mut out_bcf,
                 out_bed.as_mut(),
                 out_bam.as_mut(),
                 pileup_threshold,

@@ -8,6 +8,8 @@ use bio::utils::Text;
 
 use separator::Separatable;
 
+use rust_htslib::prelude::*;
+
 /// Some statistics on the reference.
 pub struct ReferenceStats {
     /// Reference sequence length.
@@ -125,7 +127,11 @@ impl ReferenceStats {
         debug!(logger, "Computing GC content from GC counts...");
         let mut gc_ratio = vec![0 as f32; num_buckets];
         for (i, count) in gc_count.iter().enumerate() {
-            gc_ratio[i] = (*count as f32) / (non_n_count[i] as f32);
+            gc_ratio[i] = if non_n_count[i] == 0 {
+                f32::missing()
+            } else {
+                (*count as f32) / (non_n_count[i] as f32)
+            };
         }
 
         Ok((gc_ratio, has_gap))
