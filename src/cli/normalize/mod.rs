@@ -7,7 +7,6 @@ mod r_scripts;
 
 use std::env;
 use std::fs::File;
-use std::io::Write as IoWrite;
 use std::process::Command;
 use std::str;
 

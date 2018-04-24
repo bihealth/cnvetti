@@ -90,12 +90,6 @@ subcommands:
         default_value: '0.01'
         value_name: MAPABILITY_STEP
         help: Step in mapability to use for normalizing.
-    - contig_regex:
-        long: contig-regex
-        takes_value: true
-        default_value: '^(chr)?\d\d?$'
-        value_name: 'regex'
-        help: Regular expression for contigs taking part in statistics.
 
     # Preset-Selecting Arguments ----------------------------------------------
     - preset:

@@ -112,7 +112,7 @@ impl<'a> PileCollector<'a> {
     ) -> Result<Self, PilesError> {
         Ok(PileCollector {
             bam_reader: bam::IndexedReader::from_path(&bam_path)
-                .map_err(|e| PilesError::InvalidPath)?,
+                .map_err(|_e| PilesError::InvalidPath)?,
             bed_file,
             options: PileCollectorOptions {
                 pile_depth_percentile,
@@ -169,7 +169,7 @@ impl<'a> PileCollector<'a> {
         };
 
         // Write out blocked intervals if output path given.
-        if let Some(bed_file) = self.bed_file {
+        if let Some(ref mut bed_file) = self.bed_file {
             for (start, end, num_bases) in &intervals {
                 if (*num_bases as usize) > num_bases_thresh {
                     bed_file
@@ -209,9 +209,6 @@ quick_error! {
     pub enum PilesError {
         InvalidPath {
             description("invalid path")
-        }
-        LoadingFailed {
-            description("loading failed")
         }
     }
 }

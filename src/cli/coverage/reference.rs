@@ -11,11 +11,11 @@ use separator::Separatable;
 /// Some statistics on the reference.
 pub struct ReferenceStats {
     /// Reference sequence length.
-    length: usize,
+    pub length: usize,
     /// GC content of windows.
-    gc_content: Vec<f32>,
+    pub gc_content: Vec<f32>,
     /// Whether or not the window contains a gap (`N`).
-    has_gap: Vec<bool>,
+    pub has_gap: Vec<bool>,
 }
 
 impl ReferenceStats {
@@ -60,9 +60,9 @@ impl ReferenceStats {
         debug!(logger, "Loading reference sequence {}: {}...", path, chrom);
 
         trace!(logger, "Opening indexed FASTA reader");
-        let ref_reader = match fasta::IndexedReader::from_file(&path) {
+        let mut ref_reader = match fasta::IndexedReader::from_file(&path) {
             Ok(reader) => reader,
-            Err(error) => {
+            Err(_error) => {
                 return Err(ReferenceStatsError::InvalidPath);
             }
         };
@@ -71,7 +71,7 @@ impl ReferenceStats {
         let mut seq = Text::new();
         match ref_reader.read_all(chrom, &mut seq) {
             Ok(_) => (),
-            Err(e) => {
+            Err(_e) => {
                 return Err(ReferenceStatsError::LoadingFailed);
             }
         }

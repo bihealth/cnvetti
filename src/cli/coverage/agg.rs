@@ -15,17 +15,10 @@ const MAX_MS: f64 = 0.5;
 /// Struct with common information for aggregator.
 #[derive(Debug)]
 pub struct BaseAggregator {
-    /// Names of the samples to aggregate in this sample.
-    samples: Vec<String>,
-    /// Mapping from read group name to sample.
-    read_group_to_sample: HashMap<String, String>,
-    /// Mapping from sample name to sample index.
-    sample_to_idx: HashMap<String, u32>,
-
     /// Configuration.
     options: Options,
     /// Length of contig process
-    contig_length: u64,
+    contig_length: usize,
 
     /// Number of processed records.
     num_processed: u32,
@@ -71,28 +64,26 @@ pub struct CountAlignmentsAggregator<'a> {
 
     // TODO: lifetime not necessary?
     /// The `IntervalTree` with black-listed intervals.
-    tree: &'a interval_tree::IntervalTree<u32, u32>,
+    tree: Option<&'a interval_tree::IntervalTree<u32, u32>>,
 
     /// Per-sample read counts (each bin is a `u32`).
     counters: Vec<u32>,
+
+    // Optional BAM record writer.
+    out_bam: Option<&'a mut bam::Writer>,
 }
 
 impl<'a> CountAlignmentsAggregator<'a> {
     /// Construct new aggregator with the given BAM `header`.  This information is
     /// necessary to appropriately allocate buffers for all samples in the header.
     pub fn new(
-        tree: &'a interval_tree::IntervalTree<u32, u32>,
-        samples: Vec<String>,
-        read_group_to_sample: HashMap<String, String>,
-        sample_to_idx: HashMap<String, u32>,
+        tree: Option<&'a interval_tree::IntervalTree<u32, u32>>,
         options: Options,
-        contig_length: u64,
-    ) -> CountAlignmentsAggregator<'a> {
+        contig_length: usize,
+        out_bam: Option<&'a mut bam::Writer>,
+    ) -> Self {
         CountAlignmentsAggregator {
             base: BaseAggregator {
-                samples,
-                read_group_to_sample,
-                sample_to_idx,
                 options,
                 contig_length,
                 num_processed: 0,
@@ -100,6 +91,7 @@ impl<'a> CountAlignmentsAggregator<'a> {
             },
             tree: tree,
             counters: vec![0; contig_length as usize],
+            out_bam,
         }
     }
 }
@@ -178,12 +170,15 @@ impl<'a> BamRecordAggregator for CountAlignmentsAggregator<'a> {
             let pos = (record.pos() as u32)..((record.pos() + 1) as u32);
             let window_length = self.base.options.window_length as usize;
             let bin = record.pos() as usize / window_length;
-            if self.tree.find(pos).next().is_none() {
+            if self.tree.is_some() && self.tree.unwrap().find(pos).next().is_none() {
                 if log {
                     // bin == 94_860/20 {
                     println!("-> Counting {}", str::from_utf8(record.qname()).unwrap());
                 }
 
+                self.out_bam.as_mut().map(|ref mut out_bam| {
+                    out_bam.write(record).expect("Could not write BAM record.")
+                });
                 self.counters[bin] += 1;
             } else {
                 if log {
@@ -220,15 +215,17 @@ impl<'a> BamRecordAggregator for CountAlignmentsAggregator<'a> {
         };
 
         // Pile-masked bases.
-        let ms = self.tree
-            .find(window.clone())
-            .map(|entry| {
-                let end = min(window.end, entry.interval().end) as i32;
-                let start = max(window.start, entry.interval().start) as i32;
-                assert!(end >= start, "Should overlap, come from tree query");
-                end - start
-            })
-            .sum::<i32>();
+        let ms = match self.tree {
+            Some(ref tree) => tree.find(window.clone())
+                .map(|entry| {
+                    let end = min(window.end, entry.interval().end) as i32;
+                    let start = max(window.start, entry.interval().start) as i32;
+                    assert!(end >= start, "Should overlap, come from tree query");
+                    end - start
+                })
+                .sum::<i32>(),
+            None => 0_i32,
+        };
         result.insert(String::from("MS"), ms);
 
         // Raw read counts.
@@ -277,15 +274,17 @@ impl<'a> BamRecordAggregator for CountAlignmentsAggregator<'a> {
             start: (window_id * self.base.options.window_length as u32) as u32,
             end: ((window_id + 1) * self.base.options.window_length as u32) as u32,
         };
-        let ms = self.tree
-            .find(window.clone())
-            .map(|entry| {
-                let end = min(window.end, entry.interval().end) as i32;
-                let start = max(window.start, entry.interval().start) as i32;
-                assert!(end >= start, "Should overlap, come from tree query");
-                end - start
-            })
-            .sum::<i32>();
+        let ms = match self.tree {
+            Some(ref tree) => tree.find(window.clone())
+                .map(|entry| {
+                    let end = min(window.end, entry.interval().end) as i32;
+                    let start = max(window.start, entry.interval().start) as i32;
+                    assert!(end >= start, "Should overlap, come from tree query");
+                    end - start
+                })
+                .sum::<i32>(),
+            None => 0_i32,
+        };
 
         // Ratio for scaling up to the read count.
         let len = (window.end - window.start) as i32;
@@ -299,79 +298,70 @@ impl<'a> BamRecordAggregator for CountAlignmentsAggregator<'a> {
     }
 }
 
-/// Bin for coverage aggregation.
-#[derive(Debug)]
-pub struct CoverageBin {}
+// Bin for coverage aggregation.
+// #[derive(Debug)]
+// pub struct CoverageBin {}
 
-/// Struct for aggregating as coverage.
-#[derive(Debug)]
-pub struct CoverageAggregator {
-    /// Common information from all aggregators.
-    pub base: BaseAggregator,
-    /// Number of bases for each base in the current bin for the one sample in the BAM file.
-    pub coverage: Vec<CoverageBin>,
-}
+// Struct for aggregating as coverage.
+// #[derive(Debug)]
+// pub struct CoverageAggregator {
+//     /// Common information from all aggregators.
+//     pub base: BaseAggregator,
+//     /// Number of bases for each base in the current bin for the one sample in the BAM file.
+//     pub coverage: Vec<CoverageBin>,
+// }
 
-impl CoverageAggregator {
-    pub fn new(
-        samples: Vec<String>,
-        read_group_to_sample: HashMap<String, String>,
-        sample_to_idx: HashMap<String, u32>,
-        options: Options,
-        contig_length: u64,
-    ) -> CoverageAggregator {
-        CoverageAggregator {
-            base: BaseAggregator {
-                samples,
-                read_group_to_sample,
-                sample_to_idx,
-                options,
-                contig_length,
-                num_processed: 0,
-                num_skipped: 0,
-            },
-            coverage: Vec::new(),
-        }
-    }
-}
+// impl CoverageAggregator {
+//     pub fn new(options: Options, contig_length: usize) -> CoverageAggregator {
+//         CoverageAggregator {
+//             base: BaseAggregator {
+//                 options,
+//                 contig_length,
+//                 num_processed: 0,
+//                 num_skipped: 0,
+//             },
+//             coverage: Vec::new(),
+//         }
+//     }
+// }
 
-impl BamRecordAggregator for CoverageAggregator {
-    fn put_bam_record(&mut self, _record: &bam::Record) {
-        panic!("XXX TODO WRITE ME XXX TODO");
-    }
+// impl BamRecordAggregator for CoverageAggregator {
+//     fn put_bam_record(&mut self, _record: &bam::Record) {
+//         panic!("XXX TODO WRITE ME XXX TODO");
+//     }
 
-    fn integer_field_names(&self) -> Vec<String> {
-        Vec::new()
-    }
+//     fn integer_field_names(&self) -> Vec<String> {
+//         Vec::new()
+//     }
 
-    fn float_field_names(&self) -> Vec<String> {
-        vec![String::from("COV"), String::from("WINSD")]
-    }
+//     fn float_field_names(&self) -> Vec<String> {
+//         vec![String::from("COV"), String::from("WINSD")]
+//     }
 
-    fn integer_values(&self, _window_id: u32) -> HashMap<String, i32> {
-        panic!("Implement me!");
-        // HashMap::new()
-    }
+//     fn integer_values(&self, _window_id: u32) -> HashMap<String, i32> {
+//         panic!("Implement me!");
+//         // HashMap::new()
+//     }
 
-    fn float_values(&self, _window_id: u32) -> HashMap<String, f32> {
-        panic!("Implement me!");
-        // HashMap::new()
-    }
+//     fn float_values(&self, _window_id: u32) -> HashMap<String, f32> {
+//         panic!("Implement me!");
+//         // HashMap::new()
+//     }
 
-    fn num_processed(&self) -> u32 {
-        self.base.num_processed
-    }
+//     fn num_processed(&self) -> u32 {
+//         self.base.num_processed
+//     }
 
-    fn num_skipped(&self) -> u32 {
-        self.base.num_skipped
-    }
+//     fn num_skipped(&self) -> u32 {
+//         self.base.num_skipped
+//     }
 
-    /// Whether the window is masked for the sample.
-    fn is_masked(&self, _window_id: u32) -> bool {
-        false // no pile-based masking for coverage
-    }
+//     /// Whether the window is masked for the sample.
+//     fn is_masked(&self, _window_id: u32) -> bool {
+//         false // no pile-based masking for coverage
+//     }
 
-    fn get_coverage(&self, _window_id: u32) -> i32 {
-        panic!("Implement me!");
-    }
-}
+//     fn get_coverage(&self, _window_id: u32) -> i32 {
+//         panic!("Implement me!");
+//     }
+// }

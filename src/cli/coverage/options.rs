@@ -52,9 +52,6 @@ pub struct Options {
 
     /// GC bin size when using simple GC normalization.
     pub gc_step: f64,
-
-    /// Regular expression the contigs have to match to be considered.
-    pub contig_regex: String,
 }
 
 impl Options {
@@ -89,7 +86,6 @@ impl Options {
                 Some(x) => Some(x.to_string()),
                 None => None,
             },
-            contig_regex: matches.value_of("contig_regex").unwrap().to_string(),
             window_length: matches
                 .value_of("window_length")
                 .unwrap()
