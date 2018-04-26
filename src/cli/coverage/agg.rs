@@ -3,10 +3,14 @@ use std::collections::HashMap;
 use std::ops::Range;
 
 use cli::coverage::options::*;
+use cli::shared::math;
 
 use bio::data_structures::interval_tree;
 
 use rust_htslib::bam;
+use rust_htslib::prelude::*;
+
+use statrs::statistics::Statistics;
 
 // TODO: make this configurable in options.
 /// Largest fraction of pile-masked windows before ignoring.
@@ -28,8 +32,8 @@ pub struct BaseAggregator {
 
 /// Trait for alignment aggregation from BAM files.
 pub trait BamRecordAggregator {
-    /// Put the given record into the aggregation.
-    fn put_bam_record(&mut self, record: &bam::Record);
+    /// Put all `fetch()`ed records from `reader` into the aggregator.
+    fn put_fetched_records(&mut self, reader: &mut bam::IndexedReader);
 
     /// Names of the integer fields that will be written out.
     fn integer_field_names(&self) -> Vec<String>;
@@ -51,9 +55,6 @@ pub trait BamRecordAggregator {
 
     /// Whether the window is masked for the sample.
     fn is_masked(&self, window_id: u32) -> bool;
-
-    /// Coverage/count for the given window.
-    fn get_coverage(&self, window_id: u32) -> i32;
 }
 
 /// Struct for aggregating as alignment counts.
@@ -97,6 +98,26 @@ impl<'a> CountAlignmentsAggregator<'a> {
 }
 
 impl<'a> CountAlignmentsAggregator<'a> {
+    fn put_bam_record(&mut self, record: &bam::Record) {
+        if !self.skip_mapq(record) && !self.skip_flags(record) && !self.skip_discordant(record)
+            && !self.skip_clipping(record) && !self.skip_paired_and_all_but_first(record)
+        {
+            self.base.num_processed += 1;
+
+            let pos = (record.pos() as u32)..((record.pos() + 1) as u32);
+            let window_length = self.base.options.window_length as usize;
+            let bin = record.pos() as usize / window_length;
+            if self.tree.is_some() && self.tree.unwrap().find(pos).next().is_none() {
+                self.out_bam.as_mut().map(|ref mut out_bam| {
+                    out_bam.write(record).expect("Could not write BAM record.")
+                });
+                self.counters[bin] += 1;
+            } else {
+                self.base.num_skipped += 1;
+            }
+        }
+    }
+
     // Skip `record` based on `MAPQ`?
     fn skip_mapq(&self, record: &bam::Record) -> bool {
         record.mapq() < self.base.options.min_mapq
@@ -150,23 +171,11 @@ impl<'a> CountAlignmentsAggregator<'a> {
 }
 
 impl<'a> BamRecordAggregator for CountAlignmentsAggregator<'a> {
-    fn put_bam_record(&mut self, record: &bam::Record) {
-        if !self.skip_mapq(record) && !self.skip_flags(record) && !self.skip_discordant(record)
-            && !self.skip_clipping(record) && !self.skip_paired_and_all_but_first(record)
-        {
-            self.base.num_processed += 1;
-
-            let pos = (record.pos() as u32)..((record.pos() + 1) as u32);
-            let window_length = self.base.options.window_length as usize;
-            let bin = record.pos() as usize / window_length;
-            if self.tree.is_some() && self.tree.unwrap().find(pos).next().is_none() {
-                self.out_bam.as_mut().map(|ref mut out_bam| {
-                    out_bam.write(record).expect("Could not write BAM record.")
-                });
-                self.counters[bin] += 1;
-            } else {
-                self.base.num_skipped += 1;
-            }
+    /// Put all `fetch()`ed records from `reader` into the aggregator.
+    fn put_fetched_records(&mut self, reader: &mut bam::IndexedReader) {
+        let mut record = bam::Record::new();
+        while reader.read(&mut record).is_ok() {
+            self.put_bam_record(&record);
         }
     }
 
@@ -283,76 +292,167 @@ impl<'a> BamRecordAggregator for CountAlignmentsAggregator<'a> {
 
         ratio < MAX_MS
     }
-
-    fn get_coverage(&self, window_id: u32) -> i32 {
-        return self.counters[window_id as usize] as i32;
-    }
 }
 
 // Bin for coverage aggregation.
-// #[derive(Debug)]
-// pub struct CoverageBin {}
+#[derive(Debug, Clone)]
+pub struct CoverageBin {
+    /// Mean coverage.
+    pub cov_mean: f32,
+    /// Median coverage.
+    pub cov_median: f32,
+    /// Coverage standard deviation.
+    pub cov_stddev: f32,
+    /// Coverage MAD.
+    pub cov_mad: f32,
+}
+
+impl CoverageBin {
+    fn new() -> Self {
+        CoverageBin {
+            cov_mean: 0_f32,
+            cov_median: 0_f32,
+            cov_stddev: 0_f32,
+            cov_mad: 0_f32,
+        }
+    }
+}
 
 // Struct for aggregating as coverage.
-// #[derive(Debug)]
-// pub struct CoverageAggregator {
-//     /// Common information from all aggregators.
-//     pub base: BaseAggregator,
-//     /// Number of bases for each base in the current bin for the one sample in the BAM file.
-//     pub coverage: Vec<CoverageBin>,
-// }
+#[derive(Debug)]
+pub struct CoverageAggregator {
+    /// Common information from all aggregators.
+    pub base: BaseAggregator,
+    /// Number of bases for each base in the current bin for the one sample in the BAM file.
+    pub coverage: Vec<CoverageBin>,
 
-// impl CoverageAggregator {
-//     pub fn new(options: Options, contig_length: usize) -> CoverageAggregator {
-//         CoverageAggregator {
-//             base: BaseAggregator {
-//                 options,
-//                 contig_length,
-//                 num_processed: 0,
-//                 num_skipped: 0,
-//             },
-//             coverage: Vec::new(),
-//         }
-//     }
-// }
+    /// Base-wise coverage information for the current window.
+    pub depths: Vec<usize>,
+    /// ID of the current window.
+    pub window_id: Option<usize>,
+}
 
-// impl BamRecordAggregator for CoverageAggregator {
-//     fn put_bam_record(&mut self, _record: &bam::Record) {
-//         panic!("XXX TODO WRITE ME XXX TODO");
-//     }
+impl CoverageAggregator {
+    pub fn new(options: Options, contig_length: usize) -> CoverageAggregator {
+        let window_length = options.window_length as usize;
+        let num_bins = (contig_length + window_length - 1) / window_length;
+        CoverageAggregator {
+            base: BaseAggregator {
+                options,
+                contig_length,
+                num_processed: 0,
+                num_skipped: 0,
+            },
+            coverage: vec![CoverageBin::new(); num_bins],
+            depths: vec![0; window_length],
+            window_id: None,
+        }
+    }
 
-//     fn integer_field_names(&self) -> Vec<String> {
-//         Vec::new()
-//     }
+    fn push_window(&mut self, window_id: usize) {
+        let depths: Vec<f64> = self.depths.iter().map(|x| *x as f64).collect();
+        self.coverage[window_id] = CoverageBin {
+            cov_mean: (&depths).mean() as f32,
+            cov_stddev: (&depths).std_dev() as f32,
+            cov_median: math::median(&depths) as f32,
+            cov_mad: math::median_abs_dev(&depths) as f32,
+        };
+        let window_length = self.base.options.window_length as usize;
+        self.depths = vec![0; window_length];
+    }
+}
 
-//     fn float_field_names(&self) -> Vec<String> {
-//         vec![String::from("COV"), String::from("WINSD")]
-//     }
+impl BamRecordAggregator for CoverageAggregator {
+    /// Put all `fetch()`ed records from `reader` into the aggregator.
+    fn put_fetched_records(&mut self, reader: &mut bam::IndexedReader) {
+        let window_length = self.base.options.window_length as usize;
 
-//     fn integer_values(&self, _window_id: u32) -> HashMap<String, i32> {
-//         panic!("Implement me!");
-//         // HashMap::new()
-//     }
+        // Iterate over all pileups
+        let mut prev_window_id = None;
+        for pileup in reader.pileup() {
+            let pileup = pileup.unwrap();
+            let pos = pileup.pos() as usize;
 
-//     fn float_values(&self, _window_id: u32) -> HashMap<String, f32> {
-//         panic!("Implement me!");
-//         // HashMap::new()
-//     }
+            // On window change, push window to result.
+            self.window_id = match (self.window_id, prev_window_id) {
+                (Some(window_id), Some(my_prev_window_id)) => {
+                    if window_id != my_prev_window_id {
+                        self.push_window(my_prev_window_id);
+                        prev_window_id = Some(window_id);
+                    }
+                    Some(pos / window_length)
+                }
+                (Some(window_id), None) => {
+                    prev_window_id = Some(window_id);
+                    Some(pos / window_length)
+                }
+                (None, _) => Some(pos / window_length as usize),
+            };
 
-//     fn num_processed(&self) -> u32 {
-//         self.base.num_processed
-//     }
+            // Compute depth of "valid" reads (note that only single/first-read coverage)
+            // is computed.
+            self.depths[pos % window_length] = pileup
+                .alignments()
+                .filter(|alignment| {
+                    let record = alignment.record();
+                    !record.is_secondary() && !record.is_duplicate() && !record.is_supplementary()
+                        && !record.is_duplicate()
+                        && !record.is_quality_check_failed()
+                        && (record.mapq() >= self.base.options.min_mapq)
+                        && (!record.is_paired() || record.is_proper_pair())
+                })
+                .count();
+        }
 
-//     fn num_skipped(&self) -> u32 {
-//         self.base.num_skipped
-//     }
+        if let Some(window_id) = self.window_id {
+            match prev_window_id {
+                Some(prev_window_id) => if prev_window_id != window_id {
+                    self.push_window(window_id);
+                }
+                None => self.push_window(window_id),
+            }
+        }
+    }
 
-//     /// Whether the window is masked for the sample.
-//     fn is_masked(&self, _window_id: u32) -> bool {
-//         false // no pile-based masking for coverage
-//     }
+    fn integer_field_names(&self) -> Vec<String> {
+        Vec::new()
+    }
 
-//     fn get_coverage(&self, _window_id: u32) -> i32 {
-//         panic!("Implement me!");
-//     }
-// }
+    fn float_field_names(&self) -> Vec<String> {
+        vec![
+            String::from("COV"),
+            String::from("COVSD"),
+            String::from("COVM"),
+            String::from("COVMAD"),
+        ]
+    }
+
+    fn integer_values(&self, _window_id: u32) -> HashMap<String, i32> {
+        HashMap::new()
+    }
+
+    fn float_values(&self, window_id: u32) -> HashMap<String, f32> {
+        let window_id = window_id as usize;
+        let mut result = HashMap::new();
+
+        result.insert(String::from("COV"), self.coverage[window_id].cov_mean);
+        result.insert(String::from("COVM"), self.coverage[window_id].cov_median);
+        result.insert(String::from("COVSD"), self.coverage[window_id].cov_stddev);
+        result.insert(String::from("COVMAD"), self.coverage[window_id].cov_mad);
+
+        result
+    }
+
+    fn num_processed(&self) -> u32 {
+        self.base.num_processed
+    }
+
+    fn num_skipped(&self) -> u32 {
+        self.base.num_skipped
+    }
+
+    /// Whether the window is masked for the sample.
+    fn is_masked(&self, _window_id: u32) -> bool {
+        false // no pile-based masking for coverage
+    }
+}

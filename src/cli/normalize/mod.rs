@@ -7,7 +7,7 @@ mod r_scripts;
 
 use std::env;
 use std::fs::File;
-use std::io;
+// use std::io;
 use std::process::Command;
 use std::str;
 
@@ -32,17 +32,17 @@ use cli::shared;
 // use std::io;
 use std::io::prelude::*;
 
-fn pause() {
-    let mut stdin = io::stdin();
-    let mut stdout = io::stdout();
+// fn pause() {
+//     let mut stdin = io::stdin();
+//     let mut stdout = io::stdout();
 
-    // We want the cursor to stay at the end of the line, so we print without a newline and flush manually.
-    write!(stdout, "Press any key to continue...").unwrap();
-    stdout.flush().unwrap();
+//     // We want the cursor to stay at the end of the line, so we print without a newline and flush manually.
+//     write!(stdout, "Press any key to continue...").unwrap();
+//     stdout.flush().unwrap();
 
-    // Read a single byte and discard
-    let _ = stdin.read(&mut [0u8]).unwrap();
-}
+//     // Read a single byte and discard
+//     let _ = stdin.read(&mut [0u8]).unwrap();
+// }
 
 // TODO: check input file.
 // TODO: use index-based readers, is nicer for progress display...
@@ -125,6 +125,14 @@ pub fn call_loess(logger: &mut Logger, options: &Options) -> Result<(), String> 
                     .expect("Could not read INFO/GAP")
                     .expect("INFO/GAP was empty")[0] != 0
             };
+            // Get "is blacklisted" flag.
+            let is_blacklist = {
+                record
+                    .info(b"BLACKLIST")
+                    .integer()
+                    .unwrap_or(Some(&[0]))
+                    .expect("INFO/GAP was empty")[0] != 0
+            };
 
             // Check whether window should be used in LOESS.
             let chrom = str::from_utf8(reader.header().rid2name(record.rid().unwrap()))
@@ -132,7 +140,7 @@ pub fn call_loess(logger: &mut Logger, options: &Options) -> Result<(), String> 
                 .to_string();
             let use_chrom = re.is_match(&chrom);
 
-            let use_loess = use_chrom && !is_gap;
+            let use_loess = use_chrom && !is_gap && !is_blacklist;
             let use_loess = if use_loess { "T" } else { "F" };
 
             // Get INFO/GC.
@@ -181,7 +189,7 @@ pub fn call_loess(logger: &mut Logger, options: &Options) -> Result<(), String> 
         .wait()
         .expect("loess.R script stopped with an error");
 
-    pause();
+    // pause();
 
     // Block for BCF file reader and writer.
     {
@@ -200,8 +208,11 @@ pub fn call_loess(logger: &mut Logger, options: &Options) -> Result<(), String> 
         let mut writer = {
             // Construct extended header.
             let mut header = bcf::Header::with_template(reader.header());
-            let lines =
-                vec!["##FORMAT=<ID=NCOV,Number=1,Type=Float,Description=\"Normalized coverage\">"];
+            let lines = vec![
+                "##FORMAT=<ID=NCOV,Number=1,Type=Float,Description=\"Normalized coverage\">",
+                "##FORMAT=<ID=NCOV2,Number=1,Type=Float,Description=\"Normalized coverage \
+                 (log2-scaled)\">",
+            ];
             for line in lines {
                 header.push_record(line.as_bytes());
             }
@@ -273,6 +284,18 @@ pub fn call_loess(logger: &mut Logger, options: &Options) -> Result<(), String> 
             record
                 .push_format_float(b"NCOV", nrcs.as_slice())
                 .expect("Could not write FORMAT/NCOV");
+            let nrc2 = nrc.log2();
+            let nrcs2: Vec<f32> = vec![
+                if nrc2.is_finite() {
+                    nrc2
+                } else {
+                    f32::missing()
+                };
+                1
+            ]; // XXX
+            record
+                .push_format_float(b"NCOV2", nrcs2.as_slice())
+                .expect("Could not write FORMAT/NCOV2");
 
             // Finally, write out record again.
             writer.write(&record).expect("Could not write BCF record!");

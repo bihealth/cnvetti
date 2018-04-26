@@ -186,7 +186,7 @@ dependencies = [
  "handlebars 0.32.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "histogram 0.6.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "itertools 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "quick-error 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "quick-error 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex 0.2.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "rust-embed 1.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rust-htslib 0.17.0",

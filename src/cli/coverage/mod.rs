@@ -226,13 +226,15 @@ fn process_region(
     let blacklist = load_blacklist(logger, options, chrom, *end)?;
 
     // Construct aggregator for the records.
-    // TODO: here is where we can add more aggregators.
-    let mut aggregator: Box<BamRecordAggregator> = Box::new(CountAlignmentsAggregator::new(
-        tree.as_ref(),
-        options.clone(),
-        *end,
-        out_bam,
-    ));
+    let mut aggregator: Box<BamRecordAggregator> = match options.count_kind {
+        CountKind::Alignments => Box::new(CountAlignmentsAggregator::new(
+            tree.as_ref(),
+            options.clone(),
+            *end,
+            out_bam,
+        )),
+        CountKind::Coverage => Box::new(CoverageAggregator::new(options.clone(), *end)),
+    };
 
     // Jump to region with BAM reader.
     let mut bam_reader = bam::IndexedReader::from_path(&options.input).map_err(|e| e.to_string())?;
@@ -253,10 +255,7 @@ fn process_region(
 
     // Main loop for region: pass all BAM records in region through aggregator.
     info!(logger, "Computing coverage...");
-    let mut record = bam::Record::new();
-    while bam_reader.read(&mut record).is_ok() {
-        aggregator.put_bam_record(&record);
-    }
+    aggregator.put_fetched_records(&mut bam_reader);
     debug!(
         logger,
         "Processed {}, skipped {} records ({:.2}% are off-target)",

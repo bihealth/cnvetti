@@ -277,6 +277,34 @@ subcommands:
         value_name: MAPABILITY_STEP
         help: Step in mapability to use for normalizing.
 
+# Sub Command: cohort-stats ===================================================
+- cohort-stats:
+    about: Collect cohort-wide statistics
+    args:
+    - input:
+        long: input
+        short: i
+        multiple: false
+        takes_value: true
+        required: true
+        value_name: INPUT.bcf
+        help: >
+            Path to indexed input BCF or VCF file resulting from `cnvetti
+            normalize`.
+    - output:
+        long: output
+        short: o
+        takes_value: true
+        required: true
+        value_name: OUT.bcf
+        help: Path to output BCF file (will also write .csi file)
+    - iqr_percentile_threshold:
+        long: iqr-percentile-threshold
+        takes_value: true
+        default_value: '98'
+        value_name: THRESH
+        help: Threshold on the IQR percentile.
+
 # Sub Command: segment ========================================================
 - segment:
     about: Segment normalized coverage/count information

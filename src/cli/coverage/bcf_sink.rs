@@ -140,9 +140,11 @@ impl CoverageBcfSink {
              reference (gap)\">",
             // Generic FORMAT fields
             "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">",
-            "##FORMAT=<ID=COV,Number=1,Type=Float,Description=\"Average coverage\">",
+            "##FORMAT=<ID=COV,Number=1,Type=Float,Description=\"Mean coverage\">",
+            "##FORMAT=<ID=COVM,Number=1,Type=Float,Description=\"Median coverage\">",
             // FORMAT fields used for coverage
-            "##FORMAT=<ID=WINSD,Number=1,Type=Float,Description=\"Per-window coverage SD)\">",
+            "##FORMAT=<ID=COVSD,Number=1,Type=Float,Description=\"Per-window coverage SD)\">",
+            "##FORMAT=<ID=COVMAD,Number=1,Type=Float,Description=\"Per-window coverage MAD)\">",
             // FORMAT fields used for read counts
             "##FORMAT=<ID=MP,Description=\"Masked for sample because too much masked because of \
              piles\",Type=Integer,Number=1>",

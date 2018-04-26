@@ -22,6 +22,7 @@ use std::process;
 use cnvetti::cli::coverage;
 use cnvetti::cli::normalize;
 // use cnvetti::cli::segment;
+use cnvetti::cli::cohort_stats;
 
 /// Custom Drain logic
 struct RuntimeLevelFilter<D> {
@@ -86,6 +87,9 @@ fn run(matches: ArgMatches) -> Result<(), String> {
         ("coverage", Some(m)) => coverage::call(&mut logger, &coverage::Options::new(&m)),
         ("normalize", Some(m)) => normalize::call(&mut logger, &normalize::Options::new(&m)),
         // ("segment", Some(m)) => segment::call(&mut logger, &segment::Options::new(&m)),
+        ("cohort-stats", Some(m)) => {
+            cohort_stats::call(&mut logger, &cohort_stats::Options::new(&m))
+        }
         _ => Err("Invalid command".to_string()),
     }
 }
