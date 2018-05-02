@@ -1,5 +1,7 @@
+pub mod lowess;
 pub mod math;
 
+pub use self::lowess::{lowess, LowessResults};
 use slog::Logger;
 
 /// Build index file for the VCF/BCF file at `path`.

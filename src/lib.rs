@@ -2,7 +2,7 @@
 
 #[macro_use]
 extern crate serde_derive;
-#[macro_use]
+// #[macro_use]
 extern crate serde_json;
 
 #[macro_use]
@@ -19,8 +19,6 @@ extern crate separator;
 extern crate shlex;
 #[macro_use]
 extern crate slog;
-extern crate csv;
 extern crate statrs;
-extern crate tempdir;
 
 pub mod cli;

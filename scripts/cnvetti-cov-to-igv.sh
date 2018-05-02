@@ -4,7 +4,7 @@
 # more than one sample into a ".igv" file for convertion to TGF and ultimately
 # display in IGV.
 
-usage() { >&2 echo "Usage: $0 [-m RCOV|COV|NCOV|NCOV2] IN.bcf OUT.igv"; }
+usage() { >&2 echo "Usage: $0 [-m RCOV|COV|NCOV|NCOV2|NCOV_GC|NCOV2_GC|SCOV|SCOV2] IN.bcf OUT.igv"; }
 
 METRIC=
 
@@ -21,7 +21,7 @@ while getopts ":hm:" flag; do
 done
 
 case "$METRIC" in
-    RCOV|COV|NCOV|NCOV2);;
+    RCOV|COV|NCOV|NCOV2|NCOV_GC|NCOV2_GC|SCOV|SCOV2);;
     *) >&2 echo "ERROR: Invalid metric '$METRIC'"; usage; exit 1;;
 esac
 
@@ -43,12 +43,16 @@ samples=$(
 >$OUT
 
 case $METRIC in
-    NCOV)
-        echo "#track color=000,000,000 graphType=points viewLimits=0:1.8 windowingFunction=mean" \
+    NCOV2*|SCOV2)
+        echo "#track color=000,000,255 altColor=255,000,000 graphType=points viewLimits=-1.5:1.5 windowingFunction=none" \
         >> $OUT
     ;;
-    NCOV2)
-        echo "#track color=000,000,255 altColor=255,000,000 graphType=points viewLimits=-1:1 windowingFunction=mean" \
+    NCOV_*|SCOV)
+        echo "#track color=000,000,000 graphType=points viewLimits=0:1.8 windowingFunction=none" \
+        >> $OUT
+    ;;
+    *)
+        echo "#track color=000,000,255 graphType=points windowingFunction=none" \
         >> $OUT
     ;;
 esac

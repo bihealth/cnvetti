@@ -129,7 +129,10 @@ impl Options {
         if let Some(preset) = matches.value_of("preset") {
             match OptionsPreset::from_str(preset).expect("Unknown --preset") {
                 OptionsPreset::Wgs => {
-                    panic!("Wgs preset not implemented yet!");
+                    options.window_length = 500;
+                    options.mask_piles = false;
+                    options.skip_discordant = false;
+                    options.count_kind = CountKind::Coverage;
                 }
                 OptionsPreset::WesOnTarget => {
                     panic!("WesOnTarget preset not implemented yet!");

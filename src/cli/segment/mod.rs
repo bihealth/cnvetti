@@ -86,17 +86,14 @@ fn process_region(
     coverage.resize(n_samples, Vec::new());
 
     // Key for the metric to segment.
-    let key = match &options.count_kind {
-        CountKind::Coverage => b"NCV",
-        CountKind::Alignments => b"NRC",
-    };
+    let key = b"NCOV";
 
     // Whether or not to skip a record.
     fn skip_record(record: &mut bcf::Record, options: &Options) -> bool {
         // TODO: skip on mapability, cohort IQR
         // TODO: record should not be mut, see rust-bio/rust-htslib#78
 
-        let is_missing = record.format(b"NRC").float().unwrap()[0][0].is_missing();
+        let is_missing = record.format(b"COV").float().unwrap()[0][0].is_missing();
         let gap = record
             .info(b"GAP")
             .integer()
@@ -107,9 +104,9 @@ fn process_region(
             .float()
             .expect("no INFO/GC")
             .expect("INFO/GC empty")[0];
-        let few_gc_windows = record.has_filter(b"FEW_GCWINDOWS");
+        // let few_gc_windows = record.has_filter(b"FEW_GCWINDOWS");
 
-        (gc < options.min_gc) || (gc > options.max_gc) || few_gc_windows || gap || is_missing
+        (gc < options.min_gc) || (gc > options.max_gc) || gap || is_missing // || few_gc_windows 
     }
 
     // First pass, collect normalized coverage and filtered-out mask.
@@ -176,7 +173,7 @@ fn process_region(
     while reader.read(&mut record).is_ok() {
         writer.translate(&mut record);
         if skip_record(&mut record, options) {
-            let vals: Vec<f32> = if let Some(idx) = idx {
+            let mut vals: Vec<f32> = if let Some(idx) = idx {
                 (0..n_samples)
                     .map(|i| (2_f64.powf(coverage[i][idx]) - PSEUDO_EPSILON) as f32)
                     .collect()
@@ -184,20 +181,28 @@ fn process_region(
                 vec![0_f32; n_samples]
             };
             record
-                .push_format_float(b"SRC", &vals)
-                .expect("Could not write FORMAT/SRC");
+                .push_format_float(b"SCOV", &vals)
+                .expect("Could not write FORMAT/SCOV");
+            vals[0] = vals[0].log2();
+            record
+                .push_format_float(b"SCOV2", &vals)
+                .expect("Could not write FORMAT/SCOV2");
             record.push_filter(writer.header().name_to_id(b"SEG_SKIPPED").unwrap());
         } else {
             idx = match idx {
                 Some(idx) => Some(idx + 1),
                 None => Some(0),
             };
-            let vals: Vec<f32> = (0..n_samples)
+            let mut vals: Vec<f32> = (0..n_samples)
                 .map(|i| (2_f64.powf(coverage[i][idx.unwrap()]) - PSEUDO_EPSILON) as f32)
                 .collect();
             record
-                .push_format_float(b"SRC", &vals)
-                .expect("Could not write FORMAT/SRC");
+                .push_format_float(b"SCOV", &vals)
+                .expect("Could not write FORMAT/SCOV");
+            vals[0] = vals[0].log2();
+            record
+                .push_format_float(b"SCOV2", &vals)
+                .expect("Could not write FORMAT/SCOV2");
         }
         writer.write(&record).expect("Writing the record failed!");
     }
@@ -245,8 +250,9 @@ pub fn call(logger: &mut Logger, options: &Options) -> Result<(), String> {
             // Construct extended header.
             let mut header = bcf::Header::with_template(reader.header());
             let lines = vec![
-                "##FORMAT=<ID=SRC,Number=1,Type=Float,Description=\"Segmented normalized read \
-                 count\">",
+                "##FORMAT=<ID=SCOV,Number=1,Type=Float,Description=\"Segmented coverage\">",
+                "##FORMAT=<ID=SCOV2,Number=1,Type=Float,Description=\"Segmented coverage \
+                (log2-scaled)\">",
                 "##FILTER=<ID=SEG_SKIPPED,Description=\"Window skipped in segmentation\">",
             ];
             for line in lines {

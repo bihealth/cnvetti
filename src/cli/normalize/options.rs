@@ -6,8 +6,8 @@ pub use cli::options::*;
 #[derive(Clone, Debug, PartialEq)]
 pub enum Normalization {
     BinnedGc,
-    LoessGc,
-    LoessGcMapability,
+    LowessGc,
+    LowessGcMapability,
 }
 
 impl Normalization {
@@ -15,8 +15,8 @@ impl Normalization {
     pub fn from_str(s: &str) -> Option<Normalization> {
         match s {
             "BinnedGc" => Some(Normalization::BinnedGc),
-            "LoessGc" => Some(Normalization::LoessGc),
-            "LoessGcMapability" => Some(Normalization::LoessGcMapability),
+            "LowessGc" => Some(Normalization::LowessGc),
+            "LowessGcMapability" => Some(Normalization::LowessGcMapability),
             _ => None,
         }
     }

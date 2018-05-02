@@ -255,15 +255,15 @@ subcommands:
     - normalization:
         long: normalization
         takes_value: true
-        default_value: LoessGcMapability
+        default_value: BinnedGc
         value_name: TYPE
         possible_values:
         - BinnedGc
-        - LoessGc
-        - LoessGcMapability
+        - LowessGc
+        - LowessGcMapability
         help: >
             The method to use for read count/coverage normalization.  Note that
-            the LOESS variants require R installed (base R is enough).
+            the Lowess variants require R installed (base R is enough).
     - gc_step:
         long: gc-step
         takes_value: true

@@ -408,7 +408,7 @@ impl BamRecordAggregator for CoverageAggregator {
             match prev_window_id {
                 Some(prev_window_id) => if prev_window_id != window_id {
                     self.push_window(window_id);
-                }
+                },
                 None => self.push_window(window_id),
             }
         }
