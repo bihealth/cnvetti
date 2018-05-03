@@ -1,5 +1,6 @@
 pub mod lowess;
 pub mod math;
+pub mod stats;
 
 pub use self::lowess::{lowess, LowessResults};
 use slog::Logger;

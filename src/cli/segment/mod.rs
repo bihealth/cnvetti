@@ -22,7 +22,7 @@ use separator::Separatable;
 use rust_segment::seg_haar;
 
 /// Epsilon to add normalized metric to prevent -nan through log2()
-const PSEUDO_EPSILON: f64 = 1e-10;
+const PSEUDO_EPSILON: f64 = 1e-6;
 
 /// Generate list of all contigs from BCF header.
 fn build_chroms(header: &bcf::header::HeaderView) -> Vec<(String, u32)> {
@@ -106,7 +106,7 @@ fn process_region(
             .expect("INFO/GC empty")[0];
         // let few_gc_windows = record.has_filter(b"FEW_GCWINDOWS");
 
-        (gc < options.min_gc) || (gc > options.max_gc) || gap || is_missing // || few_gc_windows 
+        (gc < options.min_gc) || (gc > options.max_gc) || gap || is_missing // || few_gc_windows
     }
 
     // First pass, collect normalized coverage and filtered-out mask.
@@ -129,7 +129,7 @@ fn process_region(
             .iter()
             .enumerate()
         {
-            coverage[i].push(((**val)[0] as f64 + PSEUDO_EPSILON).log2());
+            coverage[i].push(((**val)[0].max(0.0) as f64 + PSEUDO_EPSILON).log2());
         }
     }
 
@@ -155,7 +155,11 @@ fn process_region(
                 options.haar_seg_l_max as u32,
             );
 
-            debug!(logger, "Created {} segments", haar_res.segments.len().separated_string());
+            debug!(
+                logger,
+                "Created {} segments",
+                haar_res.segments.len().separated_string()
+            );
 
             haar_res.seg_values
         })
@@ -249,7 +253,7 @@ pub fn call(logger: &mut Logger, options: &Options) -> Result<(), String> {
             let lines = vec![
                 "##FORMAT=<ID=SCOV,Number=1,Type=Float,Description=\"Segmented coverage\">",
                 "##FORMAT=<ID=SCOV2,Number=1,Type=Float,Description=\"Segmented coverage \
-                (log2-scaled)\">",
+                 (log2-scaled)\">",
                 "##FILTER=<ID=SEG_SKIPPED,Description=\"Window skipped in segmentation\">",
             ];
             for line in lines {
