@@ -3,8 +3,6 @@
 include!(concat!(env!("OUT_DIR"), "/version.rs"));
 
 mod options;
-mod seg_haar;
-mod seg_utils;
 
 use std::env;
 use std::str;
@@ -20,6 +18,8 @@ pub use self::options::*;
 use cli::shared;
 
 use separator::Separatable;
+
+use rust_segment::seg_haar;
 
 /// Epsilon to add normalized metric to prevent -nan through log2()
 const PSEUDO_EPSILON: f64 = 1e-10;
@@ -145,22 +145,19 @@ fn process_region(
             );
 
             // Perform segmentation, yielding breakpoints.
-            let breakpoints = seg_haar::segment_haar_seg(
+            let haar_res = seg_haar(
                 &vals,
                 None,
                 None,
+                &[0..(vals.len())],
                 options.haar_seg_breaks_fdr_q,
-                options.haar_seg_l_min,
-                options.haar_seg_l_max,
-                logger,
+                options.haar_seg_l_min as u32,
+                options.haar_seg_l_max as u32,
             );
 
-            if breakpoints.len() < 50 {
-                debug!(logger, "Breakpoints: {:?}", &breakpoints);
-            }
+            debug!(logger, "Created {} segments", haar_res.segments.len().separated_string());
 
-            // Replace values with their medians, from breakpoints.
-            seg_utils::replace_with_segment_medians(vals, &breakpoints)
+            haar_res.seg_values
         })
         .collect();
 

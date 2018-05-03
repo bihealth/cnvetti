@@ -21,4 +21,6 @@ extern crate shlex;
 extern crate slog;
 extern crate statrs;
 
+extern crate rust_segment;
+
 pub mod cli;

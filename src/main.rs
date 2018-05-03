@@ -19,10 +19,10 @@ use std::sync::{atomic, Arc};
 use clap::{App, ArgMatches};
 use std::process;
 
+use cnvetti::cli::cohort_stats;
 use cnvetti::cli::coverage;
 use cnvetti::cli::normalize;
 use cnvetti::cli::segment;
-use cnvetti::cli::cohort_stats;
 
 /// Custom Drain logic
 struct RuntimeLevelFilter<D> {
