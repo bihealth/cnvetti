@@ -392,6 +392,6 @@ subcommands:
     - haar_seg_breaks_fdr_q:
         long: haar-seg-breaks-fdr-q
         takes_value: true
-        default_value: '1e-7'
+        default_value: '0.001'
         value_name: PROB
         help: Value for `q` in the HaarSeg FDR computation.
