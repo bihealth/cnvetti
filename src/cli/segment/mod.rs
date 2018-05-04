@@ -19,10 +19,10 @@ use cli::shared;
 
 use separator::Separatable;
 
-use rust_segment::seg_haar;
+use rust_segment::{adjust_breaks, reject_nonaberrant, seg_haar};
 
 /// Epsilon to add normalized metric to prevent -nan through log2()
-const PSEUDO_EPSILON: f64 = 1e-6;
+const PSEUDO_EPSILON: f64 = 1e-12;
 
 /// Generate list of all contigs from BCF header.
 fn build_chroms(header: &bcf::header::HeaderView) -> Vec<(String, u32)> {
@@ -134,6 +134,7 @@ fn process_region(
     }
 
     debug!(logger, "Performing segmentation...");
+    const MAX_REFINEMENTS: usize = 10; // TODO: get from configuration
     let coverage: Vec<Vec<f64>> = coverage
         .iter()
         .enumerate()
@@ -145,7 +146,7 @@ fn process_region(
             );
 
             // Perform segmentation, yielding breakpoints.
-            let haar_res = seg_haar(
+            let mut haar_res = seg_haar(
                 &vals,
                 None,
                 None,
@@ -154,10 +155,38 @@ fn process_region(
                 options.haar_seg_l_min as u32,
                 options.haar_seg_l_max as u32,
             );
+            debug!(
+                logger,
+                "Raw segments: {}",
+                haar_res.segments.len().separated_string()
+            );
+            // Adjust breakpoints.
+            for i in 0..MAX_REFINEMENTS {
+                let (num_refined, inner_haar_res) = adjust_breaks(&haar_res, &vals);
+                debug!(
+                    logger,
+                    "{} changed after {}-th break adjustments",
+                    num_refined,
+                    i + 1
+                );
+                if num_refined > 0 {
+                    haar_res = inner_haar_res;
+                } else {
+                    break; // nothing more to do
+                }
+            }
+            debug!(
+                logger,
+                "Segments after adjustment: {}",
+                haar_res.segments.len().separated_string()
+            );
+            // Reject non-aberrant segments.
+            const ABERRANT_FACTOR: f64 = 3.0;
+            haar_res = reject_nonaberrant(&haar_res, &vals, ABERRANT_FACTOR);
 
             debug!(
                 logger,
-                "Created {} segments",
+                "Final segments: {}",
                 haar_res.segments.len().separated_string()
             );
 
@@ -167,44 +196,40 @@ fn process_region(
 
     // Second pass, write segmentation
     debug!(logger, "Second pass over region (write segmentation)...");
-    let mut idx: Option<usize> = None; // index into vals[i]
+    let mut idx = 0;  // current index into coverage[i]
+    let mut prev_vals: Option<Vec<f32>> = None;  // [log2(val)]
     reader
         .fetch(rid, *start, *end)
         .expect("Could not fetch region from BCF file");
     while reader.read(&mut record).is_ok() {
         writer.translate(&mut record);
-        if skip_record(&mut record, options) {
-            let mut vals: Vec<f32> = if let Some(idx) = idx {
-                (0..n_samples)
-                    .map(|i| (2_f64.powf(coverage[i][idx]) - PSEUDO_EPSILON) as f32)
-                    .collect()
+        let vals = if skip_record(&mut record, options) {
+            record.push_filter(writer.header().name_to_id(b"SEG_SKIPPED").unwrap());
+            if let Some(ref prev_vals) = &prev_vals {
+                prev_vals.clone()
             } else {
                 vec![0_f32; n_samples]
-            };
-            record
-                .push_format_float(b"SCOV", &vals)
-                .expect("Could not write FORMAT/SCOV");
-            vals[0] = vals[0].log2();
-            record
-                .push_format_float(b"SCOV2", &vals)
-                .expect("Could not write FORMAT/SCOV2");
-            record.push_filter(writer.header().name_to_id(b"SEG_SKIPPED").unwrap());
+            }
         } else {
-            idx = match idx {
-                Some(idx) => Some(idx + 1),
-                None => Some(0),
-            };
-            let mut vals: Vec<f32> = (0..n_samples)
-                .map(|i| (2_f64.powf(coverage[i][idx.unwrap()]) - PSEUDO_EPSILON) as f32)
-                .collect();
-            record
-                .push_format_float(b"SCOV", &vals)
-                .expect("Could not write FORMAT/SCOV");
-            vals[0] = vals[0].log2();
-            record
-                .push_format_float(b"SCOV2", &vals)
-                .expect("Could not write FORMAT/SCOV2");
-        }
+            let vals = (0..n_samples)
+                .map(|i| {
+                    if coverage[i][idx] > 0.0 && coverage[i][idx] < PSEUDO_EPSILON {
+                        0.0
+                    } else {
+                        (coverage[i][idx] - PSEUDO_EPSILON) as f32
+                    }
+                })
+                .collect::<Vec<f32>>();
+            prev_vals = Some(vals.clone());
+            idx += 1;
+            vals
+        };
+        record
+            .push_format_float(b"SCOV", &[2_f32.powf(vals[0])])
+            .expect("Could not write FORMAT/SCOV");
+        record
+            .push_format_float(b"SCOV2", &vals)
+            .expect("Could not write FORMAT/SCOV2");
         writer.write(&record).expect("Writing the record failed!");
     }
 }
