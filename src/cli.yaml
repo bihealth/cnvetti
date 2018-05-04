@@ -395,3 +395,26 @@ subcommands:
         default_value: '0.001'
         value_name: PROB
         help: Value for `q` in the HaarSeg FDR computation.
+
+# Sub Command: call ===========================================================
+- segment:
+    about: Perform CNV calling based on an existing segmentation.
+    args:
+    # Input/Output File Arguments ---------------------------------------------
+    - input:
+        long: input
+        short: i
+        multiple: false
+        takes_value: true
+        required: true
+        value_name: INPUT.bcf
+        help: >
+            Path to indexed input BCF or VCF file resulting from `cnvetti
+            segment`.
+    - output:
+        long: output
+        short: o
+        takes_value: true
+        required: true
+        value_name: OUT.bcf
+        help: Path to output BCF file (will also write .csi file)

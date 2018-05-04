@@ -1,5 +1,6 @@
 mod options;
 
+pub mod call;
 pub mod cohort_stats;
 pub mod coverage;
 pub mod normalize;

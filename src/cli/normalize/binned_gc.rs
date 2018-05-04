@@ -81,8 +81,10 @@ pub fn normalize_binned_gc(logger: &mut Logger, options: &Options) -> Result<(),
                 //     .increment(scaled_dev(val))
                 //     .expect("Could not increment bucket");
                 // val
-                ((record.coverage / medians[bin]) as f32,
-                (record.coverage_sd / medians[bin]) as f32)
+                (
+                    (record.coverage / medians[bin]) as f32,
+                    (record.coverage_sd / medians[bin]) as f32,
+                )
             } else {
                 (f32::missing(), f32::missing())
             }

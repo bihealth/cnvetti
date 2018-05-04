@@ -21,42 +21,10 @@ use separator::Separatable;
 
 use rust_segment::{adjust_breaks, reject_nonaberrant, seg_haar};
 
+use cli::shared::process;
+
 /// Epsilon to add normalized metric to prevent -nan through log2()
 const PSEUDO_EPSILON: f64 = 1e-12;
-
-/// Generate list of all contigs from BCF header.
-fn build_chroms(header: &bcf::header::HeaderView) -> Vec<(String, u32)> {
-    let mut result = Vec::new();
-
-    for ref record in header.header_records() {
-        if let bcf::HeaderRecord::Contig {
-            key,
-            key_value_pairs,
-        } = record
-        {
-            assert_eq!(key, "contig");
-            let mut name: Option<String> = None;
-            let mut length: Option<u32> = None;
-            for &(ref key, ref value) in key_value_pairs {
-                if key == "ID" {
-                    name = Some(value.clone());
-                } else if key == "length" {
-                    length = Some(value.parse::<u32>().unwrap());
-                }
-            }
-            if let (Some(ref name), Some(length)) = (&name, length) {
-                result.push((name.clone(), length));
-            } else {
-                panic!(
-                    "Could not parse both name/length from {:?}/{:?}",
-                    name, length
-                );
-            }
-        }
-    }
-
-    result
-}
 
 /// Process one region.
 fn process_region(
@@ -196,8 +164,8 @@ fn process_region(
 
     // Second pass, write segmentation
     debug!(logger, "Second pass over region (write segmentation)...");
-    let mut idx = 0;  // current index into coverage[i]
-    let mut prev_vals: Option<Vec<f32>> = None;  // [log2(val)]
+    let mut idx = 0; // current index into coverage[i]
+    let mut prev_vals: Option<Vec<f32>> = None; // [log2(val)]
     reader
         .fetch(rid, *start, *end)
         .expect("Could not fetch region from BCF file");
@@ -231,25 +199,6 @@ fn process_region(
             .push_format_float(b"SCOV2", &vals)
             .expect("Could not write FORMAT/SCOV2");
         writer.write(&record).expect("Writing the record failed!");
-    }
-}
-
-/// Perform the actual processing.
-fn process(
-    reader: &mut bcf::IndexedReader,
-    writer: &mut bcf::Writer,
-    logger: &mut Logger,
-    options: &Options,
-) {
-    let contigs = build_chroms(reader.header());
-    for (chrom, length) in contigs.iter() {
-        process_region(
-            reader,
-            writer,
-            logger,
-            options,
-            &(chrom.to_string(), 0, *length),
-        );
     }
 }
 
@@ -309,7 +258,7 @@ pub fn call(logger: &mut Logger, options: &Options) -> Result<(), String> {
         }
 
         info!(logger, "Processing...");
-        process(&mut reader, &mut writer, logger, &options);
+        process(&mut reader, &mut writer, logger, &options, &process_region);
     }
 
     // Build index on the output file.

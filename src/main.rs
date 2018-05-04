@@ -19,6 +19,7 @@ use std::sync::{atomic, Arc};
 use clap::{App, ArgMatches};
 use std::process;
 
+use cnvetti::cli::call;
 use cnvetti::cli::cohort_stats;
 use cnvetti::cli::coverage;
 use cnvetti::cli::normalize;
@@ -90,6 +91,7 @@ fn run(matches: ArgMatches) -> Result<(), String> {
         ("cohort-stats", Some(m)) => {
             cohort_stats::call(&mut logger, &cohort_stats::Options::new(&m))
         }
+        ("call", Some(m)) => call::call(&mut logger, &call::Options::new(&m)),
         _ => Err("Invalid command".to_string()),
     }
 }
