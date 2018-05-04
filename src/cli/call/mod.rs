@@ -3,6 +3,7 @@ include!(concat!(env!("OUT_DIR"), "/version.rs"));
 mod options;
 
 use std::env;
+use std::mem;
 use std::ops::Range;
 
 use shlex;
@@ -239,25 +240,80 @@ fn process_region(
         .fetch(rid, *start, *end)
         .expect("Could not fetch region from BCF file");
     let segment_infos = collect_segments(reader);
+
+    // Perform t-test on segments and reset their mean to neutral copy number state if the test
+    // fails (p value threshold taken from `options`).
     let mut segment_infos = validate_segments(&segment_infos, options);
     info!(
         logger,
         "Collected {} segments",
         segment_infos.len().separated_string()
     );
-    let mut num_segments = segment_infos.len();
-    loop {
-        segment_infos = merge_segments(&segment_infos, options);
-        info!(
-            logger,
-            "Merging => {} segments",
-            segment_infos.len().separated_string()
-        );
-        if num_segments == segment_infos.len() {
-            break;
+
+    // Merge segments until the number of segments does not fall any more, up the number of
+    // times as configured in `options`.
+    for i in 0..options.max_merges {
+        let mut merged_infos = merge_segments(&segment_infos, options);
+        if (merge_infos.len() != segment_infos.len()) {
+            mem::swap(&mut merged_infos, &mut segment_infos);
         } else {
-            num_segments = segment_infos.len();
+            break;
         }
+    }
+    info!(
+        logger,
+        "Merging => {} segments",
+        segment_infos.len().separated_string()
+    );
+
+    // TODO: "knit" long CNV calls with short non-CNV segments
+
+    // TODO: also do last step in CNVnator?
+
+    // Finally, construct CNV call records and write to output.
+    for info in segment_infos.iter().filter(|r| r.cov_mean != 2.0) {
+        let mut record = writer.empty_record();
+
+        let alleles = &[
+            Vec::from("N"),
+            if r.cov_mean < 2.0 {
+                Vec::from("<DEL>")
+            } else {
+                Vec::from("<DUP>")
+            },
+        ];
+
+        // REF..QUAL
+        record.inner_mut().rid = rid;
+        record.set_pos(info.segment.start as i32);
+        record
+            .set_id(
+                format!("CNV_{}_{}_{}", chrom, info.segment.start, infos.segment.end).as_bytes(),
+            )
+            .expect("Cannot set ID");
+        record
+            .set_alleles(alleles)
+            .map_err(|e| format!("Could not update alleles: {}", e))?;
+
+        // INFO/*
+        record
+            .push_info_integer(b"END", &[info.segment.end as i32])
+            .expect("Cannot set FORMAT/END");
+
+        // FORMAT/GT
+        record
+            .push_format_integer(b"GT", &[0, 2])
+            .map_err(|e| format!("Could not write FORMAT/GT: {}", e))?;
+        record
+            .push_format_integer(b"CN", &[r.cov_mean.round() as f32])
+            .map_err(|e| format!("Could not write FORMAT/CN: {}", e))?;
+        record
+            .push_format_integer(b"CNR", &[r.cov_mean as f32])
+            .map_err(|e| format!("Could not write FORMAT/CNR: {}", e))?;
+
+        writer
+            .write_record(&record)
+            .expect("Writing to BCF file failed!");
     }
 }
 
@@ -292,6 +348,8 @@ pub fn call(logger: &mut Logger, options: &Options) -> Result<(), String> {
                 "##FORMAT<ID=GP,Number=1,Type=Integer,Description=\"Genotype quality\">",
                 "##FORMAT=<ID=CN,Number=1,Type=Integer,Description=\"Copy number genotype for \
                  imprecise events\">",
+                "##FORMAT=<ID=CNR,Number=1,Type=Integer,Description=\"Real-valued copy number \
+                genotype for imprecise events\">",
                 "##FORMAT=<ID=CNQ,Number=1,Type=Float,Description=\"Copy number genotype \
                  quality for imprecise events\">",
                 "##FORMAT=<ID=CNL,Number=G,Type=Float,Description=\"Copy number genotype \

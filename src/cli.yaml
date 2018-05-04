@@ -435,6 +435,13 @@ subcommands:
     - merge_corr_factor:
         long: merge-corr-factor
         takes_value: true
-        default_value: '0.05'
-        value_name: '2970000000'
+        default_value: 'default_value'
+        value_name: FACTOR
         help: Correction factor (0.99 * genome-length).
+
+    - max_merges:
+        long: max-merges
+        takes_value: true
+        default_value: '10'
+        value_name: COUNT
+        help: Maximal number of merges.

@@ -19,6 +19,9 @@ pub struct Options {
     pub merge_p_val_thresh: f64,
     /// Factor for multiple value correction (assuming human genome and 99% is CN neutral).
     pub merge_corr_factor: f64,
+
+    /// Maximal number of segment merges.
+    pub max_merges: usize,
 }
 
 impl Options {
@@ -49,6 +52,11 @@ impl Options {
                 .value_of("merge_corr_factor")
                 .unwrap()
                 .parse::<f64>()
+                .unwrap(),
+            max_merges: matches
+                .value_of("max_merges")
+                .unwrap()
+                .parse::<usize>()
                 .unwrap(),
         }
     }
