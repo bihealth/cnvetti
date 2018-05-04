@@ -28,6 +28,7 @@ pub struct NormData {
     pub gc_content: f64,
     pub mapability: f64,
     pub coverage: f64,
+    pub coverage_sd: f64,
 }
 
 impl NormData {
@@ -39,6 +40,7 @@ impl NormData {
         gc_content: f64,
         mapability: f64,
         coverage: f64,
+        coverage_sd: f64,
     ) -> NormData {
         NormData {
             use_chrom,
@@ -47,6 +49,7 @@ impl NormData {
             gc_content,
             mapability,
             coverage,
+            coverage_sd,
         }
     }
 
@@ -154,6 +157,10 @@ pub fn load_norm_data(logger: &Logger, options: &Options) -> Result<Vec<NormData
                 .format(b"COV")
                 .float()
                 .map_err(|e| format!("FORMAT/COV not found: {}", e))?[0][0];
+            let coverage_sd = record
+                .format(b"COVSD")
+                .float()
+                .map_err(|e| format!("FORMAT/COV_SD not found: {}", e))?[0][0];
 
             res.push(NormData::new(
                 use_chrom,
@@ -162,6 +169,7 @@ pub fn load_norm_data(logger: &Logger, options: &Options) -> Result<Vec<NormData
                 gc_content.into(),
                 mapability.into(),
                 coverage.into(),
+                coverage_sd.into(),
             ));
             // Update book-keeping.
             prev_rid = Some(record.rid());
@@ -180,7 +188,7 @@ fn chi_square_distance(a: f32, b: f32) -> f32 {
 pub fn write_normalized_data(
     logger: &Logger,
     options: &Options,
-    normalized_coverage: &[f32],
+    normalized_coverage: &[(f32, f32)],
 ) -> Result<(), String> {
     // Block for BCF file reader and writer.
     {
@@ -205,6 +213,7 @@ pub fn write_normalized_data(
             let lines = vec![
                 "##FORMAT=<ID=OUTLIER,Number=1,Type=Integer,Description=\"Is outlier\">",
                 "##FORMAT=<ID=NCOV,Number=1,Type=Float,Description=\"Normalized coverage\">",
+                "##FORMAT=<ID=NCOVSD,Number=1,Type=Float,Description=\"Normalized coverage SD\">",
                 "##FORMAT=<ID=NCOV2,Number=1,Type=Float,Description=\"Normalized coverage \
                  (log2-scaled)\">",
             ];
@@ -258,12 +267,16 @@ pub fn write_normalized_data(
             writer.translate(&mut record);
 
             // Write normalized coverage into record.
-            let nrcs: Vec<f32> = vec![normalized_coverage[i] as f32; 1];
+            let nrcs: Vec<f32> = vec![normalized_coverage[i].0 as f32; 1];
             record
                 .push_format_float(b"NCOV", nrcs.as_slice())
                 .map_err(|e| format!("Could not write FORMAT/NCOV: {}", e))?;
+            let nrcsd: Vec<f32> = vec![normalized_coverage[i].1 as f32; 1];
+            record
+                .push_format_float(b"NCOVSD", nrcsd.as_slice())
+                .map_err(|e| format!("Could not write FORMAT/NCOVSD: {}", e))?;
 
-            let nrc2 = (normalized_coverage[i] + EPSILON).log2();
+            let nrc2 = (normalized_coverage[i].0 + EPSILON).log2();
             let nrcs2: Vec<f32> = vec![
                 if nrc2.is_finite() {
                     nrc2 as f32
@@ -279,9 +292,9 @@ pub fn write_normalized_data(
             // Compute flag for single point outlier.
             let is_outlier = if i > 0 && i + 1 < normalized_coverage.len() {
                 const CHI_SQUAR_THRESH: f32 = 6.635;
-                chi_square_distance(normalized_coverage[i - 1], normalized_coverage[i])
+                chi_square_distance(normalized_coverage[i - 1].0, normalized_coverage[i].0)
                     > CHI_SQUAR_THRESH
-                    && chi_square_distance(normalized_coverage[i + 1], normalized_coverage[i])
+                    && chi_square_distance(normalized_coverage[i + 1].0, normalized_coverage[i].0)
                         > CHI_SQUAR_THRESH
             } else {
                 false

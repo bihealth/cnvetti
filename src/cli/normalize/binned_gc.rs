@@ -68,10 +68,10 @@ pub fn normalize_binned_gc(logger: &mut Logger, options: &Options) -> Result<(),
     //     (CONSISTENCY_CONSTANT * (1.0 - val).abs() * 1_000.0) as u64 + 1
     // }
 
-    // Comput normalized coverage and outlier flags.
+    // Comput normalized coverage, normalized means and outlier flags.
     debug!(logger, "Computing normalized coverages...");
     // let mut abs_devs = vec![Histogram::new(); num_bins];
-    let normalized: Vec<f32> = norm_data
+    let normalized: Vec<(f32, f32)> = norm_data
         .iter()
         .map(|record| {
             let bin = record.gc_bin(options.gc_step);
@@ -81,9 +81,10 @@ pub fn normalize_binned_gc(logger: &mut Logger, options: &Options) -> Result<(),
                 //     .increment(scaled_dev(val))
                 //     .expect("Could not increment bucket");
                 // val
-                (record.coverage / medians[bin]) as f32
+                ((record.coverage / medians[bin]) as f32,
+                (record.coverage_sd / medians[bin]) as f32)
             } else {
-                f32::missing()
+                (f32::missing(), f32::missing())
             }
         })
         .collect();
