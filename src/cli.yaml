@@ -418,3 +418,23 @@ subcommands:
         required: true
         value_name: OUT.bcf
         help: Path to output BCF file (will also write .csi file)
+
+    # P-value related Arguments -----------------------------------------------
+    - significant_p_val_thresh:
+        long: significant-p-val-thresh
+        takes_value: true
+        default_value: '0.05'
+        value_name: P-VALUE
+        help: Threshold on P-value for accepting segments.
+    - merge_p_val_thresh:
+        long: merge-p-val-thresh
+        takes_value: true
+        default_value: '0.05'
+        value_name: P-VALUE
+        help: Threshold on P-Value for merging segments.
+    - merge_corr_factor:
+        long: merge-corr-factor
+        takes_value: true
+        default_value: '0.05'
+        value_name: '2970000000'
+        help: Correction factor (0.99 * genome-length).

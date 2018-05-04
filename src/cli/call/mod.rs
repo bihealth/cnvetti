@@ -3,6 +3,7 @@ include!(concat!(env!("OUT_DIR"), "/version.rs"));
 mod options;
 
 use std::env;
+use std::ops::Range;
 
 use shlex;
 
@@ -14,6 +15,202 @@ use separator::Separatable;
 
 use rust_htslib::bcf::record::Numeric;
 use rust_htslib::bcf::{self, Read as BcfRead};
+
+/// Collect information about one segment.
+#[derive(Debug, Clone)]
+struct SegmentInfo {
+    segment: Range<usize>,
+    length: usize,
+    cov_mean: f32,
+    cov_sd: f64,
+}
+
+impl SegmentInfo {
+    /// Merge `other` into `self` and return merge result.
+    fn merge(&self, other: &Self) -> Self {
+        let a = (self.length as f32) / ((self.length + other.length) as f32);
+        let b = 1.0 - a;
+
+        SegmentInfo {
+            segment: Range {
+                start: self.segment.start,
+                end: other.segment.end,
+            },
+            length: self.length + other.length,
+            cov_mean: self.cov_mean / a + other.cov_mean / b,
+            cov_sd: ((self.cov_sd.powi(2) * ((self.length - 1) as f64)
+                + other.cov_sd.powi(2) * ((other.length - 1) as f64))
+                / ((self.length + other.length - 1) as f64))
+                .sqrt(),
+        }
+    }
+
+    /// Compute whether merging should be performed with given `threshold` on P-value.
+    ///
+    /// Uses Welch's test.
+    fn can_merge(&self, other: &Self, threshold: f64) -> bool {
+        let s_delta = (self.cov_sd.powi(2) / (self.length as f64)
+            + other.cov_sd.powi(2) / (other.length as f64))
+            .sqrt();
+        let t = ((self.cov_mean - other.cov_mean) as f64) / s_delta;
+        // TODO: implement Welch's two sample t test.
+        false
+    }
+
+    /// Compute P-value of segment.
+    fn p_value(&self, options: &Options) -> f64 {
+        /// TODO: implement Student's t test.
+        options.significant_p_val_thresh
+    }
+
+    /// Return `SegmentInfo` with mean set to copy number neutral state.
+    fn with_reset_mean(&self) -> Self {
+        SegmentInfo {
+            cov_mean: 2.0, // TODO: properly reset on X and Y chrom
+            ..self.clone()
+        }
+    }
+}
+
+/// Collect information about all segments from `reader`.
+fn collect_segments(reader: &mut bcf::IndexedReader) -> Vec<SegmentInfo> {
+    let mut result: Vec<SegmentInfo> = Vec::new();
+
+    // Temporary segment.
+    #[derive(Debug, Clone)]
+    struct TempSegmentInfo {
+        // This segment's range.
+        segment: Range<usize>,
+        // Number of skipped reference so far.
+        skipped_ref: usize,
+        // Current mean (all the same).
+        cov_mean: f32,
+        // Current sum of variance squares.
+        cov_variance_sum: f64,
+    };
+    let mut tmp: Option<TempSegmentInfo> = None;
+
+    let mut record = reader.empty_record();
+    while reader.read(&mut record).is_ok() {
+        // Extract the interesting information about the segment from BCF record.
+        let start = record.pos() as usize;
+        let end = record
+            .info(b"END")
+            .integer()
+            .expect("Could not read FORMAT/END")
+            .expect("Could not access FORMAT/END")[0] as usize;
+        let cov_mean = record
+            .format(b"NCOV")
+            .float()
+            .expect("Could not access FORMAT/NCOV")[0][0];
+        let cov_sd = record
+            .format(b"NCOV")
+            .float()
+            .expect("Could not access FORMAT/NCOVSD")[0][0] as f64;
+
+        // Possibly ignore this window.
+        if cov_mean.is_missing() || !cov_mean.is_finite() {
+            continue;
+        }
+
+        // Update temporary segment, possibly saving starting new one and pushing current.
+        tmp = Some(match tmp {
+            Some(tmp) => {
+                if cov_mean == tmp.cov_mean {
+                    // Extend current segment.
+                    TempSegmentInfo {
+                        segment: Range {
+                            start: tmp.segment.start,
+                            end: end,
+                        },
+                        skipped_ref: tmp.skipped_ref + (tmp.segment.start - end),
+                        cov_mean: tmp.cov_mean,
+                        cov_variance_sum: tmp.cov_variance_sum + cov_sd * cov_sd,
+                    }
+                } else {
+                    // Save current segment and start new.
+                    result.push(SegmentInfo {
+                        segment: tmp.segment.clone(),
+                        length: tmp.segment.len() - tmp.skipped_ref,
+                        cov_mean: tmp.cov_mean,
+                        cov_sd: (tmp.cov_variance_sum
+                            / ((tmp.segment.len() - tmp.skipped_ref - 1) as f64))
+                            .sqrt(),
+                    });
+                    TempSegmentInfo {
+                        segment: Range { start, end },
+                        skipped_ref: 0,
+                        cov_mean: cov_mean,
+                        cov_variance_sum: cov_sd * cov_sd,
+                    }
+                }
+            }
+            None => {
+                // Start first segment.
+                TempSegmentInfo {
+                    segment: Range { start, end },
+                    skipped_ref: 0,
+                    cov_mean: cov_mean,
+                    cov_variance_sum: cov_sd * cov_sd,
+                }
+            }
+        });
+    }
+
+    if let Some(tmp) = tmp {
+        // Save last segment, if any.
+        result.push(SegmentInfo {
+            segment: tmp.segment.clone(),
+            length: tmp.segment.len() - tmp.skipped_ref,
+            cov_mean: tmp.cov_mean,
+            cov_sd: (tmp.cov_variance_sum / ((tmp.segment.len() - tmp.skipped_ref - 1) as f64))
+                .sqrt(),
+        });
+    }
+
+    result
+}
+
+/// Set segment means to copy number neutral state if not significantly deviated...
+///
+/// Merging sements is handled in `merge_segments`.
+fn validate_segments(segments: &[SegmentInfo], options: &Options) -> Vec<SegmentInfo> {
+    segments
+        .iter()
+        .map(|seg| {
+            if seg.p_value(options) < options.significant_p_val_thresh {
+                seg.with_reset_mean()
+            } else {
+                seg.clone()
+            }
+        })
+        .collect::<Vec<SegmentInfo>>()
+}
+
+/// Merge segments from lef to right using the strategy also used in CNVnator.
+fn merge_segments(segments: &[SegmentInfo], options: &Options) -> Vec<SegmentInfo> {
+    if segments.len() <= 2 {
+        return Vec::from(segments);
+    }
+
+    let mut result: Vec<SegmentInfo> = Vec::new();
+    result.push(segments[0].clone());
+
+    for i in 1..segments.len() {
+        let prev = result.last().unwrap().clone();
+        let current = segments[i].clone();
+
+        if current.cov_mean == prev.cov_mean || prev.can_merge(&current, options.merge_p_val_thresh)
+        {
+            result.pop();
+            result.push(prev.merge(&current));
+        } else {
+            result.push(current);
+        }
+    }
+
+    result
+}
 
 /// Process one region.
 fn process_region(
@@ -30,6 +227,38 @@ fn process_region(
         (start + 1).separated_string(),
         end.separated_string()
     );
+
+    // Resolve contig name to contig index.
+    let rid = reader
+        .header()
+        .name2rid(chrom.as_bytes())
+        .expect("Could not resolve contig name to index");
+
+    // Go over the region, collecting segment mean coverage, as well as standard deviations.
+    reader
+        .fetch(rid, *start, *end)
+        .expect("Could not fetch region from BCF file");
+    let segment_infos = collect_segments(reader);
+    let mut segment_infos = validate_segments(&segment_infos, options);
+    info!(
+        logger,
+        "Collected {} segments",
+        segment_infos.len().separated_string()
+    );
+    let mut num_segments = segment_infos.len();
+    loop {
+        segment_infos = merge_segments(&segment_infos, options);
+        info!(
+            logger,
+            "Merging => {} segments",
+            segment_infos.len().separated_string()
+        );
+        if num_segments == segment_infos.len() {
+            break;
+        } else {
+            num_segments = segment_infos.len();
+        }
+    }
 }
 
 /// Main entry point for the "segment" command.
