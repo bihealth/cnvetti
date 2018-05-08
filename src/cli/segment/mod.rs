@@ -2,7 +2,8 @@
 
 include!(concat!(env!("OUT_DIR"), "/version.rs"));
 
-mod options;
+pub mod options;
+pub use self::options::*;
 
 use std::env;
 use std::str;
@@ -14,7 +15,6 @@ use shlex;
 
 use slog::Logger;
 
-pub use self::options::*;
 use cli::shared;
 
 use separator::Separatable;

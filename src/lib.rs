@@ -13,6 +13,7 @@ extern crate slog;
 extern crate statrs;
 #[macro_use]
 extern crate quick_error;
+extern crate tempdir;
 
 extern crate rust_segment;
 

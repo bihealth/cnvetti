@@ -1,6 +1,7 @@
 include!(concat!(env!("OUT_DIR"), "/version.rs"));
 
-mod options;
+pub mod options;
+pub use self::options::*;
 
 use shlex;
 
@@ -13,8 +14,6 @@ use rust_htslib::bcf::{self, Read as BcfRead};
 
 use cli::shared;
 use cli::shared::stats::Stats;
-
-pub use self::options::*;
 
 /// Main entry point for the "normalize" command.
 pub fn call(logger: &mut Logger, options: &Options) -> Result<(), String> {

@@ -1,5 +1,8 @@
 // Implementation of the "coverage" command.
 
+pub mod options;
+pub use self::options::*;
+
 use std::cmp::{max, min};
 use std::fs::File;
 
@@ -16,13 +19,11 @@ use slog::Logger;
 
 mod agg;
 mod bcf_sink;
-mod options;
 mod piles;
 mod reference;
 mod regions;
 
 use self::agg::*;
-pub use self::options::*;
 use self::piles::PileCollector;
 
 use self::bcf_sink::{sample_from_bam, CoverageBcfSink};

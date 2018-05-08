@@ -4,6 +4,7 @@ about: CNV calling for the masses
 author: Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>
 
 settings:
+- DeriveDisplayOrder
 - SubcommandRequiredElseHelp
 - GlobalVersion
 - UnifiedHelpMessage
@@ -453,3 +454,60 @@ subcommands:
         default_value: '10'
         value_name: COUNT
         help: Maximal number of merges.
+
+# Sub Command: quick ==========================================================
+- quick:
+    about: Shortcuts to common use cases with sensible defaults.
+    settings:
+    - DeriveDisplayOrder
+    - SubcommandRequiredElseHelp
+    - GlobalVersion
+    - UnifiedHelpMessage
+    - ColorAuto
+    subcommands:
+    - wgs-deep:
+        about: Premade configuration for deep WGS sequencing (>=30x).
+        settings:
+        - DeriveDisplayOrder
+        - GlobalVersion
+        - UnifiedHelpMessage
+        - ColorAuto
+        args:
+        # Input/Output File Arguments ---------------------------------------------
+        - input:
+            long: input
+            short: i
+            multiple: false
+            takes_value: true
+            required: true
+            value_name: INPUT.bcf
+            help: >
+                Path to indexed input BCF or VCF file resulting from `cnvetti
+                normalize`.
+        - output:
+            long: output
+            short: o
+            takes_value: true
+            required: true
+            value_name: OUT.bcf
+            help: Path to output CNV BCF file (will also write .csi file)
+        - output_segmentation:
+            long: output-segmentation
+            takes_value: true
+            required: false
+            value_name: OUT.seg.bcf
+            help: Optional path to segmentation result BCF file (will also write .csi file).
+        - reference:
+            long: reference
+            short: r
+            takes_value: true
+            required: true
+            value_name: REF.fa
+            help: Path to FAI-indexed reference FASTA file used for read alignment.
+        # Misc Arguments ------------------------------------------------------
+        - contig_regex:
+            long: contig-regex
+            takes_value: true
+            default_value: '^(chr)?\d\d?$'
+            value_name: 'regex'
+            help: Regular expression for contigs taking part in statistics.

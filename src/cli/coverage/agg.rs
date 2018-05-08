@@ -410,10 +410,7 @@ impl BamRecordAggregator for CoverageAggregator {
     }
 
     fn float_field_names(&self) -> Vec<String> {
-        vec![
-            String::from("COV"),
-            String::from("COVSD"),
-        ]
+        vec![String::from("COV"), String::from("COVSD")]
     }
 
     fn integer_values(&self, _window_id: u32) -> HashMap<String, i32> {

@@ -1,14 +1,14 @@
 // Implementation of the "normalize" command.
 
 mod binned_gc;
-mod options;
+pub mod options;
+pub use self::options::*;
 mod shared;
 
 use slog::Logger;
 
 use self::binned_gc::normalize_binned_gc;
 
-pub use self::options::*;
 use cli::shared::build_index;
 
 // TODO: check input file.

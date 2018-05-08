@@ -27,7 +27,7 @@ impl Normalization {
 pub struct Options {
     pub input: String,
     pub output: String,
-    pub min_gc_window_count: i32,
+    pub min_gc_window_count: i32, // can go away
     pub io_threads: u32,
     pub gc_step: f64,         // should come from stats file
     pub mapability_step: f64, // can go away

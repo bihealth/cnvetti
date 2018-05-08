@@ -24,6 +24,7 @@ use cnvetti::cli::cohort_stats;
 use cnvetti::cli::coverage;
 use cnvetti::cli::normalize;
 use cnvetti::cli::segment;
+use cnvetti::cli::shortcuts;
 
 /// Custom Drain logic
 struct RuntimeLevelFilter<D> {
@@ -92,6 +93,12 @@ fn run(matches: ArgMatches) -> Result<(), String> {
             cohort_stats::call(&mut logger, &cohort_stats::Options::new(&m))
         }
         ("call", Some(m)) => call::call(&mut logger, &call::Options::new(&m)),
+        ("quick", Some(m)) => match m.subcommand() {
+            ("wgs-deep", Some(m)) => {
+                shortcuts::call_quick_wgs_deep(&mut logger, &shortcuts::WgsDeepOptions::new(&m))
+            }
+            _ => Err("Invalid command".to_string()),
+        },
         _ => Err("Invalid command".to_string()),
     }
 }
