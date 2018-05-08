@@ -8,7 +8,7 @@ use bio::data_structures::interval_tree;
 
 use rust_htslib::bam::{self, Read as BamRead};
 
-use cli::shared::math;
+use cli::shared::stats::Stats;
 
 use slog::Logger;
 
@@ -157,7 +157,7 @@ impl<'a> PileCollector<'a> {
         let num_bases_thresh = match num_bases_thresh {
             Some(num_bases_thresh) => num_bases_thresh,
             None => {
-                let num_bases_thresh = math::percentile(&depths, options.pile_depth_percentile);
+                let num_bases_thresh = depths.percentile(options.pile_depth_percentile);
                 debug!(
                     logger,
                     "Setting threshold to percentile {} value, is = {}",

@@ -209,7 +209,7 @@ pub fn write_normalized_data(
         // Construct writer...
         let mut writer = {
             // Construct extended header.
-            let mut header = bcf::Header::with_template(reader.header());
+            let mut header = bcf::Header::from_template(reader.header());
             let lines = vec![
                 "##FORMAT=<ID=OUTLIER,Number=1,Type=Integer,Description=\"Is outlier\">",
                 "##FORMAT=<ID=NCOV,Number=1,Type=Float,Description=\"Normalized coverage\">",

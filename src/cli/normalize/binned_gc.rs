@@ -63,12 +63,7 @@ pub fn normalize_binned_gc(logger: &mut Logger, options: &Options) -> Result<(),
         })
         .collect();
 
-    // // Helper for scaling the deviation.
-    // fn scaled_dev(val: f64) -> u64 {
-    //     (CONSISTENCY_CONSTANT * (1.0 - val).abs() * 1_000.0) as u64 + 1
-    // }
-
-    // Comput normalized coverage, normalized means and outlier flags.
+    // Compute normalized coverage, normalized means and outlier flags.
     debug!(logger, "Computing normalized coverages...");
     // let mut abs_devs = vec![Histogram::new(); num_bins];
     let normalized: Vec<(f32, f32)> = norm_data
@@ -90,23 +85,6 @@ pub fn normalize_binned_gc(logger: &mut Logger, options: &Options) -> Result<(),
             }
         })
         .collect();
-    // let abs_devs_medians: Vec<f64> = (0..num_bins)
-    //     .map(|bin| {
-    //         if bin >= abs_devs.len() {
-    //             0.0_f64
-    //         } else {
-    //             abs_devs[bin].percentile(50.0).unwrap_or(0) as f64
-    //         }
-    //     })
-    //     .collect();
-    // let is_outlier: Vec<bool> = norm_data
-    //     .iter()
-    //     .map(|record| {
-    //         let bin = record.gc_bin(options.gc_step);
-    //         let val = record.coverage / medians[bin];
-    //         (scaled_dev(val) as f64) < (OUTLIER_THRESH * abs_devs_medians[bin])
-    //     })
-    //     .collect();
 
     // Write out the normalized data again.
     write_normalized_data(logger, options, &normalized)?;

@@ -5,28 +5,21 @@ authors = ["Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>"]
 
 [dependencies]
 bio = "*"
+chrono = "*"
+clap = {version = "*", features = ["yaml", "color", "suggestions"]}
+histogram = "*"
+quick-error = "*"
+regex = "*"
 #rust-htslib = {git = "https://github.com/rust-bio/rust-htslib.git", branch = "master" }
 rust-htslib = {path = "../rust-htslib"}
-clap = {version = "*", features = ["yaml", "color", "suggestions"]}
+rust-segment = { path = "../rust-segment" }
+separator = "*"
+shlex = "*"
 slog = {version = "*", features = ["max_level_trace", "release_max_level_debug"] }
 slog-term = "*"
 slog-async = "*"
-chrono = "*"
-quick-error = "*"
-itertools = "*"
-shlex = "*"
-separator = "*"
-handlebars = "*"
-histogram = "*"
-regex = "*"
-rust-embed = "1.1.1"
-serde = "1.0"
-serde_derive = "1.0"
-serde_json = "1.0"
 statrs = "*"
 tempdir = "*"
-csv = "1.0.0-beta.5"
-rust-segment = { path = "../rust-segment" }
 
 [build-dependencies]
 git-build-version = "*"

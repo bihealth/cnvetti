@@ -34,6 +34,9 @@ pub struct Options {
     pub haar_seg_l_max: usize,
     /// HaarSeg: value for the FDR "Q" value.
     pub haar_seg_breaks_fdr_q: f64,
+
+    /// P-value threshold for accepting segment.
+    pub significant_p_val_thresh: f64,
 }
 
 impl Options {
@@ -73,6 +76,11 @@ impl Options {
                 .unwrap(),
             haar_seg_breaks_fdr_q: matches
                 .value_of("haar_seg_breaks_fdr_q")
+                .unwrap()
+                .parse::<f64>()
+                .unwrap(),
+            significant_p_val_thresh: matches
+                .value_of("significant_p_val_thresh")
                 .unwrap()
                 .parse::<f64>()
                 .unwrap(),

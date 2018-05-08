@@ -20,7 +20,6 @@ mod options;
 mod piles;
 mod reference;
 mod regions;
-pub mod summary; // TODO: move into mod shared?
 
 use self::agg::*;
 pub use self::options::*;
@@ -266,6 +265,7 @@ fn process_region(
     );
 
     // Create the BCF records for this region.
+    info!(logger, "Writing BCF with coverage information...");
 
     // Get `u32` 0-base coordinates.
     for (wid, gc) in ref_stats.gc_content.iter().enumerate() {
@@ -280,7 +280,11 @@ fn process_region(
         let window_length = options.window_length as usize;
         let pos = wid * window_length;
         let window_end = min(*end as usize, (wid + 1) * window_length);
-        let alleles = &[Vec::from("N"), Vec::from("<COUNT>")];
+        let alleles_v = vec![Vec::from("N"), Vec::from("<COUNT>")];
+        let alleles = alleles_v
+            .iter()
+            .map(|x| x.as_slice())
+            .collect::<Vec<&[u8]>>();
 
         record.inner_mut().rid = rid as i32;
         record.set_pos(pos as i32);
@@ -288,7 +292,7 @@ fn process_region(
             .set_id(format!("WIN_{}_{}_{}", chrom, pos + 1, window_end).as_bytes())
             .map_err(|e| format!("Could not update ID: {}", e))?;
         record
-            .set_alleles(alleles)
+            .set_alleles(&alleles)
             .map_err(|e| format!("Could not update alleles: {}", e))?;
 
         // Columns: INFO

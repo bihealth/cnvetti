@@ -1,8 +1,5 @@
-pub mod lowess;
-pub mod math;
 pub mod stats;
 
-pub use self::lowess::{lowess, LowessResults};
 use slog::Logger;
 
 use rust_htslib::bcf::{self, Read as BcfRead};

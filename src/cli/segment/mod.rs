@@ -19,7 +19,7 @@ use cli::shared;
 
 use separator::Separatable;
 
-use rust_segment::{adjust_breaks, reject_nonaberrant, seg_haar};
+use rust_segment::{reject_nonaberrant_pvalue, seg_haar};
 
 use cli::shared::process;
 
@@ -102,7 +102,6 @@ fn process_region(
     }
 
     debug!(logger, "Performing segmentation...");
-    const MAX_REFINEMENTS: usize = 10; // TODO: get from configuration
     let coverage: Vec<Vec<f64>> = coverage
         .iter()
         .enumerate()
@@ -128,29 +127,14 @@ fn process_region(
                 "Raw segments: {}",
                 haar_res.segments.len().separated_string()
             );
-            // Adjust breakpoints.
-            for i in 0..MAX_REFINEMENTS {
-                let (num_refined, inner_haar_res) = adjust_breaks(&haar_res, &vals);
-                debug!(
-                    logger,
-                    "{} changed after {}-th break adjustments",
-                    num_refined,
-                    i + 1
-                );
-                if num_refined > 0 {
-                    haar_res = inner_haar_res;
-                } else {
-                    break; // nothing more to do
-                }
-            }
+            // Reject segments not passing p value.
+            haar_res =
+                reject_nonaberrant_pvalue(&haar_res, &vals, options.significant_p_val_thresh);
             debug!(
                 logger,
-                "Segments after adjustment: {}",
+                "Segments after selecting aberrant (p): {}",
                 haar_res.segments.len().separated_string()
             );
-            // Reject non-aberrant segments.
-            const ABERRANT_FACTOR: f64 = 3.0;
-            haar_res = reject_nonaberrant(&haar_res, &vals, ABERRANT_FACTOR);
 
             debug!(
                 logger,
@@ -223,7 +207,7 @@ pub fn call(logger: &mut Logger, options: &Options) -> Result<(), String> {
     {
         let mut writer = {
             // Construct extended header.
-            let mut header = bcf::Header::with_template(reader.header());
+            let mut header = bcf::Header::from_template(reader.header());
             let lines = vec![
                 "##FORMAT=<ID=SCOV,Number=1,Type=Float,Description=\"Segmented coverage\">",
                 "##FORMAT=<ID=SCOV2,Number=1,Type=Float,Description=\"Segmented coverage \

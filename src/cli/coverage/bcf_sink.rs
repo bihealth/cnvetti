@@ -126,9 +126,6 @@ impl CoverageBcfSink {
         let lines = vec![
             // Misc fields
             "##ALT=<ID=COUNT,Description=\"Record describes a window for read counting\">",
-            // TODO: FEW_GCWINDOWS should go into normalize but then cannot be found?
-            "##FILTER=<ID=FEW_GCWINDOWS,Description=\"Masked because of few windows with \
-             this GC content\">",
             // INFO fields describing the window
             "##INFO=<ID=END,Number=1,Type=Integer,Description=\"Window end\">",
             "##INFO=<ID=GC,Number=1,Type=Float,Description=\"Reference GC content in percent\">",
@@ -141,17 +138,12 @@ impl CoverageBcfSink {
             // Generic FORMAT fields
             "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">",
             "##FORMAT=<ID=COV,Number=1,Type=Float,Description=\"Mean coverage\">",
-            "##FORMAT=<ID=COVM,Number=1,Type=Float,Description=\"Median coverage\">",
-            // FORMAT fields used for coverage
+            // FORMAT fields used when calling by coverage (deep WGS)
             "##FORMAT=<ID=COVSD,Number=1,Type=Float,Description=\"Per-window coverage SD)\">",
-            "##FORMAT=<ID=COVMAD,Number=1,Type=Float,Description=\"Per-window coverage MAD)\">",
-            // FORMAT fields used for read counts
+            // FORMAT fields used for read counts (off-target WES, shallow WGS)
+            // TODO: use Character here with 'Y'/'N'
             "##FORMAT=<ID=MP,Description=\"Masked for sample because too much masked because of \
              piles\",Type=Integer,Number=1>",
-            "##FORMAT=<ID=RCOV,Number=1,Type=Integer,Description=\"Coverage in number of \
-             aligning reads before scaling for read piles\">",
-            "##FORMAT=<ID=MS,Number=1,Type=Integer,Description=\"Number of bases in window \
-             masked because of read piles\">",
         ];
         for line in lines {
             header.push_record(line.as_bytes());

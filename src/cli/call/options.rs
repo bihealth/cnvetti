@@ -2,7 +2,7 @@ use clap::ArgMatches;
 
 pub use cli::options::*;
 
-/// Options for the "coverage" command.
+/// Options for the "call" command.
 #[derive(Clone, Debug)]
 pub struct Options {
     /// Path to input file.
@@ -27,9 +27,6 @@ pub struct Options {
 impl Options {
     /// Build options from ArgMatches.
     pub fn new(matches: &ArgMatches) -> Options {
-        let segmentation = matches.value_of("segmentation").unwrap();
-        let count_kind = matches.value_of("count_kind").unwrap();
-
         Options {
             input: matches.value_of("input").unwrap().to_string(),
             output: matches.value_of("output").unwrap().to_string(),

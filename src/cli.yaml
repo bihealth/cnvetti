@@ -396,8 +396,16 @@ subcommands:
         value_name: PROB
         help: Value for `q` in the HaarSeg FDR computation.
 
+    # P-value related Arguments -----------------------------------------------
+    - significant_p_val_thresh:
+        long: significant-p-val-thresh
+        takes_value: true
+        default_value: '0.05'
+        value_name: P-VALUE
+        help: Threshold on P-value for accepting segments.
+
 # Sub Command: call ===========================================================
-- segment:
+- call:
     about: Perform CNV calling based on an existing segmentation.
     args:
     # Input/Output File Arguments ---------------------------------------------
@@ -435,7 +443,7 @@ subcommands:
     - merge_corr_factor:
         long: merge-corr-factor
         takes_value: true
-        default_value: 'default_value'
+        default_value: '2970000000'
         value_name: FACTOR
         help: Correction factor (0.99 * genome-length).
 

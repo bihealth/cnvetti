@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use std::ops::Range;
 
 use cli::coverage::options::*;
-use cli::shared::math;
 
 use bio::data_structures::interval_tree;
 
@@ -82,7 +81,7 @@ impl<'a> CountAlignmentsAggregator<'a> {
         options: Options,
         contig_length: usize,
         out_bam: Option<&'a mut bam::Writer>,
-    ) -> Self {
+    ) -> CountAlignmentsAggregator<'a> {
         CountAlignmentsAggregator {
             base: BaseAggregator {
                 options,
@@ -299,21 +298,15 @@ impl<'a> BamRecordAggregator for CountAlignmentsAggregator<'a> {
 pub struct CoverageBin {
     /// Mean coverage.
     pub cov_mean: f32,
-    /// Median coverage.
-    pub cov_median: f32,
     /// Coverage standard deviation.
     pub cov_stddev: f32,
-    /// Coverage MAD.
-    pub cov_mad: f32,
 }
 
 impl CoverageBin {
     fn new() -> Self {
         CoverageBin {
             cov_mean: 0_f32,
-            cov_median: 0_f32,
             cov_stddev: 0_f32,
-            cov_mad: 0_f32,
         }
     }
 }
@@ -354,8 +347,6 @@ impl CoverageAggregator {
         self.coverage[window_id] = CoverageBin {
             cov_mean: (&depths).mean() as f32,
             cov_stddev: (&depths).std_dev() as f32,
-            cov_median: math::median(&depths) as f32,
-            cov_mad: math::median_abs_dev(&depths) as f32,
         };
         let window_length = self.base.options.window_length as usize;
         self.depths = vec![0; window_length];
@@ -422,8 +413,6 @@ impl BamRecordAggregator for CoverageAggregator {
         vec![
             String::from("COV"),
             String::from("COVSD"),
-            String::from("COVM"),
-            String::from("COVMAD"),
         ]
     }
 
@@ -436,9 +425,7 @@ impl BamRecordAggregator for CoverageAggregator {
         let mut result = HashMap::new();
 
         result.insert(String::from("COV"), self.coverage[window_id].cov_mean);
-        result.insert(String::from("COVM"), self.coverage[window_id].cov_median);
         result.insert(String::from("COVSD"), self.coverage[window_id].cov_stddev);
-        result.insert(String::from("COVMAD"), self.coverage[window_id].cov_mad);
 
         result
     }

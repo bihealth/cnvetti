@@ -12,7 +12,7 @@ use rust_htslib::bcf::record::Numeric;
 use rust_htslib::bcf::{self, Read as BcfRead};
 
 use cli::shared;
-use cli::shared::math::percentile;
+use cli::shared::stats::Stats;
 
 pub use self::options::*;
 
@@ -44,7 +44,7 @@ pub fn call(logger: &mut Logger, options: &Options) -> Result<(), String> {
                 .iter()
                 .map(|a| a[0] as f64)
                 .collect();
-            let iqr = percentile(&ncovs, 75_f64) - percentile(&ncovs, 25_f64);
+            let iqr = ncovs.percentile(75.0) - ncovs.percentile(25.0);
             if iqr.is_finite() {
                 iqrs.push(iqr as f64);
             }
@@ -52,7 +52,7 @@ pub fn call(logger: &mut Logger, options: &Options) -> Result<(), String> {
     }
 
     // Compute threshold.
-    let iqr_thresh = percentile(&iqrs, options.percentile_threshold);
+    let iqr_thresh = iqrs.percentile(options.percentile_threshold);
     info!(
         logger,
         "Setting IQR threshold at {}% = {} (log2: {}/{})",
@@ -74,7 +74,7 @@ pub fn call(logger: &mut Logger, options: &Options) -> Result<(), String> {
 
         let mut writer = {
             // Construct extended header.
-            let mut header = bcf::Header::with_template(reader.header());
+            let mut header = bcf::Header::from_template(reader.header());
             let lines = vec![
                 "##INFO=<ID=NCOV_IQR,Number=1,Type=Float,Description=\"Normalized coverage \
                  cohort IQR\">",
@@ -121,7 +121,7 @@ pub fn call(logger: &mut Logger, options: &Options) -> Result<(), String> {
                 .iter()
                 .map(|a| a[0] as f64)
                 .collect();
-            let iqr = percentile(&ncovs, 75_f64) - percentile(&ncovs, 25_f64);
+            let iqr = ncovs.percentile(75.0) - ncovs.percentile(25.0);
             let (iqr, pass) = if iqr.is_finite() {
                 (iqr as f32, iqr < iqr_thresh)
             } else {
