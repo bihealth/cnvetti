@@ -131,9 +131,9 @@ impl CoverageBcfSink {
             "##INFO=<ID=GC,Number=1,Type=Float,Description=\"Reference GC content in percent\">",
             "##INFO=<ID=MAPABILITY,Number=1,Type=Float,Description=\"Mean mapability in the \
              window\">",
-            "##INFO=<ID=BLACKLIST,Number=1,Type=Float,Description=\"Interval overlaps with \
+            "##INFO=<ID=BLACKLIST,Number=0,Type=Flag,Description=\"Interval overlaps with \
              blacklist site\">",
-            "##INFO=<ID=GAP,Number=1,Type=Integer,Description=\"Window overlaps with N in \
+            "##INFO=<ID=GAP,Number=0,Type=Flag,Description=\"Window overlaps with N in \
              reference (gap)\">",
             // Generic FORMAT fields
             "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">",
@@ -143,7 +143,7 @@ impl CoverageBcfSink {
             // FORMAT fields used for read counts (off-target WES, shallow WGS)
             // TODO: use Character here with 'Y'/'N'
             "##FORMAT=<ID=MP,Description=\"Masked for sample because too much masked because of \
-             piles\",Type=Integer,Number=1>",
+             piles (Y/N)\",Type=Character,Number=1>",
         ];
         for line in lines {
             header.push_record(line.as_bytes());

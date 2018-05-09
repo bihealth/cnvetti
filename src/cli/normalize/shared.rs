@@ -109,17 +109,15 @@ pub fn load_norm_data(logger: &Logger, options: &Options) -> Result<Vec<NormData
             let is_gap = {
                 record
                     .info(b"GAP")
-                    .integer()
+                    .flag()
                     .map_err(|e| format!("Could not load gaps: {}", e))?
-                    .ok_or("INFO/GAP was empty")?[0] != 0
             };
             // Get "is blacklisted" flag.
             let is_blacklisted = {
                 record
                     .info(b"BLACKLIST")
-                    .integer()
-                    .unwrap_or(Some(&[0]))
-                    .ok_or("INFO/BLACKLIST was empty")?[0] != 0
+                    .flag()
+                    .map_err(|e| format!("Could not load gaps: {}", e))?
             };
             // Get INFO/GC.
             let gc_content = {
@@ -160,7 +158,7 @@ pub fn load_norm_data(logger: &Logger, options: &Options) -> Result<Vec<NormData
             let coverage_sd = record
                 .format(b"COVSD")
                 .float()
-                .map_err(|e| format!("FORMAT/COV_SD not found: {}", e))?[0][0];
+                .map_err(|e| format!("FORMAT/COVSD not found: {}", e))?[0][0];
 
             res.push(NormData::new(
                 use_chrom,
@@ -211,7 +209,7 @@ pub fn write_normalized_data(
             // Construct extended header.
             let mut header = bcf::Header::from_template(reader.header());
             let lines = vec![
-                "##FORMAT=<ID=OUTLIER,Number=1,Type=Integer,Description=\"Is outlier\">",
+                "##FORMAT=<ID=OUTLIER,Number=1,Type=Character,Description=\"Is outlier\">",
                 "##FORMAT=<ID=NCOV,Number=1,Type=Float,Description=\"Normalized coverage\">",
                 "##FORMAT=<ID=NCOVSD,Number=1,Type=Float,Description=\"Normalized coverage SD\">",
                 "##FORMAT=<ID=NCOV2,Number=1,Type=Float,Description=\"Normalized coverage \
@@ -299,9 +297,8 @@ pub fn write_normalized_data(
             } else {
                 false
             };
-            let vals: Vec<i32> = vec![is_outlier as i32; 1];
             record
-                .push_format_integer(b"OUTLIER", vals.as_slice())
+                .push_format_char(b"OUTLIER", if is_outlier { b"Y" } else { b"N" })
                 .map_err(|e| format!("Could not write FORMAT/OUTLIER: {}", e))?;
 
             // Finally, write out record again.

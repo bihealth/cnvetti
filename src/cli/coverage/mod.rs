@@ -300,9 +300,11 @@ fn process_region(
         record
             .push_info_integer(b"END", &[window_end as i32])
             .map_err(|e| format!("Could not write INFO/END: {}", e))?;
-        record
-            .push_info_integer(b"GAP", &[ref_stats.has_gap[wid] as i32])
-            .map_err(|e| format!("Could not write INFO/GAP: {}", e))?;
+        if ref_stats.has_gap[wid] {
+            record
+                .push_info_flag(b"GAP")
+                .map_err(|e| format!("Could not write INFO/GAP: {}", e))?;
+        }
         record
             .push_info_float(b"GC", &[*gc as f32])
             .map_err(|e| format!("Could not write INFO/GC: {}", e))?;
@@ -314,7 +316,7 @@ fn process_region(
         if let Some(ref blacklist) = &blacklist {
             if blacklist.find(pos..window_end).peekable().peek().is_some() {
                 record
-                    .push_info_integer(b"BLACKLIST", &[1])
+                    .push_info_flag(b"BLACKLIST")
                     .map_err(|e| format!("Could not write INFO/BLACKLIST: {}", e))?;
             }
         }
@@ -325,6 +327,12 @@ fn process_region(
             .map_err(|e| format!("Could not write FORMAT/GT: {}", e))?;
 
         // Columns: FORMAT/COV etc.
+        for field in aggregator.character_field_names() {
+            let value: String = aggregator.character_values(wid as u32).get(&field).unwrap().to_string();
+            record
+                .push_format_char(field.as_bytes(), value.as_bytes())
+                .map_err(|e| format!("Could not write FORMAT/{}: {}", field, e))?;
+        }
         for field in aggregator.integer_field_names() {
             let value = *aggregator.integer_values(wid as u32).get(&field).unwrap();
             record

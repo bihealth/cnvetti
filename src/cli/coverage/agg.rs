@@ -34,13 +34,19 @@ pub trait BamRecordAggregator {
     /// Put all `fetch()`ed records from `reader` into the aggregator.
     fn put_fetched_records(&mut self, reader: &mut bam::IndexedReader);
 
+    /// Names of the character fields that will be written out.
+    fn character_field_names(&self) -> Vec<String>;
+
     /// Names of the integer fields that will be written out.
     fn integer_field_names(&self) -> Vec<String>;
 
     /// Names of the float fields that will be written out.
     fn float_field_names(&self) -> Vec<String>;
 
-    /// Return float values.
+    /// Return character values.
+    fn character_values(&self, window_id: u32) -> HashMap<String, String>;
+
+    /// Return integer values.
     fn integer_values(&self, window_id: u32) -> HashMap<String, i32>;
 
     /// Return float values.
@@ -178,15 +184,23 @@ impl<'a> BamRecordAggregator for CountAlignmentsAggregator<'a> {
         }
     }
 
+    fn character_field_names(&self) -> Vec<String> {
+        vec![String::from("MP")]
+    }
+
     fn integer_field_names(&self) -> Vec<String> {
-        vec![String::from("RCOV"), String::from("MS"), String::from("MP")]
+        Vec::new()
     }
 
     fn float_field_names(&self) -> Vec<String> {
         vec![String::from("COV")]
     }
 
-    fn integer_values(&self, window_id: u32) -> HashMap<String, i32> {
+    fn integer_values(&self, _window_id: u32) -> HashMap<String, i32> {
+        HashMap::new()
+    }
+
+    fn character_values(&self, window_id: u32) -> HashMap<String, String> {
         let mut result = HashMap::new();
 
         let window = Range {
@@ -194,7 +208,6 @@ impl<'a> BamRecordAggregator for CountAlignmentsAggregator<'a> {
             end: ((window_id + 1) * self.base.options.window_length as u32) as u32,
         };
 
-        // Pile-masked bases.
         let ms = match self.tree {
             Some(ref tree) => tree.find(window.clone())
                 .map(|entry| {
@@ -206,18 +219,11 @@ impl<'a> BamRecordAggregator for CountAlignmentsAggregator<'a> {
                 .sum::<i32>(),
             None => 0_i32,
         };
-        result.insert(String::from("MS"), ms);
-
-        // Raw read counts.
-        result.insert(
-            String::from("RCOV"),
-            self.counters[window_id as usize] as i32,
-        );
 
         // Ratio for scaling up to the read count.
         let len = (window.end - window.start) as i32;
         let ratio = (len - ms) as f64 / len as f64;
-        result.insert(String::from("MP"), (ratio < MAX_MS) as i32);
+        result.insert(String::from("MP"), if ratio < MAX_MS { "Y".to_string() } else { "N".to_string() });
 
         result
     }
@@ -405,12 +411,20 @@ impl BamRecordAggregator for CoverageAggregator {
         }
     }
 
+    fn character_field_names(&self) -> Vec<String> {
+        Vec::new()
+    }
+
     fn integer_field_names(&self) -> Vec<String> {
         Vec::new()
     }
 
     fn float_field_names(&self) -> Vec<String> {
         vec![String::from("COV"), String::from("COVSD")]
+    }
+
+    fn character_values(&self, _window_id: u32) -> HashMap<String, String> {
+        HashMap::new()
     }
 
     fn integer_values(&self, _window_id: u32) -> HashMap<String, i32> {

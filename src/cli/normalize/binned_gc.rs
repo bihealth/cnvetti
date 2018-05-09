@@ -19,16 +19,16 @@ fn compute_histos(norm_data: &Vec<NormData>, options: &Options) -> Result<Vec<Hi
 
     for ref record in norm_data {
         let bin = record.gc_bin(options.gc_step);
-        if record.use_record(0.6) {
+        // TODO: for WGS, mapability can also be computed based on MAPQ score distribution
+        if record.use_record(0.0) {  // TODO: refine again
             // Resize histogram Vec if necessary.
             if result.len() <= bin {
                 result.resize(bin + 1, Histogram::new());
             }
             // Register for coverage (rounded by one decimal place) for GC bin.
             if record.coverage.is_finite() {
-                // println!("Incrementing {}", (record.coverage * 10.0 + 1.0).round() as u64);
                 result[bin]
-                    .increment((record.coverage * 10.0 + 1.0).round() as u64)
+                    .increment((record.coverage * 10.0).round() as u64)
                     .map_err(|e| format!("Problem incrementing histogram: {}", e))?;
             }
         }
