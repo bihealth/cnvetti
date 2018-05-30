@@ -20,7 +20,8 @@ fn compute_histos(norm_data: &Vec<NormData>, options: &Options) -> Result<Vec<Hi
     for ref record in norm_data {
         let bin = record.gc_bin(options.gc_step);
         // TODO: for WGS, mapability can also be computed based on MAPQ score distribution
-        if record.use_record(0.0) {  // TODO: refine again
+        if record.use_record(0.0) {
+            // TODO: refine again
             // Resize histogram Vec if necessary.
             if result.len() <= bin {
                 result.resize(bin + 1, Histogram::new());

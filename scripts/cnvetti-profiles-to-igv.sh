@@ -5,7 +5,7 @@
 
 usage() { >&2 echo "Usage: $0 [-f FIELDS] IN.bcf OUT"; }
 
-FIELDS="COV NCOV SCOV NCOV2 SCOV2"
+FIELDS="COV NCOV PVAL SCOV NCOV2 SCOV2"
 
 while getopts ":hf:" flag; do
     case "$flag" in
@@ -35,7 +35,7 @@ LOG_FIELDS=
 
 for field in $FIELDS; do
     case $field in
-        COV|NCOV|SCOV)
+        PVAL|COV|NCOV|SCOV)
             OUT_LIN=$OUT.linear.igv
             LIN_FIELDS+=" $field"
             ;;

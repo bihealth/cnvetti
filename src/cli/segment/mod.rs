@@ -49,11 +49,10 @@ fn process_region(
         .expect("Could not resolve contig name to index");
 
     // Vectors for the coverage markers.
-    let n_samples = reader.header().sample_count() as usize;
-    let mut coverage: Vec<Vec<f64>> = Vec::new();
-    coverage.resize(n_samples, Vec::new());
+    let mut ncov: Vec<f64> = Vec::new();
+    let mut ncov_log2: Vec<f64> = Vec::new();
 
-    // Key for the metric to segment.
+    // Key for the metric to segment (do log2 after conversion to f64 here).
     let key = b"NCOV";
 
     // Whether or not to skip a record.
@@ -90,97 +89,90 @@ fn process_region(
             continue;
         }
 
-        for (i, val) in record
+        let val = record
             .format(key)
             .float()
-            .expect("Record does not have field")
-            .iter()
-            .enumerate()
-        {
-            coverage[i].push(((**val)[0].max(0.0) as f64 + PSEUDO_EPSILON).log2());
-        }
+            .expect("Record does not have field")[0][0] as f64;
+        ncov.push(val);
+        ncov_log2.push((val.max(0.0) as f64 + PSEUDO_EPSILON).log2());
     }
 
     debug!(logger, "Performing segmentation...");
-    let coverage: Vec<Vec<f64>> = coverage
-        .iter()
-        .enumerate()
-        .map(|(i, ref vals)| {
-            debug!(
-                logger,
-                "Segmenting for {}...",
-                str::from_utf8(&reader.header().id_to_sample(bcf::header::Id(i as u32))).unwrap()
-            );
 
-            // Perform segmentation, yielding breakpoints.
-            let mut haar_res = seg_haar(
-                &vals,
-                None,
-                None,
-                &[0..(vals.len())],
-                options.haar_seg_breaks_fdr_q,
-                options.haar_seg_l_min as u32,
-                options.haar_seg_l_max as u32,
-            );
-            debug!(
-                logger,
-                "Raw segments: {}",
-                haar_res.segments.len().separated_string()
-            );
-            // Reject segments not passing p value.
-            haar_res =
-                reject_nonaberrant_pvalue(&haar_res, &vals, options.significant_p_val_thresh);
-            debug!(
-                logger,
-                "Segments after selecting aberrant (p): {}",
-                haar_res.segments.len().separated_string()
-            );
-
-            debug!(
-                logger,
-                "Final segments: {}",
-                haar_res.segments.len().separated_string()
-            );
-
-            haar_res.seg_values
-        })
-        .collect();
+    // Perform segmentation, yielding breakpoints.
+    let mut segmentation = seg_haar(
+        &ncov_log2,
+        None,
+        None,
+        &[0..(ncov_log2.len())],
+        options.haar_seg_breaks_fdr_q,
+        options.haar_seg_l_min as u32,
+        options.haar_seg_l_max as u32,
+    );
+    debug!(
+        logger,
+        "Raw segments: {}",
+        segmentation.segments.len().separated_string()
+    );
+    // Record P-values, to later write out.
+    let mut p_values = Vec::new();
+    for seg in &segmentation.segments {
+        let new_len = p_values.len() + seg.range.len();
+        let p_val = if seg.range.len() > 2 {
+            seg.p_value_significant_student(options.significant_p_val_thresh) as f32
+        } else {
+            1.0
+        };
+        p_values.resize(new_len, p_val);
+    }
+    // Reject segments not passing p value.
+    segmentation =
+        reject_nonaberrant_pvalue(&segmentation, &ncov, options.significant_p_val_thresh);
+    debug!(
+        logger,
+        "Segments after selecting aberrant (p): {}",
+        segmentation.segments.len().separated_string()
+    );
 
     // Second pass, write segmentation
     debug!(logger, "Second pass over region (write segmentation)...");
-    let mut idx = 0; // current index into coverage[i]
-    let mut prev_vals: Option<Vec<f32>> = None; // [log2(val)]
+    let mut idx = 0; // current index into ncov
+    let mut prev_val: Option<(f32, f32)> = None; // (val, log2(val))
     reader
         .fetch(rid, *start, *end)
         .expect("Could not fetch region from BCF file");
     while reader.read(&mut record).is_ok() {
         writer.translate(&mut record);
-        let vals = if skip_record(&mut record, options) {
+
+        let (val, val_log2) = if skip_record(&mut record, options) {
             record.push_filter(writer.header().name_to_id(b"SEG_SKIPPED").unwrap());
-            if let Some(ref prev_vals) = &prev_vals {
-                prev_vals.clone()
+            if let Some(prev_val) = prev_val {
+                prev_val
             } else {
-                vec![0_f32; n_samples]
+                (1.0, 0.0)
             }
         } else {
-            let vals = (0..n_samples)
-                .map(|i| {
-                    if coverage[i][idx] > 0.0 && coverage[i][idx] < PSEUDO_EPSILON {
-                        0.0
-                    } else {
-                        (coverage[i][idx] - PSEUDO_EPSILON) as f32
-                    }
-                })
-                .collect::<Vec<f32>>();
-            prev_vals = Some(vals.clone());
+            let val = if segmentation.values[idx] > 0.0 && segmentation.values[idx] < PSEUDO_EPSILON
+            {
+                (1.0, 0.0)
+            } else {
+                (
+                    (segmentation.values[idx] - PSEUDO_EPSILON) as f32,
+                    segmentation.values_log2[idx] as f32,
+                )
+            };
+            prev_val = Some(val);
             idx += 1;
-            vals
+            val
         };
         record
-            .push_format_float(b"SCOV", &[2_f32.powf(vals[0])])
+            .push_format_float(b"PVAL", &[p_values[idx]])
+            .expect("Could not write FORMAT/PVAL");
+        record
+            .push_format_float(b"SCOV", &[val])
             .expect("Could not write FORMAT/SCOV");
         record
-            .push_format_float(b"SCOV2", &vals)
+            .push_format_float(b"SCOV2", &[val_log2])
             .expect("Could not write FORMAT/SCOV2");
         writer.write(&record).expect("Writing the record failed!");
     }
@@ -209,6 +201,7 @@ pub fn call(logger: &mut Logger, options: &Options) -> Result<(), String> {
             // Construct extended header.
             let mut header = bcf::Header::from_template(reader.header());
             let lines = vec![
+                "##FORMAT=<ID=PVAL,Number=1,Type=Float,Description=\"P value of original segment\">",
                 "##FORMAT=<ID=SCOV,Number=1,Type=Float,Description=\"Segmented coverage\">",
                 "##FORMAT=<ID=SCOV2,Number=1,Type=Float,Description=\"Segmented coverage \
                  (log2-scaled)\">",

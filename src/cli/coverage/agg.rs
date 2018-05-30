@@ -223,7 +223,14 @@ impl<'a> BamRecordAggregator for CountAlignmentsAggregator<'a> {
         // Ratio for scaling up to the read count.
         let len = (window.end - window.start) as i32;
         let ratio = (len - ms) as f64 / len as f64;
-        result.insert(String::from("MP"), if ratio < MAX_MS { "Y".to_string() } else { "N".to_string() });
+        result.insert(
+            String::from("MP"),
+            if ratio < MAX_MS {
+                "Y".to_string()
+            } else {
+                "N".to_string()
+            },
+        );
 
         result
     }

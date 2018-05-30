@@ -328,7 +328,11 @@ fn process_region(
 
         // Columns: FORMAT/COV etc.
         for field in aggregator.character_field_names() {
-            let value: String = aggregator.character_values(wid as u32).get(&field).unwrap().to_string();
+            let value: String = aggregator
+                .character_values(wid as u32)
+                .get(&field)
+                .unwrap()
+                .to_string();
             record
                 .push_format_char(field.as_bytes(), value.as_bytes())
                 .map_err(|e| format!("Could not write FORMAT/{}: {}", field, e))?;
