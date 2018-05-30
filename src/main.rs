@@ -97,6 +97,10 @@ fn run(matches: ArgMatches) -> Result<(), String> {
             ("wgs-deep", Some(m)) => {
                 shortcuts::call_quick_wgs_deep(&mut logger, &shortcuts::WgsDeepOptions::new(&m))
             }
+            ("wgs-cov-bins", Some(m)) => shortcuts::call_quick_wgs_cov_bins(
+                &mut logger,
+                &shortcuts::WgsCovBinsOptions::new(&m),
+            ),
             _ => Err("Invalid command".to_string()),
         },
         _ => Err("Invalid command".to_string()),

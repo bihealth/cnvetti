@@ -32,3 +32,24 @@ pub fn call_quick_wgs_deep(logger: &mut Logger, options: &WgsDeepOptions) -> Res
 
     Ok(())
 }
+
+/// Main entry point for the "wgs-cov-bins" command.
+pub fn call_quick_wgs_cov_bins(
+    logger: &mut Logger,
+    options: &WgsCovBinsOptions,
+) -> Result<(), String> {
+    let options = options.clone();
+
+    info!(logger, "Running cnvetti quick wgs-cov-bins");
+    info!(logger, "Configuration: {:?}", &options);
+
+    // Create the temporary directory that we will use for calling the wrapped commands.
+    let tmp_dir = TempDir::new("cnvetti_quick_wgs-cov-bins")
+        .map_err(|e| format!("Could not create temporary directory: {:?}", e))?;
+
+    // Perform the individual steps.
+    call_coverage(logger, &options.to_coverage_options(&tmp_dir))?;
+    call_normalize(logger, &options.to_normalize_options(&tmp_dir))?;
+
+    Ok(())
+}
