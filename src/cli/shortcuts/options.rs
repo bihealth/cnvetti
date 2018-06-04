@@ -28,7 +28,7 @@ pub struct WgsDeepOptions {
     pub io_threads: u32,
 }
 
-// Implementatin of constructor.
+// Implementation of constructor.
 impl WgsDeepOptions {
     /// Build options from ArgMatches.
     pub fn new(matches: &ArgMatches) -> Self {

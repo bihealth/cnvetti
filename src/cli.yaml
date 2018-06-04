@@ -455,6 +455,108 @@ subcommands:
         value_name: COUNT
         help: Maximal number of merges.
 
+# Sub Command: wisexome =======================================================
+
+- wisexome:
+    about: Implementation of WISExome in CNVetti.
+    settings:
+    - DeriveDisplayOrder
+    - SubcommandRequiredElseHelp
+    - GlobalVersion
+    - UnifiedHelpMessage
+    - ColorAuto
+    subcommands:
+    # Sub Sub Command: wise count =============================================
+    - count:
+        about: Compute per-target counts from BAM file.
+        settings:
+        - DeriveDisplayOrder
+        - GlobalVersion
+        - UnifiedHelpMessage
+        - ColorAuto
+        args:
+        - input:
+            long: input
+            short: i
+            multiple: false
+            takes_value: true
+            required: true
+            value_name: INPUT.bam
+            help: Path to indexed input BAM file (.bai must exist).
+        - targets-bed:
+            long: targets-bed
+            short: b
+            multiple: false
+            takes_value: true
+            required: true
+            value_name: TARGETS.bed
+            help: Path to tabix-indexed, bgziped, targets BED file.
+        - output:
+            long: output
+            short: o
+            takes_value: true
+            required: true
+            value_name: OUT.bcf
+            help: Path to output count BCF file.
+        # Misc Arguments ------------------------------------------------------
+        - contig_regex:
+            long: contig-regex
+            takes_value: true
+            default_value: '^(chr)?\d\d?$'
+            value_name: 'regex'
+            help: Regular expression for contigs taking part in statistics.
+
+    # Sub Sub Command: wise normalize =========================================
+    - normalize:
+        about: Length-normalize output of count step.
+        settings:
+        - DeriveDisplayOrder
+        - GlobalVersion
+        - UnifiedHelpMessage
+        - ColorAuto
+        args:
+        - input:
+            long: input
+            short: i
+            multiple: false
+            takes_value: true
+            required: true
+            value_name: INPUT.bcf
+            help: Path to indexed input BCF file from wise count.
+        - output:
+            long: output
+            short: o
+            takes_value: true
+            required: true
+            value_name: OUT.bcf
+            help: Path to output normalized counts BCF file.
+
+    # Sub Sub Command: wise build-ref =========================================
+    - build-ref:
+        about: Create reference for WISExome approach
+        settings:
+        - DeriveDisplayOrder
+        - GlobalVersion
+        - UnifiedHelpMessage
+        - ColorAuto
+        args:
+        - input:
+            long: input
+            short: i
+            multiple: false
+            takes_value: true
+            required: true
+            value_name: INPUT.bcf
+            help: Path to indexed input BCF file from wise count.
+        - output:
+            long: output
+            short: o
+            takes_value: true
+            required: true
+            value_name: OUT.bcf
+            help: Path to output normalized counts BCF file.
+
+
 # Sub Command: quick ==========================================================
 - quick:
     about: Shortcuts to common use cases with sensible defaults.
@@ -465,7 +567,6 @@ subcommands:
     - UnifiedHelpMessage
     - ColorAuto
     subcommands:
-
     # Sub Sub Command: quick wgs-deep =========================================
     - wgs-deep:
         about: Premade configuration for deep WGS sequencing (>=30x).

@@ -25,6 +25,7 @@ use cnvetti::cli::coverage;
 use cnvetti::cli::normalize;
 use cnvetti::cli::segment;
 use cnvetti::cli::shortcuts;
+use cnvetti::cli::wisexome;
 
 /// Custom Drain logic
 struct RuntimeLevelFilter<D> {
@@ -101,6 +102,18 @@ fn run(matches: ArgMatches) -> Result<(), String> {
                 &mut logger,
                 &shortcuts::WgsCovBinsOptions::new(&m),
             ),
+            _ => Err("Invalid command".to_string()),
+        },
+        ("wisexome", Some(m)) => match m.subcommand() {
+            ("count", Some(m)) => {
+                wisexome::call_wise_count(&mut logger, &wisexome::CountOptions::new(&m))
+            }
+            ("normalize", Some(m)) => {
+                wisexome::call_wise_normalize(&mut logger, &wisexome::NormalizeOptions::new(&m))
+            }
+            ("build-ref", Some(m)) => {
+                wisexome::call_wise_build_ref(&mut logger, &wisexome::BuildRefOptions::new(&m))
+            }
             _ => Err("Invalid command".to_string()),
         },
         _ => Err("Invalid command".to_string()),
