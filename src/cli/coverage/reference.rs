@@ -71,8 +71,13 @@ impl ReferenceStats {
 
         trace!(logger, "Reading reference {}", chrom);
         let mut seq = Text::new();
-        match ref_reader.read_all(chrom, &mut seq) {
-            Ok(_) => (),
+        match ref_reader.fetch_all(chrom) {
+            Ok(_) => match ref_reader.read(&mut seq) {
+                Ok(_) => (),
+                Err(_e) => {
+                    return Err(ReferenceStatsError::LoadingFailed);
+                }
+            },
             Err(_e) => {
                 return Err(ReferenceStatsError::LoadingFailed);
             }

@@ -161,7 +161,9 @@ fn collect_segments(reader: &mut bcf::IndexedReader) -> Vec<SegmentInfo> {
             .expect("Could not access FORMAT/NCOVSD")[0][0];
 
         // Possibly ignore this window.
-        if cov_mean.is_missing() || !cov_mean.is_finite() || cov_sd.is_missing()
+        if cov_mean.is_missing()
+            || !cov_mean.is_finite()
+            || cov_sd.is_missing()
             || !cov_sd.is_finite()
         {
             continue;

@@ -28,7 +28,7 @@ pub struct NormData {
     pub gc_content: f64,
     pub mapability: f64,
     pub coverage: f64,
-    pub coverage_sd: f64,
+    pub coverage_sd: Option<f64>,
 }
 
 impl NormData {
@@ -40,7 +40,7 @@ impl NormData {
         gc_content: f64,
         mapability: f64,
         coverage: f64,
-        coverage_sd: f64,
+        coverage_sd: Option<f64>,
     ) -> NormData {
         NormData {
             use_chrom,
@@ -55,7 +55,9 @@ impl NormData {
 
     /// Whether to use this record, also based on minimal mapability.
     pub fn use_record(&self, min_mapability: f64) -> bool {
-        self.use_chrom && !self.is_gap && !self.is_blacklisted
+        self.use_chrom
+            && !self.is_gap
+            && !self.is_blacklisted
             && (self.mapability >= min_mapability)
     }
 
@@ -155,10 +157,10 @@ pub fn load_norm_data(logger: &Logger, options: &Options) -> Result<Vec<NormData
                 .format(b"COV")
                 .float()
                 .map_err(|e| format!("FORMAT/COV not found: {}", e))?[0][0];
-            let coverage_sd = record
-                .format(b"COVSD")
-                .float()
-                .map_err(|e| format!("FORMAT/COVSD not found: {}", e))?[0][0];
+            let coverage_sd = match record.format(b"COVSD").float() {
+                Ok(x) => Some(x[0][0] as f64),
+                Err(_e) => None,
+            };
 
             res.push(NormData::new(
                 use_chrom,
@@ -186,7 +188,7 @@ fn chi_square_distance(a: f32, b: f32) -> f32 {
 pub fn write_normalized_data(
     logger: &Logger,
     options: &Options,
-    normalized_coverage: &[(f32, f32)],
+    normalized_coverage: &[(f32, Option<f32>)],
 ) -> Result<(), String> {
     // Block for BCF file reader and writer.
     {
@@ -269,10 +271,12 @@ pub fn write_normalized_data(
             record
                 .push_format_float(b"NCOV", nrcs.as_slice())
                 .map_err(|e| format!("Could not write FORMAT/NCOV: {}", e))?;
-            let nrcsd: Vec<f32> = vec![normalized_coverage[i].1 as f32; 1];
-            record
-                .push_format_float(b"NCOVSD", nrcsd.as_slice())
-                .map_err(|e| format!("Could not write FORMAT/NCOVSD: {}", e))?;
+            if let Some(ncovsd) = normalized_coverage[i].1 {
+                let nrcsd: Vec<f32> = vec![ncovsd as f32; 1];
+                record
+                    .push_format_float(b"NCOVSD", nrcsd.as_slice())
+                    .map_err(|e| format!("Could not write FORMAT/NCOVSD: {}", e))?;
+            }
 
             let nrc2 = (normalized_coverage[i].0 + EPSILON).log2();
             let nrcs2: Vec<f32> = vec![

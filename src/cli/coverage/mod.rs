@@ -195,7 +195,13 @@ fn process_region(
     out_bam: Option<&mut bam::Writer>,
     pile_threshold: Option<usize>,
 ) -> Result<Option<usize>, String> {
-    info!(logger, "Processing region {}:{}-{}", chrom, start, end);
+    info!(
+        logger,
+        "Processing region {}:{}-{}",
+        chrom,
+        start.separated_string(),
+        end.separated_string()
+    );
 
     // Load statistics for the given contig.
     let ref_stats = ReferenceStats::from_path(

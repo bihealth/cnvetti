@@ -104,8 +104,11 @@ impl<'a> CountAlignmentsAggregator<'a> {
 
 impl<'a> CountAlignmentsAggregator<'a> {
     fn put_bam_record(&mut self, record: &bam::Record) {
-        if !self.skip_mapq(record) && !self.skip_flags(record) && !self.skip_discordant(record)
-            && !self.skip_clipping(record) && !self.skip_paired_and_all_but_first(record)
+        if !self.skip_mapq(record)
+            && !self.skip_flags(record)
+            && !self.skip_discordant(record)
+            && !self.skip_clipping(record)
+            && !self.skip_paired_and_all_but_first(record)
         {
             self.base.num_processed += 1;
 
@@ -130,7 +133,9 @@ impl<'a> CountAlignmentsAggregator<'a> {
 
     // Skip `record` because of flags.
     fn skip_flags(&self, record: &bam::Record) -> bool {
-        record.is_secondary() || record.is_supplementary() || record.is_duplicate()
+        record.is_secondary()
+            || record.is_supplementary()
+            || record.is_duplicate()
             || record.is_quality_check_failed()
     }
 
@@ -209,7 +214,8 @@ impl<'a> BamRecordAggregator for CountAlignmentsAggregator<'a> {
         };
 
         let ms = match self.tree {
-            Some(ref tree) => tree.find(window.clone())
+            Some(ref tree) => tree
+                .find(window.clone())
                 .map(|entry| {
                     let end = min(window.end, entry.interval().end) as i32;
                     let start = max(window.start, entry.interval().start) as i32;
@@ -243,7 +249,8 @@ impl<'a> BamRecordAggregator for CountAlignmentsAggregator<'a> {
 
         // Pile-masked bases.
         let ms = match self.tree {
-            Some(ref tree) => tree.find(window.clone())
+            Some(ref tree) => tree
+                .find(window.clone())
                 .map(|entry| {
                     let end = min(window.end, entry.interval().end) as i32;
                     let start = max(window.start, entry.interval().start) as i32;
@@ -287,7 +294,8 @@ impl<'a> BamRecordAggregator for CountAlignmentsAggregator<'a> {
             end: ((window_id + 1) * self.base.options.window_length as u32) as u32,
         };
         let ms = match self.tree {
-            Some(ref tree) => tree.find(window.clone())
+            Some(ref tree) => tree
+                .find(window.clone())
                 .map(|entry| {
                     let end = min(window.end, entry.interval().end) as i32;
                     let start = max(window.start, entry.interval().start) as i32;
@@ -399,7 +407,9 @@ impl BamRecordAggregator for CoverageAggregator {
                 .alignments()
                 .filter(|alignment| {
                     let record = alignment.record();
-                    !record.is_secondary() && !record.is_duplicate() && !record.is_supplementary()
+                    !record.is_secondary()
+                        && !record.is_duplicate()
+                        && !record.is_supplementary()
                         && !record.is_duplicate()
                         && !record.is_quality_check_failed()
                         && (record.mapq() >= self.base.options.min_mapq)

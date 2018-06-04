@@ -92,12 +92,12 @@ fn process_region(
         let val = record
             .format(key)
             .float()
-            .expect("Record does not have field")[0][0] as f64;
+            .expect("Record does not have field: NCOV")[0][0] as f64;
         ncov.push(val);
         ncov_log2.push((val.max(0.0) as f64 + PSEUDO_EPSILON).log2());
     }
 
-    debug!(logger, "Performing segmentation...");
+    debug!(logger, "Performing segmentation... {}", ncov_log2.len());
 
     // Perform segmentation, yielding breakpoints.
     let mut segmentation = seg_haar(
@@ -137,28 +137,28 @@ fn process_region(
     // Second pass, write segmentation
     debug!(logger, "Second pass over region (write segmentation)...");
     let mut idx = 0; // current index into ncov
-    let mut prev_val: Option<(f32, f32)> = None; // (val, log2(val))
+    let mut prev_val: Option<(f32, f32, f32)> = None; // (val, log2(val), p_value)
     reader
         .fetch(rid, *start, *end)
         .expect("Could not fetch region from BCF file");
     while reader.read(&mut record).is_ok() {
         writer.translate(&mut record);
-
-        let (val, val_log2) = if skip_record(&mut record, options) {
+        let (val, val_log2, p_value) = if skip_record(&mut record, options) {
             record.push_filter(writer.header().name_to_id(b"SEG_SKIPPED").unwrap());
             if let Some(prev_val) = prev_val {
                 prev_val
             } else {
-                (1.0, 0.0)
+                (1.0, 0.0, 1.0)
             }
         } else {
             let val = if segmentation.values[idx] > 0.0 && segmentation.values[idx] < PSEUDO_EPSILON
             {
-                (1.0, 0.0)
+                (1.0, 0.0, 1.0)
             } else {
                 (
                     (segmentation.values[idx] - PSEUDO_EPSILON) as f32,
                     segmentation.values_log2[idx] as f32,
+                    p_values[idx],
                 )
             };
             prev_val = Some(val);
@@ -166,7 +166,7 @@ fn process_region(
             val
         };
         record
-            .push_format_float(b"PVAL", &[p_values[idx]])
+            .push_format_float(b"PVAL", &[p_value])
             .expect("Could not write FORMAT/PVAL");
         record
             .push_format_float(b"SCOV", &[val])
