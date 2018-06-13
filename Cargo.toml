@@ -8,8 +8,11 @@ bio = "*"
 chrono = "*"
 clap = {version = "*", features = ["yaml", "color", "suggestions"]}
 histogram = "*"
+pdqselect = "*"
+ordered-float = "*"
 quick-error = "*"
 regex = "*"
+rayon = "*"
 #rust-htslib = {git = "https://github.com/rust-bio/rust-htslib.git", branch = "master" }
 rust-htslib = {path = "../rust-htslib"}
 rust-segment = { path = "../rust-segment" }
@@ -18,6 +21,8 @@ shlex = "*"
 slog = {version = "*", features = ["max_level_trace", "release_max_level_debug"] }
 slog-term = "*"
 slog-async = "*"
+strum = "*"
+strum_macros = "*"
 statrs = "*"
 tempdir = "*"
 

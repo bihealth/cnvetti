@@ -21,14 +21,13 @@ mod agg;
 mod bcf_sink;
 mod piles;
 mod reference;
-mod regions;
 
 use self::agg::*;
 use self::piles::PileCollector;
 
-use self::bcf_sink::{sample_from_bam, CoverageBcfSink};
+use self::bcf_sink::CoverageBcfSink;
 use self::reference::ReferenceStats;
-use self::regions::GenomeRegions;
+use cli::shared::regions::GenomeRegions;
 
 use cli::shared;
 
@@ -379,7 +378,7 @@ pub fn call(logger: &mut Logger, options: &Options) -> Result<(), String> {
             .map_err(|e| format!("Could not read fasta index: {}", e.to_string()))?;
         let mut out_bcf = CoverageBcfSink::from_path(
             &options.output,
-            &sample_from_bam(&options.input)?,
+            &shared::sample_from_bam(&options.input)?,
             &index,
             logger,
         )?;

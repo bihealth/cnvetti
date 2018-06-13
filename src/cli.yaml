@@ -505,6 +505,14 @@ subcommands:
             default_value: '^(chr)?\d\d?$'
             value_name: 'regex'
             help: Regular expression for contigs taking part in statistics.
+        - min_mapq:
+            long: min-mapq
+            takes_value: true
+            default_value: '0'
+            value_name: MIN_MAPQ
+            help: >
+                Alignments with alignment quality less than `MIN_MAPQ` will be
+                ignored.
 
     # Sub Sub Command: wise normalize =========================================
     - normalize:
@@ -530,6 +538,13 @@ subcommands:
             required: true
             value_name: OUT.bcf
             help: Path to output normalized counts BCF file.
+        - min_fragments:
+            long: min-fragments
+            takes_value: true
+            required: false
+            default_value: '20'
+            value_name: FRAGMENTS
+            help: Minimal number of fragments a target must have before it is ignored.
 
     # Sub Sub Command: wise build-ref =========================================
     - build-ref:
@@ -555,6 +570,126 @@ subcommands:
             required: true
             value_name: OUT.bcf
             help: Path to output normalized counts BCF file.
+        - num_threads:
+            long: num-threads
+            takes_value: true
+            required: false
+            value_name: THREADS
+            default_value: '0'
+            help: Number of threads to use, '0' to disable multi-threading.
+        - filter_z_score:
+            long: filter-z-score
+            takes_value: true
+            required: false
+            value_name: MULT
+            default_value: '5.64'
+            help: 'Threshold on z score (default: 5.64).'
+        - filter_rel:
+            long: filter-rel
+            takes_value: true
+            required: false
+            value_name: REL
+            default_value: '0.35'
+            help: 'Relative threshold'
+        - min_ref_targets:
+            long: min-ref-targets
+            takes_value: true
+            required: false
+            value_name: COUNT
+            default_value: '10'
+            help: 'Minimal number of targets before filtering (default: 10).'
+        - max_ref_targets:
+            long: max-ref-targets
+            takes_value: true
+            required: false
+            value_name: COUNT
+            default_value: '100'
+            help: Number of targets to start out with.
+        - max_samples_reliable:
+            long: max-samples-reliable
+            takes_value: true
+            required: false
+            value_name: COUNT
+            default_value: '4'
+            help: >
+              If a CNV is called for more than this many reference samples
+              then ignore.
+        - min_samples_min_fragments:
+            long: min-samples-min-fragments
+            takes_value: true
+            required: false
+            default_value: '10'
+            value_name: FRAGMENTS
+            help: >
+              Minimal number of samples that must have a number of fragments
+              above `--min-fragments` from `normalize`.
+
+    # Sub Sub Command: wise call ==============================================
+    - call:
+        about: Perform calling for WISExome approach.
+        settings:
+        - DeriveDisplayOrder
+        - GlobalVersion
+        - UnifiedHelpMessage
+        - ColorAuto
+        args:
+        - input:
+            long: input
+            short: i
+            multiple: false
+            takes_value: true
+            required: true
+            value_name: INPUT.bcf
+            help: Path to indexed input BCF file from wise normalize.
+        - input_ref:
+            long: input-ref
+            short: r
+            multiple: false
+            takes_value: true
+            required: true
+            value_name: REF.bf
+            help: Path to indexed reference BCF file from wise build-ref.
+        - output:
+            long: output
+            takes_value: true
+            required: true
+            value_name: OUT.bcf
+            help: Path to output calls BCF file.
+        - output_probes:
+            long: output-probes
+            short: o
+            takes_value: true
+            value_name: OUT_PROBES.bcf
+            default_value: ''
+            help: Path to output BCF with per-probe information.
+        - num_threads:
+            long: num-threads
+            takes_value: true
+            required: false
+            value_name: THREADS
+            default_value: '0'
+            help: Number of threads to use, '0' to disable multi-threading.
+        - max_window_size:
+            long: max-window-size
+            takes_value: true
+            required: false
+            value_name: SIZE
+            default_value: '15'
+            help: Maximal window size for increasing sensitivity step.
+        - thresh_rel:
+            long: thresh-rel-cov
+            takes_value: true
+            required: false
+            value_name: THRESH
+            default_value: '0.35'
+            help: Threshold on relative coverage deviation.
+        - thresh_z:
+            long: threshold-z-score
+            takes_value: true
+            required: false
+            value_name: THRESH
+            default_value: '5.64'
+            help: Threshold on z score.
 
 
 # Sub Command: quick ==========================================================

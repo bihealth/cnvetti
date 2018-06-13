@@ -5,12 +5,10 @@ include!(concat!(env!("OUT_DIR"), "/version.rs"));
 use chrono;
 
 use std::env;
+use std::path::Path;
 
 use shlex;
 
-use std::path::Path;
-
-use rust_htslib::bam::{self, Read};
 use rust_htslib::bcf;
 
 use bio::io::fasta;
@@ -20,56 +18,6 @@ use slog::Logger;
 pub struct CoverageBcfSink {
     pub header: bcf::Header,
     pub writer: bcf::Writer,
-}
-
-/// Parse @RG lane into triple (id, sm).
-fn parse_line_rg(line: String) -> Option<(String, String)> {
-    let line_split = line.split("\t");
-    let mut id: Option<String> = None;
-    let mut sm: Option<String> = None;
-    for s in line_split {
-        let token: Vec<&str> = s.split(":").collect();
-        if token.len() >= 2 {
-            match token[0] {
-                "ID" => {
-                    id = Some(token[1].to_string());
-                }
-                "SM" => {
-                    sm = Some(token[1].to_string());
-                }
-                _ => (),
-            }
-        }
-    }
-
-    match (id, sm) {
-        (Some(id), Some(sm)) => Some((id, sm)),
-        _ => None,
-    }
-}
-
-pub fn sample_from_bam<P: AsRef<Path>>(path: P) -> Result<Vec<String>, String> {
-    let path = path.as_ref().to_str().unwrap();
-    let reader = bam::Reader::from_path(path)
-        .map_err(|e| format!("Could not open BAM file for reading {}: {}", &path, e))?;
-
-    let text = String::from_utf8(Vec::from(reader.header().as_bytes())).unwrap();
-    let mut samples = Vec::new();
-
-    for line in text.lines() {
-        if line.starts_with("@RG") {
-            match parse_line_rg(line.to_string()) {
-                Some((_id, sm)) => {
-                    if !samples.contains(&sm) {
-                        samples.push(sm.clone());
-                    }
-                }
-                None => (),
-            }
-        }
-    }
-
-    Ok(samples)
 }
 
 impl CoverageBcfSink {
@@ -99,7 +47,7 @@ impl CoverageBcfSink {
         let now = chrono::Utc::now();
         header.push_record(format!("##fileDate={}", now.format("%Y%m%d").to_string()).as_bytes());
 
-        // Put creating tool version an dcall into file.
+        // Put creating tool version and call into file.
         header.push_record(format!("##cnvetti_coverageVersion={}", VERSION).as_bytes());
         header.push_record(
             format!(
@@ -121,7 +69,6 @@ impl CoverageBcfSink {
             header.push_record(format!("##contig=<ID={},length={}>", seq.name, seq.len).as_bytes());
         }
 
-        // TODO: GAP should be a Flag
         // TODO: Change description based on configured count.
         let lines = vec![
             // Misc fields

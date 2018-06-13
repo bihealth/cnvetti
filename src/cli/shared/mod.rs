@@ -1,7 +1,13 @@
+pub mod regions;
 pub mod stats;
+
+use std::path::Path;
 
 use slog::Logger;
 
+use std::str;
+
+use rust_htslib::bam::{self, Read as BamRead};
 use rust_htslib::bcf::{self, Read as BcfRead};
 
 /// Build index file for the VCF/BCF file at `path`.
@@ -73,23 +79,92 @@ pub fn tokenize_genome_regions(regions: &Vec<String>) -> Vec<(String, u64, u64)>
         .collect()
 }
 
+/// Parse @RG lane into triple (id, sm).
+fn parse_line_rg(line: String) -> Option<(String, String)> {
+    let line_split = line.split("\t");
+    let mut id: Option<String> = None;
+    let mut sm: Option<String> = None;
+    for s in line_split {
+        let token: Vec<&str> = s.split(":").collect();
+        if token.len() >= 2 {
+            match token[0] {
+                "ID" => {
+                    id = Some(token[1].to_string());
+                }
+                "SM" => {
+                    sm = Some(token[1].to_string());
+                }
+                _ => (),
+            }
+        }
+    }
+
+    match (id, sm) {
+        (Some(id), Some(sm)) => Some((id, sm)),
+        _ => None,
+    }
+}
+
+/// Generate list of all contigs from BAM header.
+pub fn build_chroms_bam(header: &bam::HeaderView) -> Vec<(String, u32)> {
+    let mut result = Vec::new();
+
+    for (no, name) in header.target_names().iter().enumerate() {
+        let len = header.target_len(no as u32).unwrap();
+        result.push((
+            str::from_utf8(name)
+                .expect("Could not decode contig name")
+                .to_string(),
+            len,
+        ));
+    }
+
+    result
+}
+
+/// Construct sample list from BAM header.
+pub fn sample_from_header(header: &Vec<u8>) -> Vec<String> {
+    let text = String::from_utf8(header.to_vec()).unwrap();
+    let mut samples = Vec::new();
+
+    for line in text.lines() {
+        if line.starts_with("@RG") {
+            match parse_line_rg(line.to_string()) {
+                Some((_id, sm)) => {
+                    if !samples.contains(&sm) {
+                        samples.push(sm.clone());
+                    }
+                }
+                None => (),
+            }
+        }
+    }
+
+    samples
+}
+
+/// Construct sample list from BAM file.
+pub fn sample_from_bam<P: AsRef<Path>>(path: P) -> Result<Vec<String>, String> {
+    let path = path.as_ref().to_str().unwrap();
+    let reader = bam::Reader::from_path(path)
+        .map_err(|e| format!("Could not open BAM file for reading {}: {}", &path, e))?;
+
+    Ok(sample_from_header(&Vec::from(reader.header().as_bytes())))
+}
+
 /// Generate list of all contigs from BCF header.
 pub fn build_chroms(header: &bcf::header::HeaderView) -> Vec<(String, u32)> {
     let mut result = Vec::new();
 
     for ref record in header.header_records() {
-        if let bcf::HeaderRecord::Contig {
-            key,
-            key_value_pairs,
-        } = record
-        {
+        if let bcf::HeaderRecord::Contig { key, values } = record {
             assert_eq!(key, "contig");
             let mut name: Option<String> = None;
             let mut length: Option<u32> = None;
-            for &(ref key, ref value) in key_value_pairs {
-                if key == "ID" {
-                    name = Some(value.clone());
-                } else if key == "length" {
+            for (ref key, ref value) in values {
+                if key.as_str() == "ID" {
+                    name = Some(value.to_string());
+                } else if key.as_str() == "length" {
                     length = Some(value.parse::<u32>().unwrap());
                 }
             }

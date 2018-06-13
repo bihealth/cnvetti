@@ -3,13 +3,12 @@ include!(concat!(env!("OUT_DIR"), "/version.rs"));
 pub mod options;
 pub use self::options::*;
 
+use slog::Logger;
 use std::env;
 use std::mem;
 use std::ops::Range;
 
 use shlex;
-
-use slog::Logger;
 
 use cli::shared::{self, process};
 use separator::Separatable;

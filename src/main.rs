@@ -114,6 +114,9 @@ fn run(matches: ArgMatches) -> Result<(), String> {
             ("build-ref", Some(m)) => {
                 wisexome::call_wise_build_ref(&mut logger, &wisexome::BuildRefOptions::new(&m))
             }
+            ("call", Some(m)) => {
+                wisexome::call_wise_call(&mut logger, &wisexome::CallOptions::new(&m))
+            }
             _ => Err("Invalid command".to_string()),
         },
         _ => Err("Invalid command".to_string()),
