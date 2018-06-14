@@ -1,0 +1,41 @@
+language: rust
+
+cache: cargo
+
+rust:
+- stable
+- beta
+- nightly
+
+matrix:
+  allow_failures:
+  - rust: stable
+  - rust: beta
+  fast_finish: true
+
+# Dependencies of kcov, used for cargo-travis
+addons:
+  apt:
+    packages:
+    - libcurl4-openssl-dev
+    - libelf-dev
+    - libdw-dev
+    - binutils-dev
+    - cmake
+    sources:
+    - kalakris-cmake
+
+before_script:
+- cargo install --force cargo-travis
+- export PATH=$HOME/.cargo/bin:$PATH
+- rustup component add rustfmt-preview
+
+script:
+- cargo fmt --version
+- cargo fmt --all -- --check
+- cargo build
+- cargo test
+
+env:
+  global:
+  - RUST_BACKTRACE=1
