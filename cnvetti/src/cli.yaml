@@ -2,12 +2,22 @@ name: cnvetti
 version: 0.1.0
 about: Robust, efficient, and versatile clinical CNV calling from HTS data
 author: Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>
+before_help: >
+  The "quick-*" commands are very easy to use it's recommended to get started using them before
+  you look at the more complex pre-defined workflows or the low-level primitives accessible in
+  the "cmd" command.
+after_help: >
+  See the tool's web site https://github.com/bihealth/cnvetti for more information, getting
+  started information and detailed manual.
 
 settings:
+- ArgRequiredElseHelp
+- ColorAuto
 - DeriveDisplayOrder
 - GlobalVersion
+- InferSubcommands
+- StrictUtf8
 - UnifiedHelpMessage
-- ColorAuto
 
 args:
 - verbose:
@@ -32,3 +42,47 @@ args:
     global: true
     default_value: '0'
     help: Number of additional threads to use for (de)compression in I/O.
+
+subcommands:
+# Sub command: cmd ================================================================================
+- cmd:
+    about: Low-level access to the CNVetti primitives.
+    settings:
+    - ArgRequiredElseHelp
+    - ColorAuto
+    - DeriveDisplayOrder
+    - GlobalVersion
+    - InferSubcommands
+    - StrictUtf8
+    - UnifiedHelpMessage
+    subcommands:
+    # Sub command: cmd coverage -------------------------------------------------------------------
+    - coverage:
+        about: Record coverage from input BAM file
+    # Sub command: cmd normalize ------------------------------------------------------------------
+    - normalize:
+        about: Normalize coverage on a per-sample level
+    # Sub command: cmd filter ---------------------------------------------------------------------
+    - filter:
+        about: Filter coverage information
+    # Sub command: cmd merge-coverage -------------------------------------------------------------
+    - merge-coverage:
+        about: Merge the coverage information for multiple samples
+    # Sub command: cmd de-bias --------------------------------------------------------------------
+    - de-dias:
+        about: Try to remove bias in the data
+    # Sub command: cmd build-model-pool -----------------------------------------------------------
+    - build-model-pool:
+        about: Build model based on pooling a reference panel
+    # Sub command: cmd build-model-wis ------------------------------------------------------------
+    - build-model-wis:
+        about: Build within-sample model.
+    # Sub command: cmd flag-unreliable ------------------------------------------------------------
+    - flag-unreliable:
+        about: Scan for unreliable regions and flag them
+    # Sub command: cmd discover -------------------------------------------------------------------
+    - discover:
+        about: Perform CNV discovery ("calling")
+    # Sub command: cmd genotype -------------------------------------------------------------------
+    - genotype:
+        about: Perform CNV genotyping
