@@ -13,3 +13,4 @@ slog-term = "*"
 slog-async = "*"
 
 lib-coverage = { path = "../lib-coverage" }
+lib-shared = { path = "../lib-shared" }

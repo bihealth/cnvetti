@@ -90,6 +90,12 @@ subcommands:
             value_name: REGION
             help: Optional genome region to limit the processing to.
         # Counting-related arguments ..............................................................
+        - contig_regex:
+            long: contig-regex
+            takes_value: true
+            default_value: '^(chr)?\d\d?$'
+            value_name: REGEX
+            help: Regular expression for contigs considered for coverage.
         - count_kind:
             long: count-kind
             takes_value: true

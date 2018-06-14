@@ -2,7 +2,7 @@ use std::fmt;
 /// Types for configuring the "coverage" sub command.
 use std::str::FromStr;
 
-use clap::ArgMatches;
+use clap::{ArgMatches, Values};
 
 /// Enum for selecting count type.
 #[derive(Clone, Debug, PartialEq, EnumString)]
@@ -37,6 +37,8 @@ pub struct CoverageOptions {
     pub genome_region: Option<String>,
 
     // Counting-related
+    /// Regular expression to match contigs.
+    pub contig_regex: String,
     /// Whether to count coverage/bases or alignments.
     pub count_kind: CountKind,
     /// Minimal MAPQ of a read to count.
@@ -78,6 +80,10 @@ impl CoverageOptions {
                 None => None,
             },
 
+            contig_regex: matches
+                .values_of("contig_regex")
+                .unwrap_or(Values::default())
+                .collect(),
             count_kind: CountKind::from_str(matches.value_of("count_kind").unwrap())
                 .expect("Unknown count kind"),
             min_mapq: matches.value_of("min_mapq").unwrap().parse::<u8>().unwrap(),

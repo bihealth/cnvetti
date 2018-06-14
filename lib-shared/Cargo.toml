@@ -1,20 +1,11 @@
 [package]
-name = "lib-coverage"
+name = "lib-shared"
 version = "0.1.0"
 authors = ["Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>"]
 
 [dependencies]
-chrono = "*"
 bio = "*"
 error-chain = "*"
-clap = {version = "*", features = ["yaml", "color", "suggestions"]}
+regex = "*"
 rust-htslib = {git = "https://github.com/rust-bio/rust-htslib.git", branch = "master" }
-separator = "*"
-shlex = "*"
 slog = {version = "*", features = ["max_level_trace", "release_max_level_debug"] }
-slog-term = "*"
-slog-async = "*"
-strum = "*"
-strum_macros = "*"
-
-lib-shared = { path = "../lib-shared" }
