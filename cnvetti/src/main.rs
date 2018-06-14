@@ -96,7 +96,7 @@ fn run(matches: ArgMatches) -> Result<()> {
         ("cmd", Some(m)) => match m.subcommand() {
             ("coverage", Some(m)) => {
                 lib_coverage::run(&mut logger, &lib_coverage::CoverageOptions::new(&m))
-                    .chain_err(|| "unable to open contacts file")?
+                    .chain_err(|| "Could not execute 'cmd coverage'")?
             }
             _ => bail!("Invalid command: {}", m.subcommand().0),
         },

@@ -13,3 +13,4 @@ extern crate regex;
 pub mod bam_utils;
 pub mod bcf_utils;
 pub mod regions;
+pub mod stats;

@@ -11,7 +11,7 @@ mod errors {
 pub use self::errors::*;
 
 /// Representation of a list of genomic regions.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GenomeRegions {
     /// The region specification as (chr, start, end).
     pub regions: Vec<(String, usize, usize)>,

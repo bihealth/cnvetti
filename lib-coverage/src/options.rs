@@ -1,17 +1,30 @@
-use std::fmt;
 /// Types for configuring the "coverage" sub command.
+use std::fmt;
 use std::str::FromStr;
 
 use clap::{ArgMatches, Values};
 
 /// Enum for selecting count type.
-#[derive(Clone, Debug, PartialEq, EnumString)]
+#[derive(Clone, Copy, Debug, PartialEq, EnumString)]
 pub enum CountKind {
     Coverage,
     Fragments,
 }
 
 impl fmt::Display for CountKind {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+/// Enum for selecting the considered regions.
+#[derive(Clone, Copy, Debug, PartialEq, EnumString)]
+pub enum ConsideredRegions {
+    GenomeWide,
+    TargetRegions,
+}
+
+impl fmt::Display for ConsideredRegions {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self)
     }
@@ -41,16 +54,23 @@ pub struct CoverageOptions {
     pub contig_regex: String,
     /// Whether to count coverage/bases or alignments.
     pub count_kind: CountKind,
+    /// Optional path to BED file with blacklist.
+    pub blacklist_bed: Option<String>,
+    /// Whether to count on-target regions or genome-wide.
+    pub considered_regions: ConsideredRegions,
     /// Minimal MAPQ of a read to count.
     pub min_mapq: u8,
     /// Minimal ratio of clipped bases a read must have to be considered.
     pub min_unclipped: f32,
-    /// Whether or not to skip discordant reads (BAM flag).
-    pub skip_discordant: bool,
+
+    /// Minimal fraction of window that must remain after masking (e.g., for piles).
+    pub min_window_remaining: f32,
+    /// Minimal raw coverage before ignoring.
+    pub min_raw_coverage: usize,
 
     // Binning and targets
     /// The length of the windows.
-    pub window_length: Option<u64>,
+    pub window_length: Option<usize>,
     /// Optional path to targets BED file in case of WES.
     pub targets_bed: Option<String>,
 
@@ -86,16 +106,34 @@ impl CoverageOptions {
                 .collect(),
             count_kind: CountKind::from_str(matches.value_of("count_kind").unwrap())
                 .expect("Unknown count kind"),
+            blacklist_bed: match matches.value_of("blacklist_bed") {
+                Some(x) => Some(x.to_string()),
+                None => None,
+            },
+            considered_regions: if matches.is_present("targets_bed") {
+                ConsideredRegions::TargetRegions
+            } else {
+                ConsideredRegions::GenomeWide
+            },
             min_mapq: matches.value_of("min_mapq").unwrap().parse::<u8>().unwrap(),
             min_unclipped: matches
                 .value_of("min_unclipped")
                 .unwrap()
                 .parse::<f32>()
                 .unwrap(),
-            skip_discordant: matches.is_present("skip_discordant"),
+            min_window_remaining: matches
+                .value_of("min_window_remaining")
+                .unwrap()
+                .parse::<f32>()
+                .unwrap(),
+            min_raw_coverage: matches
+                .value_of("min_raw_coverage")
+                .unwrap()
+                .parse::<usize>()
+                .unwrap(),
 
             window_length: match matches.value_of("window_length") {
-                Some(x) => Some(x.to_string().parse::<u64>().unwrap()),
+                Some(x) => Some(x.to_string().parse::<usize>().unwrap()),
                 None => None,
             },
             targets_bed: match matches.value_of("targets_bed") {

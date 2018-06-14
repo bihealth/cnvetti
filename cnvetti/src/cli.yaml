@@ -96,6 +96,12 @@ subcommands:
             default_value: '^(chr)?\d\d?$'
             value_name: REGEX
             help: Regular expression for contigs considered for coverage.
+        - blacklist_bed:
+            long: blacklist-bed
+            multiple: false
+            takes_value: true
+            value_name: MASKED.bed.gz
+            help: Path to tabix-indexed blacklist BED file.
         - count_kind:
             long: count-kind
             takes_value: true
@@ -123,11 +129,18 @@ subcommands:
             help: >
               At least `MIN_UNCLIPPED` percent of the read have to be unclipped
               for it to be counted.
-        - skip_discordant:
-            long: skip-discordant
-            help: >
-              If set, discordant alignments (as flagged by the read mapper, e.g., one read
-              does not aligned or reads have abnormal orientation).
+        - min_window_remaining:
+            long: min-window-remaining
+            takes_value: true
+            default_value: '0.5'
+            value_name: FRAC
+            help: Minimal fraction of window that must remain after masking (e.g., for piles).
+        - min_raw_coverage:
+            long: min-raw-coverage
+            takes_value: true
+            default_value: '10'
+            value_name: COUNT
+            help: Target regions with lower coverage are ignored.
         # Binning- and target-related arguments (WGS or off-target WES) ...........................
         - window_length:
             long: window-length
