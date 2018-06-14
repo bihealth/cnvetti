@@ -1,0 +1,6 @@
+[package]
+name = "lib-coverage"
+version = "0.1.0"
+authors = ["Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>"]
+
+[dependencies]
