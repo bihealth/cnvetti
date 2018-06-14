@@ -1,0 +1,34 @@
+name: cnvetti
+version: 0.1.0
+about: Robust, efficient, and versatile clinical CNV calling from HTS data
+author: Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>
+
+settings:
+- DeriveDisplayOrder
+- GlobalVersion
+- UnifiedHelpMessage
+- ColorAuto
+
+args:
+- verbose:
+    long: verbose
+    short: v
+    multiple: true
+    takes_value: false
+    global: true
+    help: Increase verbosity
+- quiet:
+    long: quiet
+    short: q
+    multiple: true
+    takes_value: false
+    global: true
+    help: Decrease verbosity
+- io_threads:
+    long: io-threads
+    short: t
+    takes_value: true
+    value_name: COUNT
+    global: true
+    default_value: '0'
+    help: Number of additional threads to use for (de)compression in I/O.

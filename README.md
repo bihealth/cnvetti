@@ -9,6 +9,7 @@ It provides this functionality for various types of data and experimental design
 
 - Supported OS: Linux
 - License: GPL v3
+- Status: Alpha
 
 ## Upcoming Features
 
