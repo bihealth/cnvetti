@@ -11,3 +11,5 @@ clap = {version = "*", features = ["yaml", "color", "suggestions"]}
 slog = {version = "*", features = ["max_level_trace", "release_max_level_debug"] }
 slog-term = "*"
 slog-async = "*"
+
+lib-coverage = { path = "../lib-coverage" }

@@ -59,6 +59,113 @@ subcommands:
     # Sub command: cmd coverage -------------------------------------------------------------------
     - coverage:
         about: Record coverage from input BAM file
+        args:
+        # Input- and output-related arguments .....................................................
+        - input:
+            long: input
+            takes_value: true
+            required: true
+            value_name: INPUT.bam
+            help: Path to BAI-indexed BAM file.
+        - output:
+            long: output
+            takes_value: true
+            required: true
+            value_name: OUT.bcf
+            help: >
+              Path to output BCF file with the coverage information.  This will also write a
+              corresponding `.csi` file.
+        - reference:
+            long: reference
+            takes_value: true
+            required: false
+            value_name: REF.fa
+            help: >
+              Path to FAI-indexed reference FASTA file used for read alignment.  This is only
+              required if GC-correction is to be performed downstream which is most likely the
+              case except for on-target WES processing.
+        - genome_region:
+            long: genome-region
+            takes_value: true
+            value_name: REGION
+            help: Optional genome region to limit the processing to.
+        # Counting-related arguments ..............................................................
+        - count_kind:
+            long: count-kind
+            takes_value: true
+            required: true
+            value_name: COUNT
+            possible_values:
+            - Coverage
+            - Fragments
+            help: >
+              Whether to consider alignment coverage or number of aligning fragments.  In the
+              cases of WES data and low-coverage WGS data, counting fragment is recommended.
+              Considering coverage is only recommended in the case of high-coverage WGS data.
+        - min_mapq:
+            long: min-mapq
+            takes_value: true
+            default_value: '0'
+            value_name: MIN_MAPQ
+            help: >
+              Alignments with alignment quality less than `MIN_MAPQ` will be ignored.
+        - min_unclipped:
+            long: min-unclipped
+            takes_value: true
+            default_value: '0.6'
+            value_name: MIN_UNCLIPPED
+            help: >
+              At least `MIN_UNCLIPPED` percent of the read have to be unclipped
+              for it to be counted.
+        - skip_discordant:
+            long: skip-discordant
+            help: >
+              If set, discordant alignments (as flagged by the read mapper, e.g., one read
+              does not aligned or reads have abnormal orientation).
+        # Binning- and target-related arguments (WGS or off-target WES) ...........................
+        - window_length:
+            long: window-length
+            takes_value: true
+            value_name: LENGTH
+            help: >
+              Length of window for binning on coverage computation.  Required unless
+            conflicts_with: targets_bed
+        - targets_bed:
+            long: targets-bed
+            takes_value: true
+            value_name: BED
+            help: >
+              Path to BED file with intervals of the targets of WES.
+            conflicts_with: window_length
+        # Pile-masking (off-target WES only) ......................................................
+        - mask_piles:
+            long: mask-piles
+            takes_value: false
+            help: >
+                Enable pile-masking algorithm using the other `--pile-*` arguments.  See the manual
+                for details.
+        - pile_size_percentile:
+            long: pile-size-percentile
+            takes_value: true
+            default_value: '90'
+            value_name: NUM
+            help: >
+              Only keep piles with size (number of aligned bases) in the lower `NUM`-th
+              percentiles.
+        - pile_max_gap:
+            long: pile-max-gap
+            takes_value: true
+            default_value: '20'
+            value_name: VAL
+            help: Merge intervals for piles if distance is <= `VAL`.
+        - pile_mask_window_size:  # TODO: remove?
+            long: pile-mask-window-size
+            takes_value: true
+            default_value: '1'
+            value_name: SIZE
+            help: >
+              Mask windows of length `SIZE` when a pile occurs.  Set to `1` to do no window-based
+              masking.
     # Sub command: cmd normalize ------------------------------------------------------------------
     - normalize:
         about: Normalize coverage on a per-sample level

@@ -28,7 +28,7 @@ mod errors {
     error_chain!{}
 }
 
-use errors::*;
+pub use errors::*;
 
 /// Custom `slog` Drain logic
 struct RuntimeLevelFilter<D> {
@@ -62,6 +62,8 @@ where
     }
 }
 
+extern crate lib_coverage;
+
 fn run(matches: ArgMatches) -> Result<()> {
     // Logging setup ------------------------------------------------------------------------------
 
@@ -77,7 +79,7 @@ fn run(matches: ArgMatches) -> Result<()> {
     }.fuse();
     let drain = slog_async::Async::new(drain).build().fuse();
 
-    let _logger = slog::Logger::root(drain, o!());
+    let mut logger = slog::Logger::root(drain, o!());
 
     // Switch log level
     if matches.is_present("quiet") {
@@ -88,6 +90,18 @@ fn run(matches: ArgMatches) -> Result<()> {
             Ordering::Relaxed,
         );
     };
+
+    // Dispatch commands from command line.
+    match matches.subcommand() {
+        ("cmd", Some(m)) => match m.subcommand() {
+            ("coverage", Some(m)) => {
+                lib_coverage::run(&mut logger, &lib_coverage::CoverageOptions::new(&m))
+                    .chain_err(|| "unable to open contacts file")?
+            }
+            _ => bail!("Invalid command: {}", m.subcommand().0),
+        },
+        _ => bail!("Invalid command: {}", matches.subcommand().0),
+    }
 
     Ok(())
 }
