@@ -188,6 +188,48 @@ subcommands:
     # Sub command: cmd normalize ------------------------------------------------------------------
     - normalize:
         about: Normalize coverage on a per-sample level
+        args:
+        # Input/Output File Arguments ---------------------------------------------
+        - input:
+            long: input
+            short: i
+            multiple: false
+            takes_value: true
+            required: true
+            value_name: INPUT.bcf
+            help: Path to indexed input BCF or VCF file from `cnvetti cmd coverage` output.
+        - output:
+            long: output
+            short: o
+            takes_value: true
+            required: true
+            value_name: OUT.bcf
+            help: Path to output BCF file (will also write .csi file)
+        # Filtration-Related Arguments --------------------------------------------
+        - min_gc_window_count:
+            long: min-gc-window-count
+            takes_value: true
+            default_value: '100'
+            value_name: COUNT
+            help: >
+                Flag windows of GC content with an occurence of less than `COUNT`
+                as `INFO/FEW_GCWINDOWS`.
+        # Statistics-Related Arguments --------------------------------------------
+        - contig_regex:
+            long: contig-regex
+            takes_value: true
+            default_value: '^(chr)?\d\d?$'
+            value_name: 'regex'
+            help: Regular expression for contigs taking part in statistics.
+        - normalization:
+            long: normalization
+            takes_value: true
+            required: true
+            value_name: TYPE
+            possible_values:
+            - TotalCovSum
+            - MedianGcBinned
+            help: The method to use for read count/coverage normalization.
     # Sub command: cmd filter ---------------------------------------------------------------------
     - filter:
         about: Filter coverage information

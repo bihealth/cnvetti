@@ -30,6 +30,9 @@ mod errors {
 
 pub use errors::*;
 
+extern crate lib_coverage;
+extern crate lib_normalize;
+
 /// Custom `slog` Drain logic
 struct RuntimeLevelFilter<D> {
     drain: D,
@@ -61,8 +64,6 @@ where
         }
     }
 }
-
-extern crate lib_coverage;
 
 fn run(matches: ArgMatches) -> Result<()> {
     // Logging setup ------------------------------------------------------------------------------
@@ -97,6 +98,10 @@ fn run(matches: ArgMatches) -> Result<()> {
             ("coverage", Some(m)) => {
                 lib_coverage::run(&mut logger, &lib_coverage::CoverageOptions::new(&m))
                     .chain_err(|| "Could not execute 'cmd coverage'")?
+            }
+            ("normalize", Some(m)) => {
+                lib_normalize::run(&mut logger, &lib_normalize::NormalizeOptions::new(&m))
+                    .chain_err(|| "Could not execute 'cmd normalize'")?
             }
             _ => bail!("Invalid command: {}", m.subcommand().0),
         },

@@ -13,4 +13,5 @@ slog-term = "*"
 slog-async = "*"
 
 lib-coverage = { path = "../lib-coverage" }
+lib-normalize = { path = "../lib-normalize" }
 lib-shared = { path = "../lib-shared" }

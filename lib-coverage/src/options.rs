@@ -87,7 +87,7 @@ pub struct CoverageOptions {
 impl CoverageOptions {
     /// Build options from ArgMatches.
     pub fn new(matches: &ArgMatches) -> Self {
-        CoverageOptions {
+        Self {
             input: matches.value_of("input").unwrap().to_string(),
             output: matches.value_of("output").unwrap().to_string(),
             reference: match matches.value_of("reference") {
