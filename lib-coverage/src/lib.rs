@@ -1,3 +1,4 @@
+/// Main library module for building initial coverage BCF files from BAM files.
 use std::collections::HashMap;
 use std::env;
 use std::fs::File;
@@ -581,6 +582,7 @@ pub fn run(logger: &mut Logger, options: &CoverageOptions) -> Result<()> {
     // Finally, create index on created output file.
     info!(logger, "Building index for output file...");
     bcf_utils::build_index(logger, &options.output).chain_err(|| "Could not build index")?;
+    info!(logger, "All done. Have a nice day!");
 
     Ok(())
 }
