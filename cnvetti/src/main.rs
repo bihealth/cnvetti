@@ -31,6 +31,8 @@ mod errors {
 pub use errors::*;
 
 extern crate lib_coverage;
+extern crate lib_merge_cov;
+extern crate lib_model_wis;
 extern crate lib_normalize;
 
 /// Custom `slog` Drain logic
@@ -103,6 +105,20 @@ fn run(matches: ArgMatches) -> Result<()> {
                 lib_normalize::run(&mut logger, &lib_normalize::NormalizeOptions::new(&m))
                     .chain_err(|| "Could not execute 'cmd normalize'")?
             }
+            ("filter", Some(_m)) => bail!("cmd filter not implemented!"),
+            ("merge-cov", Some(m)) => {
+                lib_merge_cov::run(&mut logger, &lib_merge_cov::MergeCovOptions::new(&m))
+                    .chain_err(|| "Could not execute 'cmd merge-cov'")?
+            }
+            ("de-bias", Some(_m)) => bail!("cmd de-bias not implemented!"),
+            ("build-model-pool", Some(_m)) => bail!("cmd build-model-pool not implemented!"),
+            ("build-model-wis", Some(m)) => {
+                lib_model_wis::run(&mut logger, &lib_model_wis::BuildModelWisOptions::new(&m))
+                    .chain_err(|| "Could not execute 'cmd model wis'")?
+            }
+            ("mod-coverage", Some(_m)) => bail!("cmd mod-coverage not implemented!"),
+            ("discover", Some(_m)) => bail!("cmd discover not implemented!"),
+            ("genotype", Some(_m)) => bail!("cmd genotype not implemented!"),
             _ => bail!("Invalid command: {}", m.subcommand().0),
         },
         _ => bail!("Invalid command: {}", matches.subcommand().0),
