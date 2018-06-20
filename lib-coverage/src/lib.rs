@@ -357,7 +357,7 @@ fn process_region(
     }
     let tid: u32 = bam_reader.header().tid(chrom.as_bytes()).unwrap();
     bam_reader
-        .fetch(tid, (start - 1) as u32, *end as u32)
+        .fetch(tid, *start as u32, *end as u32)
         .chain_err(|| format!("Could not seek to region {}:{}-{}", chrom, start, end))?;
 
     // Main loop for region: pass all BAM records in region through aggregator.

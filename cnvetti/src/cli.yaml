@@ -164,9 +164,8 @@ subcommands:
         - targets_bed:
             long: targets-bed
             takes_value: true
-            value_name: BED
-            help: >
-              Path to BED file with intervals of the targets of WES.
+            value_name: TGT.bed.gz
+            help: Path to tabix-indexed BED file with intervals of the targets of WES.
             conflicts_with: window_length
         # Pile-masking (off-target WES only) ......................................................
         - mask_piles:
@@ -441,3 +440,120 @@ subcommands:
         - GlobalVersion
         - UnifiedHelpMessage
         - ColorAuto
+# Sub command: quick ==============================================================================
+- quick:
+    about: Easy-to-use shortcuts for command and important use cases.
+    settings:
+    - SubcommandRequiredElseHelp
+    - ColorAuto
+    - DeriveDisplayOrder
+    - GlobalVersion
+    - InferSubcommands
+    - StrictUtf8
+    - UnifiedHelpMessage
+    subcommands:
+    # Sub command: quick wis-build-model ----------------------------------------------------------
+    - wis-build-model:
+        about: Build an within-sample model for targeted sequencing CNV calling.
+        after_help: >
+          This call takes a list of BAM files that are aligned to the same reference and are
+          ideally unrelated to reduce biases and skews in the resulting model.  Further, a tabix-
+          indexed BED file with target regions is required.
+
+          The command writes a BCF file that defines a list of reference target regions for each
+          of the input target regions.
+
+          The processing of the input files happens in parallel as well as the computation of the
+          distance matrix when building the model.
+        settings:
+        - ArgRequiredElseHelp
+        - DeriveDisplayOrder
+        - GlobalVersion
+        - UnifiedHelpMessage
+        - ColorAuto
+        args:
+        # TODO: allow more configuration options from the more fine-granular `cmd *` commands.
+        - input:
+            multiple: false
+            takes_value: true
+            required: true
+            multiple: true
+            value_name: INPUT.bam
+            help: Path to indexed input BAM file.
+        - targets_bed:
+            long: targets-bed
+            takes_value: true
+            value_name: TGT.bed.gz
+            required: true
+            help: Path to tabix-indexed BED file with intervals of the targets of WES.
+        - output:
+            long: output
+            short: o
+            takes_value: true
+            required: true
+            value_name: OUT.bcf
+            help: Path to output model BCF file.
+        - output_cov:
+            long: output-cov
+            takes_value: true
+            value_name: OUT.cov.bcf
+            help: Path to output per-sample coverage BCF file.
+        - num_threads:
+            long: num-threads
+            takes_value: true
+            required: false
+            value_name: THREADS
+            default_value: '1'
+            help: Number of threads to use.
+    # Sub command: quick wis-call -----------------------------------------------------------------
+    - wis-call:
+        about: Perform CNV calling on germline or unmatched tumor using within-sample approach.
+        after_help: >
+          This shortcut takes as the input a BCF file with the within-sample model from
+          `cnvetti quick wis-build-model` and a BAM file of one germline or unmached tumor sample.
+
+          It will then generate on-target CNV analysis and perform CNV variant calling using the
+          resulting on-target coverage result.
+        settings:
+        - ArgRequiredElseHelp
+        - DeriveDisplayOrder
+        - GlobalVersion
+        - UnifiedHelpMessage
+        - ColorAuto
+    # Sub command: quick wis-call-matched ---------------------------------------------------------
+    - wis-call:
+        about: Perform CNV calling on one matched tumor sample using the within-sample approach.
+        after_help: >
+          This shortcut takes as the input a BCF file with the within-sample model from
+          `cnvetti quick wis-build-model` and each one tumor and a matched normal BAM file.
+
+          It will then generate on-target CNV analysis of the matched tumor/normal pair and
+          generate a CNV call BCF file.
+        settings:
+        - ArgRequiredElseHelp
+        - DeriveDisplayOrder
+        - GlobalVersion
+        - UnifiedHelpMessage
+        - ColorAuto
+# Sub command: visualize ==========================================================================
+- visualize:
+    about: Visualization of coverage information (on-target, off-target, and genome-wide bins).
+    settings:
+    - SubcommandRequiredElseHelp
+    - ColorAuto
+    - DeriveDisplayOrder
+    - GlobalVersion
+    - InferSubcommands
+    - StrictUtf8
+    - UnifiedHelpMessage
+# Sub command: annotate ===========================================================================
+- annotate:
+    about: Perform annotate called CNV result BCF files
+    settings:
+    - SubcommandRequiredElseHelp
+    - ColorAuto
+    - DeriveDisplayOrder
+    - GlobalVersion
+    - InferSubcommands
+    - StrictUtf8
+    - UnifiedHelpMessage

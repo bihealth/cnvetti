@@ -58,7 +58,7 @@ struct ModelInput {
     /// For each `GenomicRegions` entry, the numeric reference/contig ID.
     pub tids: Vec<u32>, // TODO: rename
     /// For each region, the normalized coverage/fragment count per sample.
-    pub nfcs: Vec<Vec<f32>>,
+    pub ncovs: Vec<Vec<f32>>,
 }
 
 /// Load the normalized fragment counts, return region-wise vector of counts.
@@ -74,7 +74,7 @@ fn read_coverage_bcf(logger: &mut Logger, options: &BuildModelWisOptions) -> Res
 
     let mut regions = GenomeRegions::new();
     let mut tids = Vec::new();
-    let mut nfcs = Vec::new();
+    let mut ncovs = Vec::new();
 
     let mut record = reader.empty_record();
     loop {
@@ -94,14 +94,14 @@ fn read_coverage_bcf(logger: &mut Logger, options: &BuildModelWisOptions) -> Res
         tids.push(record.rid().unwrap());
 
         let mut tmp = Vec::new();
-        for nfc in record
-            .format(b"NFC")
+        for ncov in record
+            .format(b"CV")
             .float()
-            .chain_err(|| "Could not read FORMAT/NFC.")?
+            .chain_err(|| "Could not read FORMAT/CV.")?
         {
-            tmp.push(nfc[0]);
+            tmp.push(ncov[0]);
         }
-        nfcs.push(tmp);
+        ncovs.push(tmp);
     }
 
     info!(
@@ -120,7 +120,7 @@ fn read_coverage_bcf(logger: &mut Logger, options: &BuildModelWisOptions) -> Res
         num_regions,
         regions,
         tids,
-        nfcs,
+        ncovs,
     })
 }
 
@@ -128,7 +128,7 @@ fn read_coverage_bcf(logger: &mut Logger, options: &BuildModelWisOptions) -> Res
 fn compute_distances(
     logger: &mut Logger,
     tids: &Vec<u32>,
-    nfcs: &Vec<Vec<f32>>,
+    ncovs: &Vec<Vec<f32>>,
     options: &BuildModelWisOptions,
 ) -> Vec<Vec<(f32, usize)>> {
     // Set number of threads to use by rayon.
@@ -141,7 +141,8 @@ fn compute_distances(
 
     let progress = AtomicUsize::new(0);
 
-    let result = nfcs.par_iter()
+    let result = ncovs
+        .par_iter()
         .enumerate()
         .map(|(i, row)| {
             thread_local!{static DIST_RC: RefCell<Vec<(f32, usize)>> = RefCell::new(Vec::new());}
@@ -149,7 +150,7 @@ fn compute_distances(
             DIST_RC.with(|dist_rc| {
                 let mut dist = dist_rc.borrow_mut();
                 dist.clear();
-                for (j, row2) in nfcs.iter().enumerate() {
+                for (j, row2) in ncovs.iter().enumerate() {
                     if tids[i] == tids[j] {
                         dist.push((f32::INFINITY, j as usize));
                     } else {
@@ -207,6 +208,9 @@ fn prune_distances(
         .iter()
         .map(|xs| xs[0].0 as f64)
         .collect::<Vec<f64>>();
+    if error_stats.len() < 2 {
+        return Vec::new();
+    }
     let mean = error_stats.as_slice().mean();
     let std_dev = error_stats.as_slice().std_dev();
     let threshold = (mean + options.filter_z_score * std_dev) as f32;
@@ -233,7 +237,7 @@ fn count_per_probe_calls(
     num_regions: usize,
     num_samples: usize,
     ref_targets: &Vec<Vec<usize>>,
-    nfcs: &Vec<Vec<f32>>,
+    ncovs: &Vec<Vec<f32>>,
     options: &BuildModelWisOptions,
 ) -> Vec<u32> {
     info!(logger, "Count per-probe calls for UNRELIABLE flag...");
@@ -244,14 +248,14 @@ fn count_per_probe_calls(
             // Get empirical reference distribution for target `target_idx` for sample `sample_idx`.
             let ref_dist = matched_targets
                 .iter()
-                .map(|idx| nfcs[*idx][sample_idx] as f64)
+                .map(|idx| ncovs[*idx][sample_idx] as f64)
                 .collect::<Vec<f64>>();
             if ref_dist.len() < options.min_ref_targets {
                 continue;
             }
             let ref_dist = ref_dist.as_slice();
             // Compute z-score
-            let x = nfcs[target_idx][sample_idx] as f64;
+            let x = ncovs[target_idx][sample_idx] as f64;
             let z_score = (x - ref_dist.mean()).abs() / ref_dist.std_dev();
             // Compute relative value.
             let rel = x / ref_dist.mean();
@@ -419,14 +423,14 @@ pub fn run(logger: &mut Logger, options: &BuildModelWisOptions) -> Result<()> {
     info!(logger, "Options: {:?}", options);
 
     let model_input = read_coverage_bcf(logger, &options)?;
-    let distances = compute_distances(logger, &model_input.tids, &model_input.nfcs, &options);
+    let distances = compute_distances(logger, &model_input.tids, &model_input.ncovs, &options);
     let ref_targets = prune_distances(logger, &distances, &options);
     let num_calls = count_per_probe_calls(
         logger,
         model_input.num_regions,
         model_input.num_samples,
         &ref_targets,
-        &model_input.nfcs,
+        &model_input.ncovs,
         options,
     );
 

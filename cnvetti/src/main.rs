@@ -9,19 +9,23 @@ extern crate error_chain;
 #[macro_use]
 extern crate clap;
 
+extern crate rayon;
+
 // We are using the `slog` crate for logging.
 #[macro_use]
 extern crate slog;
 extern crate slog_async;
 extern crate slog_term;
 
+extern crate tempdir;
+
+use slog::Drain;
+
 use std::result;
 use std::sync::atomic::Ordering;
 use std::sync::{atomic, Arc};
 
 use clap::{App, ArgMatches};
-
-use slog::Drain;
 
 mod errors {
     // Create the Error, ErrorKind, ResultExt, and Result types
@@ -34,6 +38,8 @@ extern crate lib_coverage;
 extern crate lib_merge_cov;
 extern crate lib_model_wis;
 extern crate lib_normalize;
+
+mod quick_wis_build_model;
 
 /// Custom `slog` Drain logic
 struct RuntimeLevelFilter<D> {
@@ -114,11 +120,20 @@ fn run(matches: ArgMatches) -> Result<()> {
             ("build-model-pool", Some(_m)) => bail!("cmd build-model-pool not implemented!"),
             ("build-model-wis", Some(m)) => {
                 lib_model_wis::run(&mut logger, &lib_model_wis::BuildModelWisOptions::new(&m))
-                    .chain_err(|| "Could not execute 'cmd model wis'")?
+                    .chain_err(|| "Could not execute 'cmd build-model-wis'")?
             }
             ("mod-coverage", Some(_m)) => bail!("cmd mod-coverage not implemented!"),
             ("discover", Some(_m)) => bail!("cmd discover not implemented!"),
             ("genotype", Some(_m)) => bail!("cmd genotype not implemented!"),
+            _ => bail!("Invalid command: {}", m.subcommand().0),
+        },
+        ("quick", Some(m)) => match m.subcommand() {
+            ("wis-build-model", Some(m)) => {
+                quick_wis_build_model::run(
+                    &mut logger,
+                    &quick_wis_build_model::QuickWisBuildModelOptions::new(&m),
+                ).chain_err(|| "Could not execute 'cmd quick wis-build-models")?
+            }
             _ => bail!("Invalid command: {}", m.subcommand().0),
         },
         _ => bail!("Invalid command: {}", matches.subcommand().0),

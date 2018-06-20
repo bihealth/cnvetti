@@ -80,7 +80,7 @@ impl GenomeRegions {
                     .parse::<usize>()
                     .unwrap();
 
-                Ok((region_split[0].to_string(), start, end))
+                Ok((region_split[0].to_string(), start - 1, end))
             })
             .collect();
         Ok(GenomeRegions { regions: regions? })

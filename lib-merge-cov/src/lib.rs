@@ -150,11 +150,13 @@ pub fn merge_files(
                     let mut tmp_v = rec_in
                         .format(&key_b)
                         .string()
-                        .chain_err(|| format!("Could not retrieve string value for {}", key))?
+                        .unwrap_or_else(|_| Vec::new())
                         .iter()
                         .map(|v| Vec::from(*v))
                         .collect::<Vec<Vec<u8>>>();
-                    values_v.append(&mut tmp_v);
+                    if tmp_v.iter().any(|ref x| !x.is_empty()) {
+                        values_v.append(&mut tmp_v);
+                    }
                 } else {
                     let num_samples = reader.get_header(i).sample_count();
                     for _j in 0..num_samples {
@@ -183,11 +185,14 @@ pub fn merge_files(
                         .expect("Could not get get record")
                         .format(&key_b)
                         .float()
-                        .expect("Could not get float vector")
+                        .unwrap_or_else(|_| Vec::new())
                         .len()
                 })
                 .max()
                 .expect("Could not compute maximum");
+            if dim == 0 {
+                continue;
+            }
             // Then, build the array.
             let mut values: Vec<f32> = Vec::new();
             for i in 0..reader.reader_count() {

@@ -9,8 +9,10 @@ readme = "README.md"
 error-chain = "*"
 clap = {version = "*", features = ["yaml", "color", "suggestions"]}
 slog = {version = "*", features = ["max_level_trace", "release_max_level_debug"] }
+rayon = "*"
 slog-term = "*"
 slog-async = "*"
+tempdir = "*"
 
 lib-coverage = { path = "../lib-coverage" }
 lib-model-wis = { path = "../lib-model-wis" }
