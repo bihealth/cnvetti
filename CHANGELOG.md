@@ -6,4 +6,5 @@
     - `coverage` (genome-wide fragments/coverage, or target-wise fragments)
     - `normalize` (normalize with total coverage or by GC-wise median)
     - `merge-cov` (merge coverage BCF files)
+    - `build-model-wis` (build model for the within-sample CNV calling approach)
 - Starting out with CLI skelleton for `cnvetti cmd *`.
