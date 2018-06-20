@@ -7,5 +7,5 @@ authors = ["Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>"]
 bio = "*"
 error-chain = "*"
 regex = "*"
-rust-htslib = {git = "https://github.com/rust-bio/rust-htslib.git", branch = "master" }
+rust-htslib = { path = "../../rust-htslib" }
 slog = {version = "*", features = ["max_level_trace", "release_max_level_debug"] }
