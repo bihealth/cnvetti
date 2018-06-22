@@ -101,7 +101,7 @@ fn build_writer(
 pub fn merge_files(
     format_string: &BTreeSet<String>,
     format_float: &BTreeSet<String>,
-    reader: &mut bcf::SyncedReader,
+    reader: &mut bcf::synced::SyncedReader,
     writer: &mut bcf::Writer,
 ) -> Result<()> {
     while reader
@@ -115,7 +115,7 @@ pub fn merge_files(
         for i in 0..num_samples {
             match (reader.has_line(i), &first) {
                 (true, None) => {
-                    let mut record = reader.get_record(i).expect("Could not retrieve record");
+                    let mut record = reader.record(i).expect("Could not retrieve record");
                     writer.translate(&mut record);
                     first = Some(record);
                     // break;
@@ -145,7 +145,7 @@ pub fn merge_files(
             for i in 0..reader.reader_count() {
                 if reader.has_line(i) {
                     let mut rec_in = reader
-                        .get_record(i)
+                        .record(i)
                         .expect("We just checked that the record should be there!");
                     let mut tmp_v = rec_in
                         .format(&key_b)
@@ -158,7 +158,7 @@ pub fn merge_files(
                         values_v.append(&mut tmp_v);
                     }
                 } else {
-                    let num_samples = reader.get_header(i).sample_count();
+                    let num_samples = reader.header(i).sample_count();
                     for _j in 0..num_samples {
                         values_v.push(b"".to_vec());
                     }
@@ -181,7 +181,7 @@ pub fn merge_files(
                 .filter(|i| reader.has_line(*i))
                 .map(|i| {
                     reader
-                        .get_record(i)
+                        .record(i)
                         .expect("Could not get get record")
                         .format(&key_b)
                         .float()
@@ -197,17 +197,17 @@ pub fn merge_files(
             let mut values: Vec<f32> = Vec::new();
             for i in 0..reader.reader_count() {
                 if !reader.has_line(i) {
-                    let header = reader.get_header(i);
+                    let header = reader.header(i);
                     let n = dim * header.sample_count() as usize;
                     values.append(&mut (0..n).map(|_| f32::missing()).collect::<Vec<f32>>());
                     continue;
                 }
-                match reader.get_record(i).unwrap().format(&key_b).float() {
+                match reader.record(i).unwrap().format(&key_b).float() {
                     Ok(ref vec) => for arr in vec {
                         values.append(&mut arr.to_vec());
                     },
                     Err(_) => {
-                        let header = reader.get_header(i);
+                        let header = reader.header(i);
                         let n = dim * header.sample_count() as usize;
                         values.append(&mut (0..n).map(|_| f32::missing()).collect::<Vec<f32>>());
                     }
@@ -234,9 +234,10 @@ pub fn run(logger: &mut Logger, options: &MergeCovOptions) -> Result<()> {
 
     // Open reader.
     info!(logger, "Opening input files...");
-    let mut reader = bcf::SyncedReader::new().chain_err(|| "Could not allocated synced reader")?;
+    let mut reader =
+        bcf::synced::SyncedReader::new().chain_err(|| "Could not allocated synced reader")?;
     reader.set_require_index(true);
-    reader.set_pairing(bcf::sr_pairing::EXACT);
+    reader.set_pairing(bcf::synced::pairing::EXACT);
     for input in &options.input {
         info!(logger, "- {}", input);
         reader
@@ -251,10 +252,10 @@ pub fn run(logger: &mut Logger, options: &MergeCovOptions) -> Result<()> {
     let mut format_float = BTreeSet::new();
     let mut samples_v: Vec<Vec<u8>> = Vec::new();
     for i in 0..reader.reader_count() {
-        format_float.append(&mut get_field_names(&reader.get_header(i), "Float"));
-        format_string.append(&mut get_field_names(&reader.get_header(i), "String"));
+        format_float.append(&mut get_field_names(&reader.header(i), "Float"));
+        format_string.append(&mut get_field_names(&reader.header(i), "String"));
         let mut other = reader
-            .get_header(i)
+            .header(i)
             .samples()
             .iter()
             .map(|s| s.to_vec())
@@ -269,7 +270,7 @@ pub fn run(logger: &mut Logger, options: &MergeCovOptions) -> Result<()> {
     // Open output file; construct writer.
     // TODO: do something fancier than taking just the first header
     {
-        let mut writer = build_writer(logger, &reader.get_header(0), &samples, &options)?;
+        let mut writer = build_writer(logger, &reader.header(0), &samples, &options)?;
         merge_files(&format_string, &format_float, &mut reader, &mut writer)?;
     }
 
