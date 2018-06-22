@@ -20,3 +20,4 @@ lib-merge-cov = { path = "../lib-merge-cov" }
 lib-mod-cov = { path = "../lib-mod-cov" }
 lib-normalize = { path = "../lib-normalize" }
 lib-shared = { path = "../lib-shared" }
+lib-visualize = { path = "../lib-visualize" }

@@ -113,7 +113,9 @@ impl<'a> FragmentsGenomeWideAggregator<'a> {
 
 impl<'a> FragmentsGenomeWideAggregator<'a> {
     fn put_bam_record(&mut self, record: &bam::Record) {
-        if !self.skip_mapq(record) && !self.skip_flags(record) && !self.skip_discordant(record)
+        if !self.skip_mapq(record)
+            && !self.skip_flags(record)
+            && !self.skip_discordant(record)
             && !self.skip_clipping(record)
             && !self.skip_paired_and_all_but_leftmost(record)
         {
@@ -152,7 +154,9 @@ impl<'a> FragmentsGenomeWideAggregator<'a> {
 
     // Skip `record` because of flags.
     fn skip_flags(&self, record: &bam::Record) -> bool {
-        record.is_secondary() || record.is_supplementary() || record.is_duplicate()
+        record.is_secondary()
+            || record.is_supplementary()
+            || record.is_duplicate()
             || record.is_quality_check_failed()
     }
 
@@ -293,7 +297,9 @@ impl FragmentsTargetRegionsAggregator {
 
 impl FragmentsTargetRegionsAggregator {
     fn put_bam_record(&mut self, record: &bam::Record) {
-        if !self.skip_mapq(record) && !self.skip_flags(record) && !self.skip_discordant(record)
+        if !self.skip_mapq(record)
+            && !self.skip_flags(record)
+            && !self.skip_discordant(record)
             && !self.skip_clipping(record)
             && !self.skip_paired_and_all_but_leftmost(record)
         {
@@ -358,7 +364,9 @@ impl FragmentsTargetRegionsAggregator {
 
     // Skip `record` because of flags.
     fn skip_flags(&self, record: &bam::Record) -> bool {
-        record.is_secondary() || record.is_supplementary() || record.is_duplicate()
+        record.is_secondary()
+            || record.is_supplementary()
+            || record.is_duplicate()
             || record.is_quality_check_failed()
     }
 
@@ -403,6 +411,7 @@ impl BamRecordAggregator for FragmentsTargetRegionsAggregator {
     fn put_fetched_records(&mut self, reader: &mut bam::IndexedReader) {
         let mut record = bam::Record::new();
         while reader.read(&mut record).is_ok() {
+            record.unpack_cigar();
             self.put_bam_record(&record);
         }
     }
@@ -536,7 +545,9 @@ impl BamRecordAggregator for CoverageAggregator {
                 .alignments()
                 .filter(|alignment| {
                     let record = alignment.record();
-                    !record.is_secondary() && !record.is_duplicate() && !record.is_supplementary()
+                    !record.is_secondary()
+                        && !record.is_duplicate()
+                        && !record.is_supplementary()
                         && !record.is_duplicate()
                         && !record.is_quality_check_failed()
                         && (record.mapq() >= self.base.options.min_mapq)

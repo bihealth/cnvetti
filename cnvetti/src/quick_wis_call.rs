@@ -8,6 +8,7 @@ use tempdir::TempDir;
 use lib_coverage::{self, CoverageOptions};
 use lib_mod_cov::{self, ModelBasedCoverageOptions};
 use lib_normalize::{self, NormalizeOptions};
+use lib_visualize::{self, CovToIgvOptions};
 
 use super::errors::*;
 
@@ -23,6 +24,11 @@ pub struct QuickWisCallOptions {
     pub output: String,
     /// Path to output per-target BCF file.
     pub output_targets: Option<String>,
+
+    /// Path to IGV file with CV information.
+    pub output_igv_cov: Option<String>,
+    /// Path to IGV file with CV2 information.
+    pub output_igv_cov2: Option<String>,
 }
 
 /// Conversion into CoverageOptions.
@@ -81,6 +87,15 @@ impl QuickWisCallOptions {
             io_threads: 0,
         }
     }
+
+    fn into_cov_to_igv_options(&self, input: &String) -> CovToIgvOptions {
+        CovToIgvOptions {
+            input: input.clone(),
+            output_igv_cov: self.output_igv_cov.clone(),
+            output_igv_cov2: self.output_igv_cov2.clone(),
+            io_threads: 0,
+        }
+    }
 }
 
 impl QuickWisCallOptions {
@@ -97,10 +112,10 @@ impl QuickWisCallOptions {
                 .to_string(),
 
             output: matches.value_of("output").unwrap().to_string(),
-            output_targets: match matches.value_of("output_targets") {
-                Some(output_targets) => Some(output_targets.to_string()),
-                None => None,
-            },
+            output_targets: matches.value_of("output_targets").map(|s| s.to_string()),
+
+            output_igv_cov: matches.value_of("output_igv_cov").map(|s| s.to_string()),
+            output_igv_cov2: matches.value_of("output_igv_cov2").map(|s| s.to_string()),
         }
     }
 }
@@ -158,6 +173,14 @@ pub fn run(logger: &mut Logger, options: &QuickWisCallOptions) -> Result<()> {
             &options.input_model,
             &output_targets,
         ),
+    ).chain_err(|| "Problem with merging coverage file")?;
+    info!(logger, " => done");
+
+    // Generate IGV output files for coverage.
+    info!(logger, "Generate IGV output files");
+    lib_visualize::cov_to_igv::run(
+        &mut logger.new(o!("step" => "visualize:cov-to-igv")),
+        &options.into_cov_to_igv_options(&output_targets),
     ).chain_err(|| "Problem with merging coverage file")?;
     info!(logger, " => done");
 

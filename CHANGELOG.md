@@ -2,6 +2,8 @@
 
 ## HEAD (v0.1.0; unreleased)
 
+- Adding `cnvetti visualize` sub commands:
+    - `cov-to-igv` (extract coverage from BCF to IGV format).
 - Adding `cnvetti quick` sub commands:
     - `wis-build-model` (build model for within-sample CNV calling from BAM files)
     - `wis-call` (within-sample CNV calling from BAM and model BCF file)

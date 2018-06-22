@@ -39,6 +39,7 @@ extern crate lib_merge_cov;
 extern crate lib_mod_cov;
 extern crate lib_model_wis;
 extern crate lib_normalize;
+extern crate lib_visualize;
 
 mod quick_wis_build_model;
 mod quick_wis_call;
@@ -104,6 +105,7 @@ fn run(matches: ArgMatches) -> Result<()> {
 
     // Dispatch commands from command line.
     match matches.subcommand() {
+        // cnvetti cmd <coverage|normalize|...>
         ("cmd", Some(m)) => match m.subcommand() {
             ("coverage", Some(m)) => {
                 lib_coverage::run(&mut logger, &lib_coverage::CoverageOptions::new(&m))
@@ -132,6 +134,7 @@ fn run(matches: ArgMatches) -> Result<()> {
             ("genotype", Some(_m)) => bail!("cmd genotype not implemented!"),
             _ => bail!("Invalid command: {}", m.subcommand().0),
         },
+        // cnvetti quick <wis-build-model|wis-call>
         ("quick", Some(m)) => match m.subcommand() {
             ("wis-build-model", Some(m)) => {
                 quick_wis_build_model::run(
@@ -143,6 +146,14 @@ fn run(matches: ArgMatches) -> Result<()> {
                 quick_wis_call::run(&mut logger, &quick_wis_call::QuickWisCallOptions::new(&m))
                     .chain_err(|| "Could not execute 'cmd quick wis-call")?
             }
+            _ => bail!("Invalid command: {}", m.subcommand().0),
+        },
+        // cnvetti visualize <cov-to-igv>
+        ("visualize", Some(m)) => match m.subcommand() {
+            ("cov-to-igv", Some(m)) => lib_visualize::cov_to_igv::run(
+                &mut logger,
+                &lib_visualize::CovToIgvOptions::new(&m),
+            ).chain_err(|| "Could not execute 'visualize cov-to-igv'")?,
             _ => bail!("Invalid command: {}", m.subcommand().0),
         },
         _ => bail!("Invalid command: {}", matches.subcommand().0),
