@@ -1,22 +1,17 @@
 [package]
-name = "cnvetti"
+name = "lib-mod-cov"
 version = "0.1.0"
 authors = ["Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>"]
-license = "GPL-3.0+"
-readme = "README.md"
 
 [dependencies]
+chrono = "*"
 error-chain = "*"
 clap = {version = "*", features = ["yaml", "color", "suggestions"]}
+rust-htslib = { path = "../../rust-htslib" }
+separator = "*"
+shlex = "*"
 slog = {version = "*", features = ["max_level_trace", "release_max_level_debug"] }
-rayon = "*"
 slog-term = "*"
 slog-async = "*"
-tempdir = "*"
 
-lib-coverage = { path = "../lib-coverage" }
-lib-model-wis = { path = "../lib-model-wis" }
-lib-merge-cov = { path = "../lib-merge-cov" }
-lib-mod-cov = { path = "../lib-mod-cov" }
-lib-normalize = { path = "../lib-normalize" }
 lib-shared = { path = "../lib-shared" }

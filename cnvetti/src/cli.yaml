@@ -160,13 +160,26 @@ subcommands:
             value_name: LENGTH
             help: >
               Length of window for binning on coverage computation.  Required unless
-            conflicts_with: targets_bed
+            conflicts_with:
+            - targets_bed
+            - wis_model_bcf
         - targets_bed:
             long: targets-bed
             takes_value: true
             value_name: TGT.bed.gz
             help: Path to tabix-indexed BED file with intervals of the targets of WES.
+            conflicts_with:
+            - window_length
+            - wis_model_bcf
+        - wis_model_bcf:
+            long: wis-model-bcf
+            takes_value: true
+            value_name: MODEL.bcf
+            help: Path to WIS model BCF file.
             conflicts_with: window_length
+            conflicts_with:
+            - window_length
+            - targets_bed
         # Pile-masking (off-target WES only) ......................................................
         - mask_piles:
             long: mask-piles
@@ -413,6 +426,32 @@ subcommands:
         - GlobalVersion
         - UnifiedHelpMessage
         - ColorAuto
+        args:
+        - input:
+            multiple: false
+            takes_value: true
+            required: true
+            value_name: INPUT.bcf
+            help: Path to indexed BCF file containing normalized counts.
+        - input_model:
+            long: input-wis-model
+            multiple: false
+            takes_value: true
+            required: true
+            value_name: MODEL.bcf
+            help: Path to BCF file with the within-sample model.
+        - output:
+            long: output
+            short: o
+            takes_value: true
+            required: true
+            value_name: OUT.bcf
+            help: Path to output normalized counts BCF file.
+        groups:
+        - model:
+            required: true
+            args:
+            - input_model
     # Sub command: cmd discover -------------------------------------------------------------------
     - discover:
         about: Perform CNV discovery/calling.
@@ -448,7 +487,6 @@ subcommands:
     - ColorAuto
     - DeriveDisplayOrder
     - GlobalVersion
-    - InferSubcommands
     - StrictUtf8
     - UnifiedHelpMessage
     subcommands:
@@ -520,8 +558,37 @@ subcommands:
         - GlobalVersion
         - UnifiedHelpMessage
         - ColorAuto
-    # Sub command: quick wis-call-matched ---------------------------------------------------------
-    - wis-call:
+        args:
+        - input:
+            multiple: false
+            takes_value: true
+            required: true
+            value_name: INPUT.bam
+            help: Path to indexed input BAM file.
+        - input_model:
+            long: input-model
+            multiple: false
+            takes_value: true
+            required: true
+            value_name: MODEL.bcf
+            help: Path to BCF file with the WIS model.
+        - output:
+            long: output
+            short: o
+            takes_value: true
+            required: true
+            value_name: OUT.bcf
+            help: Path to output CNV call file.
+        - output_targets:
+            long: output-targets
+            takes_value: true
+            required: false
+            value_name: OUT.tgts.bcf
+            help: >
+              Path to BCF file with per-target coverage information (similar level of information
+              to probes in arrays).
+    # Sub command: quick wis_call_matched ---------------------------------------------------------
+    - wis-call-matched:
         about: Perform CNV calling on one matched tumor sample using the within-sample approach.
         after_help: >
           This shortcut takes as the input a BCF file with the within-sample model from

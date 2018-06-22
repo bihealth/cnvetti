@@ -36,10 +36,12 @@ pub use errors::*;
 
 extern crate lib_coverage;
 extern crate lib_merge_cov;
+extern crate lib_mod_cov;
 extern crate lib_model_wis;
 extern crate lib_normalize;
 
 mod quick_wis_build_model;
+mod quick_wis_call;
 
 /// Custom `slog` Drain logic
 struct RuntimeLevelFilter<D> {
@@ -122,7 +124,10 @@ fn run(matches: ArgMatches) -> Result<()> {
                 lib_model_wis::run(&mut logger, &lib_model_wis::BuildModelWisOptions::new(&m))
                     .chain_err(|| "Could not execute 'cmd build-model-wis'")?
             }
-            ("mod-coverage", Some(_m)) => bail!("cmd mod-coverage not implemented!"),
+            ("mod-coverage", Some(m)) => lib_mod_cov::run(
+                &mut logger,
+                &lib_mod_cov::ModelBasedCoverageOptions::new(&m),
+            ).chain_err(|| "Could not execute 'cmd mod-coverage'")?,
             ("discover", Some(_m)) => bail!("cmd discover not implemented!"),
             ("genotype", Some(_m)) => bail!("cmd genotype not implemented!"),
             _ => bail!("Invalid command: {}", m.subcommand().0),
@@ -133,6 +138,10 @@ fn run(matches: ArgMatches) -> Result<()> {
                     &mut logger,
                     &quick_wis_build_model::QuickWisBuildModelOptions::new(&m),
                 ).chain_err(|| "Could not execute 'cmd quick wis-build-models")?
+            }
+            ("wis-call", Some(m)) => {
+                quick_wis_call::run(&mut logger, &quick_wis_call::QuickWisCallOptions::new(&m))
+                    .chain_err(|| "Could not execute 'cmd quick wis-call")?
             }
             _ => bail!("Invalid command: {}", m.subcommand().0),
         },

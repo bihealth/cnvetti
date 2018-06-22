@@ -57,6 +57,7 @@ impl QuickWisBuildModelOptions {
 
             window_length: None,
             targets_bed: Some(self.targets_bed.clone()),
+            wis_model_bcf: None,
 
             mask_piles: false,
             pile_size_percentile: 0.0,
@@ -132,7 +133,7 @@ pub fn run(logger: &mut Logger, options: &QuickWisBuildModelOptions) -> Result<(
     // Set number of threads to use by rayon.
     env::set_var("RAYON_NUM_THREADS", format!("{}", options.num_threads));
 
-    info!(logger, "Running: cnvetti cmd normalize");
+    info!(logger, "Running: cnvetti quick wis-build-model");
     info!(logger, "Options: {:?}", options);
 
     let tmp_dir = TempDir::new("cnvetti_quick_wis_build_model")

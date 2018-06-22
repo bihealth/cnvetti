@@ -26,7 +26,7 @@ extern crate strum_macros;
 
 extern crate rust_htslib;
 use rust_htslib::bam::{self, Read as BamRead};
-use rust_htslib::bcf;
+use rust_htslib::bcf::{self, Read as BcfRead};
 use rust_htslib::tbx::{self, Read as TbxRead};
 
 extern crate shlex;
@@ -104,11 +104,16 @@ fn build_header(samples: &Vec<String>, contigs: &GenomeRegions) -> bcf::Header {
         "##INFO=<ID=FEW_GCWINDOWS,Number=0,Type=Flag,Description=\"There are too few windows \
          with this GC content for robust statistics, ignoring (only in window-based GC \
          correction)\">",
+        "##INFO=<ID=REF_MEAN,Number=1,Type=Flag,Description=\"Reference mean coverage\">",
+        "##INFO=<ID=REF_STD_DEV,Number=1,Type=Flag,Description=\"Reference mean standard \
+         deviation\">",
         // FILTER fields
         "##FILTER=<ID=PILE,Description=\"Window masked in sample because piles make up a
          too large fraction of it.\">",
         "##FILTER=<ID=LOWCOV,Description=\"Window has too low raw coverage (in number of fragment;
          only used for targeted sequencing CNVs)\">",
+        "##FILTER=<ID=NO_REF,Description=\"No reference targets in WIS method for this \
+         target\">",
         // "##INFO=<ID=BLACKLIST,Number=0,Type=Flag,Description=\"Interval overlaps with \
         //  blacklist site\">",
         "##INFO=<ID=GAP,Number=0,Type=Flag,Description=\"Window overlaps with N in \
@@ -134,8 +139,12 @@ fn build_header(samples: &Vec<String>, contigs: &GenomeRegions) -> bcf::Header {
          to discovery step (or similar steps such as segmentation)\">",
         "##FORMAT=<ID=CVSD,Number=1,Type=Float,Description=\"Finalized coverage standard deviation \
          (or similar steps such as segmentation); only when considering base-wise coverage\">",
+        "##FORMAT=<ID=CVZ,Number=1,Type=Float,Description=\"Finalized coverage value as Z-score
+         of reference targets distribution.\">",
         "##FORMAT=<ID=FRM,Number=1,Type=Float,Description=\"Fraction of window that was masked
          in the sample.\">",
+        // TODO: we might need to add a "TNCV" here for "total-normalized coverage" as generate
+        //       when normalizing counts for the WIS approach.
         // FORMAT fields used when calling by coverage (deep WGS only)
         "##FORMAT=<ID=CVSD,Number=1,Type=Float,Description=\"Per-window coverage SD\">",
         // FORMAT fields used for read counts (off-target WES, shallow WGS)
@@ -192,6 +201,47 @@ fn load_bed_regions_from_tabix(
         let begin = arr[1].parse::<usize>().unwrap();
         let end = arr[2].parse::<usize>().unwrap();
         result.regions.push((chrom.to_string(), begin, end));
+    }
+
+    Ok(result)
+}
+
+/// Load regions from WIS model BCF file.
+fn load_regions_from_wis_model_bcf(
+    logger: &mut Logger,
+    filename: &String,
+    chrom: &str,
+    len: usize,
+) -> Result<GenomeRegions> {
+    let mut reader =
+        bcf::IndexedReader::from_path(&filename).chain_err(|| "Could not open BCF file")?;
+
+    let tid = match reader.header().name2rid(chrom.as_bytes()) {
+        Ok(tid) => tid,
+        Err(e) => {
+            debug!(logger, "Could not map contig to ID: {}: {}", &chrom, e);
+            return Ok(GenomeRegions::new());
+        }
+    };
+
+    reader
+        .fetch(tid, 0, len as u32)
+        .chain_err(|| format!("Could not fetch region {}:1-{}", &chrom, len))?;
+
+    let mut result = GenomeRegions::new();
+    let mut record = reader.empty_record();
+
+    loop {
+        match reader.read(&mut record) {
+            Ok(_) => (),
+            Err(bcf::ReadError::NoMoreRecord) => break,
+            _ => bail!("Could not read BCF record"),
+        }
+
+        let end = record.info(b"END").integer().unwrap().unwrap()[0] as usize;
+        result
+            .regions
+            .push((chrom.to_string(), record.pos() as usize, end));
     }
 
     Ok(result)
@@ -288,9 +338,8 @@ fn process_region(
             (None, None)
         };
 
-    info!(logger, "Loading target regions from BED file");
-    // TODO: function -> consolidate with block below
     let target = if let Some(targets_bed) = &options.targets_bed {
+        info!(logger, "Loading target regions from BED file");
         let mut tbx_reader =
             tbx::Reader::from_path(targets_bed).chain_err(|| "Could not open targets BED file")?;
         let regions = load_bed_regions_from_tabix(logger, &mut tbx_reader, &chrom, contig_length)?;
@@ -302,7 +351,24 @@ fn process_region(
             intervals.insert(start..end, i as u32);
         }
         Some((regions, intervals))
+    } else if let Some(wis_model_bcf) = &options.wis_model_bcf {
+        info!(
+            logger,
+            "Loading target regions from WIS model BCF file file"
+        );
+        let regions =
+            load_regions_from_wis_model_bcf(logger, &wis_model_bcf, &chrom, contig_length)?;
+        // TODO: extract this into function
+        // Build interval tree.
+        let mut intervals: IntervalTree<u32, u32> = IntervalTree::new();
+        for (i, (_, start, end)) in regions.regions.iter().enumerate() {
+            let start = *start as u32;
+            let end = *end as u32;
+            intervals.insert(start..end, i as u32);
+        }
+        Some((regions, intervals))
     } else {
+        info!(logger, "Not loading any targets");
         None
     };
 
@@ -311,6 +377,7 @@ fn process_region(
         let mut tbx_reader = tbx::Reader::from_path(blacklist_bed)
             .chain_err(|| "Could not open blacklist BED file")?;
         let regions = load_bed_regions_from_tabix(logger, &mut tbx_reader, &chrom, contig_length)?;
+        // TODO: extract this into function
         // Build interval tree.
         let mut intervals: IntervalTree<usize, usize> = IntervalTree::new();
         for (i, (_, start, end)) in regions.regions.iter().enumerate() {

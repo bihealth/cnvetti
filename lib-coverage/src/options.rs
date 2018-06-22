@@ -73,6 +73,8 @@ pub struct CoverageOptions {
     pub window_length: Option<usize>,
     /// Optional path to targets BED file in case of WES.
     pub targets_bed: Option<String>,
+    /// Path to WIS model BCF file in case of WES with WIS model.
+    pub wis_model_bcf: Option<String>,
 
     // Pile-related
     /// Whether or not to mask based on overlap with large read piles.
@@ -110,7 +112,9 @@ impl CoverageOptions {
                 Some(x) => Some(x.to_string()),
                 None => None,
             },
-            considered_regions: if matches.is_present("targets_bed") {
+            considered_regions: if matches.is_present("targets_bed")
+                || matches.is_present("wis_model_bcf")
+            {
                 ConsideredRegions::TargetRegions
             } else {
                 ConsideredRegions::GenomeWide
@@ -137,6 +141,10 @@ impl CoverageOptions {
                 None => None,
             },
             targets_bed: match matches.value_of("targets_bed") {
+                Some(x) => Some(x.to_string()),
+                None => None,
+            },
+            wis_model_bcf: match matches.value_of("wis_model_bcf") {
                 Some(x) => Some(x.to_string()),
                 None => None,
             },

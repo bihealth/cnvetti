@@ -8,6 +8,7 @@ members = [
     "lib-genotype",
     "lib-merge-cov",
     "lib-merge-seg",
+    "lib-mod-cov",
     "lib-model-pool",
     "lib-model-wis",
     "lib-normalize",

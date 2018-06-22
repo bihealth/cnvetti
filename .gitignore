@@ -1,9 +1,10 @@
 ### Data files
 
-*.vcf*
-*.bam*
-*.bcf*
-*.csi
+/*.vcf*
+/*.bam*
+/*.bcf*
+/*.csi
+/*.bed*
 
 /core.*
 
