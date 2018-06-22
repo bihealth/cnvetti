@@ -139,6 +139,8 @@ fn build_header(samples: &Vec<String>, contigs: &GenomeRegions) -> bcf::Header {
          to discovery step (or similar steps such as segmentation)\">",
         "##FORMAT=<ID=CVSD,Number=1,Type=Float,Description=\"Finalized coverage standard deviation \
          (or similar steps such as segmentation); only when considering base-wise coverage\">",
+        "##FORMAT=<ID=CV2,Number=1,Type=Float,Description=\"Log2-scaled, finalized coverage \
+         value as input to discovery step (or similar steps such as segmentation)\">",
         "##FORMAT=<ID=CVZ,Number=1,Type=Float,Description=\"Finalized coverage value as Z-score
          of reference targets distribution.\">",
         "##FORMAT=<ID=FRM,Number=1,Type=Float,Description=\"Fraction of window that was masked

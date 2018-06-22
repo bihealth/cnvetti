@@ -212,10 +212,15 @@ fn write_mod_cov(
 
             record
                 .push_format_float(b"CV", &[probe_info.cov_rel() as f32])
-                .chain_err(|| "Could not write FORMAT/CVZ")?;
+                .chain_err(|| "Could not write FORMAT/CV")?;
             record
                 .push_format_float(b"CVZ", &[probe_info.cov_z_score() as f32])
                 .chain_err(|| "Could not write FORMAT/CVZ")?;
+            if probe_info.cov_rel().is_finite() {
+                record
+                    .push_format_float(b"CV2", &[probe_info.cov_rel().log2() as f32])
+                    .chain_err(|| "Could not write FORMAT/CV2")?;
+            }
         } else {
             record.push_filter(
                 writer

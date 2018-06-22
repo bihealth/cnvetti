@@ -12,6 +12,8 @@ use lib_shared::stats::Stats;
 
 use shared::*;
 
+// TODO: actually, this is not uncorrected by "normalize by total count"
+
 /// Compute total number of fragments per bp for normalization.
 ///
 /// The input is already assumed to be length-normalized.

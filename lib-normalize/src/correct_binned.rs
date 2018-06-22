@@ -101,9 +101,15 @@ pub fn run_binned_correction(logger: &mut Logger, options: &NormalizeOptions) ->
                     .push_info_flag(b"FEW_GCWINDOWS")
                     .chain_err(|| "Could not write INFO/FEW_GCWINDOWS")?;
             } else {
+                let norm_lcv = lcv / median as f32;
                 record
-                    .push_format_float(b"CV", &[lcv / median as f32])
+                    .push_format_float(b"CV", &[norm_lcv])
                     .chain_err(|| "Problem writing CV to BCF record")?;
+                if norm_lcv.is_finite() {
+                    record
+                        .push_format_float(b"CV2", &[norm_lcv.log2()])
+                        .chain_err(|| "Problem writing CV to BCF record")?;
+                }
                 // Write normalized CV standard deviation.
                 let is_ok = record.format(b"LCVSD").float().is_ok();
                 if is_ok {
