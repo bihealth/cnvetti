@@ -49,8 +49,11 @@ fn compute_depths(
             .alignments()
             .filter(|alignment| {
                 let record = alignment.record();
-                !record.is_secondary() && !record.is_duplicate() && !record.is_supplementary()
-                    && !record.is_duplicate() && !record.is_quality_check_failed()
+                !record.is_secondary()
+                    && !record.is_duplicate()
+                    && !record.is_supplementary()
+                    && !record.is_duplicate()
+                    && !record.is_quality_check_failed()
                     && (record.mapq() >= options.min_mapq)
                     && (!record.is_paired() || record.is_proper_pair())
             })
