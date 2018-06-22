@@ -2,6 +2,8 @@
 
 ## HEAD (v0.1.0; unreleased)
 
+- Adding `cnvetti quick` sub commands:
+    - `wis-build-model` (build model for within-sample CNV calling from BAM files)
 - Adding `cnvetti cmd` sub commands:
     - `coverage` (genome-wide fragments/coverage, or target-wise fragments)
     - `normalize` (normalize with total coverage or by GC-wise median)

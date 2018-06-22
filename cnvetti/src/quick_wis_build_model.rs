@@ -96,7 +96,7 @@ impl QuickWisBuildModelOptions {
             filter_rel: 0.35,
             min_ref_targets: 10,
             max_ref_targets: 100,
-            max_samples_reliable: 4,
+            max_samples_reliable: 8,
             min_samples_min_fragments: 10,
         }
     }
