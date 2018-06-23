@@ -17,6 +17,7 @@ mod options;
 pub use options::*;
 
 extern crate rust_htslib;
+use rust_htslib::bcf::record::Numeric;
 use rust_htslib::bcf::{self, Read};
 
 extern crate lib_shared;
@@ -217,8 +218,13 @@ fn write_mod_cov(
                 .push_format_float(b"CVZ", &[probe_info.cov_z_score() as f32])
                 .chain_err(|| "Could not write FORMAT/CVZ")?;
             if probe_info.cov_rel().is_finite() {
+                let cov2 = if probe_info.cov_rel() == 0.0 {
+                    f32::missing()
+                } else {
+                    probe_info.cov_rel().log2() as f32
+                };
                 record
-                    .push_format_float(b"CV2", &[probe_info.cov_rel().log2() as f32])
+                    .push_format_float(b"CV2", &[cov2])
                     .chain_err(|| "Could not write FORMAT/CV2")?;
             }
         } else {

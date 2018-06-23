@@ -42,6 +42,8 @@ pub struct CoverageOptions {
     pub input: String,
     /// Path to coverage depth BCF file.
     pub output: String,
+    /// Path to BED file with masked regions.
+    pub output_masked_bed: Option<String>,
     /// Path to reference FASTA file.
     pub reference: Option<String>,
 
@@ -92,6 +94,7 @@ impl CoverageOptions {
         Self {
             input: matches.value_of("input").unwrap().to_string(),
             output: matches.value_of("output").unwrap().to_string(),
+            output_masked_bed: matches.value_of("output_masked_bed").map(|s| s.to_string()),
             reference: match matches.value_of("reference") {
                 Some(x) => Some(x.to_string()),
                 None => None,
@@ -137,7 +140,13 @@ impl CoverageOptions {
                 .unwrap(),
 
             window_length: match matches.value_of("window_length") {
-                Some(x) => Some(x.to_string().parse::<usize>().unwrap()),
+                Some(x) => Some(
+                    x.to_string()
+                        .replace("_", "")
+                        .replace(",", "")
+                        .parse::<usize>()
+                        .unwrap(),
+                ),
                 None => None,
             },
             targets_bed: match matches.value_of("targets_bed") {

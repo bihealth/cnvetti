@@ -20,6 +20,8 @@ struct PileCollectorOptions {
     pile_depth_percentile: f64,
     pile_max_gap: u32,
     min_mapq: u8,
+    /// Number of threads to use for BAM I/O.
+    io_threads: u32,
 }
 
 /// Collection of read piles for black listing.
@@ -114,14 +116,23 @@ impl<'a> PileCollector<'a> {
         pile_depth_percentile: f64,
         pile_max_gap: u32,
         min_mapq: u8,
+        io_threads: u32,
     ) -> Result<Self> {
         Ok(PileCollector {
-            bam_reader: bam::IndexedReader::from_path(&bam_path).chain_err(|| "Invalid_path")?,
+            bam_reader: {
+                let mut reader =
+                    bam::IndexedReader::from_path(&bam_path).chain_err(|| "Invalid_path")?;
+                reader
+                    .set_threads(io_threads as usize)
+                    .chain_err(|| "Could not set threads for reading")?;
+                reader
+            },
             bed_file,
             options: PileCollectorOptions {
                 pile_depth_percentile,
                 pile_max_gap,
                 min_mapq,
+                io_threads,
             },
         })
     }

@@ -85,6 +85,11 @@ subcommands:
             help: >
               Path to output BCF file with the coverage information.  This will also write a
               corresponding `.csi` file.
+        - output_masked_bed:
+            long: output-masked-bed
+            takes_value: true
+            value_name: MSK.bed
+            help: Path to BED file with masked regions.
         - reference:
             long: reference
             takes_value: true

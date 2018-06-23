@@ -38,6 +38,7 @@ impl QuickWisCallOptions {
             io_threads: 0,
             input: input.clone(),
             output: output.clone(),
+            output_masked_bed: None,
 
             reference: None,
             genome_region: None,

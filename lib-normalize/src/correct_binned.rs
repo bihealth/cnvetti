@@ -106,9 +106,14 @@ pub fn run_binned_correction(logger: &mut Logger, options: &NormalizeOptions) ->
                     .push_format_float(b"CV", &[norm_lcv])
                     .chain_err(|| "Problem writing CV to BCF record")?;
                 if norm_lcv.is_finite() {
+                    let cov2 = if norm_lcv == 0.0 {
+                        f32::missing()
+                    } else {
+                        norm_lcv.log2() as f32
+                    };
                     record
-                        .push_format_float(b"CV2", &[norm_lcv.log2()])
-                        .chain_err(|| "Problem writing CV to BCF record")?;
+                        .push_format_float(b"CV2", &[cov2])
+                        .chain_err(|| "Could not write FORMAT/CV2")?;
                 }
                 // Write normalized CV standard deviation.
                 let is_ok = record.format(b"LCVSD").float().is_ok();

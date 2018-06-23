@@ -264,6 +264,7 @@ fn collect_pile_info(
         options.pile_size_percentile,
         options.pile_max_gap,
         options.min_mapq,
+        options.io_threads,
     )?;
     let threshold_empty = depth_threshold.is_none();
     let (depth_threshold, len_sum, tree) = collector.collect_piles(chrom, logger, depth_threshold);
@@ -291,6 +292,7 @@ fn process_region(
     options: &CoverageOptions,
     (chrom, start, end): &(String, usize, usize),
     contig_length: usize,
+    out_bed: Option<&mut File>,
     bcf_writer: &mut bcf::Writer,
     pile_threshold: Option<usize>,
 ) -> Result<Option<usize>> {
@@ -325,7 +327,6 @@ fn process_region(
     let (piles_size_threshold, piles_tree) =
         if options.mask_piles && options.count_kind == CountKind::Fragments {
             info!(logger, "Collecting piles for masking them later on...");
-            let out_bed = None; // TODO: enable back again
             let (piles_size_threshold, piles_tree) =
                 collect_pile_info(logger, options, chrom, out_bed, pile_threshold)?;
             (Some(piles_size_threshold), Some(piles_tree))
@@ -610,6 +611,14 @@ pub fn run(logger: &mut Logger, options: &CoverageOptions) -> Result<()> {
             .collect::<Vec<String>>()
     );
 
+    let mut out_masked = if let Some(ref output_masked_bed) = options.output_masked_bed {
+        info!(logger, "Creating BED file with masked regions");
+        Some(File::create(output_masked_bed).chain_err(|| "Could not create BED file")?)
+    } else {
+        info!(logger, "NOT creating BED file with masked regions");
+        None
+    };
+
     // Create output file writer and kick off processing.  This is done in its own block such
     // that the file is definitely closed when building the index below.
     {
@@ -642,6 +651,7 @@ pub fn run(logger: &mut Logger, options: &CoverageOptions) -> Result<()> {
                 **contig_lengths
                     .get(&*region.0)
                     .expect("Could not resolve region"),
+                out_masked.as_mut(),
                 &mut writer,
                 pileup_threshold,
             )?;
