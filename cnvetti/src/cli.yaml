@@ -190,14 +190,12 @@ subcommands:
             help: >
                 Enable pile-masking algorithm using the other `--pile-*` arguments.  See the manual
                 for details.
-        - pile_size_percentile:
-            long: pile-size-percentile
+        - mask_piles_fdr:
+            long: mask-piles-fdr
             takes_value: true
-            default_value: '90'
-            value_name: NUM
-            help: >
-              Only keep piles with size (number of aligned bases) in the lower `NUM`-th
-              percentiles.
+            default_value: '0.001'
+            value_name: FDR
+            help: Compute pile depth threshold to get FDR less than or equal to this value.
         - pile_max_gap:
             long: pile-max-gap
             takes_value: true

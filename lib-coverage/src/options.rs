@@ -81,11 +81,11 @@ pub struct CoverageOptions {
     // Pile-related
     /// Whether or not to mask based on overlap with large read piles.
     pub mask_piles: bool,
-    /// Read must not be part of a pile in a percentile above this one (ordered by pile size in
-    /// number of bases).
-    pub pile_size_percentile: f64,
     /// Join piles closer than this number.
     pub pile_max_gap: u32,
+    /// Set pile size threshold to get FDR less than or equal to this value using model
+    /// assumption of Poisson for noise.
+    pub mask_piles_fdr: f64,
 }
 
 impl CoverageOptions {
@@ -159,8 +159,8 @@ impl CoverageOptions {
             },
 
             mask_piles: matches.is_present("mask_piles"),
-            pile_size_percentile: matches
-                .value_of("pile_size_percentile")
+            mask_piles_fdr: matches
+                .value_of("mask_piles_fdr")
                 .unwrap()
                 .parse::<f64>()
                 .unwrap(),

@@ -58,7 +58,7 @@ impl QuickWisCallOptions {
             wis_model_bcf: Some(self.input_model.clone()),
 
             mask_piles: false,
-            pile_size_percentile: 0.0,
+            mask_piles_fdr: 0.0,
             pile_max_gap: 0,
         }
     }
