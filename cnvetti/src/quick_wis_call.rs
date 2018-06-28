@@ -81,7 +81,8 @@ impl QuickWisCallOptions {
     ) -> ModelBasedCoverageOptions {
         ModelBasedCoverageOptions {
             input: input.clone(),
-            input_model: input_model.clone(),
+            input_wis_model: Some(input_model.clone()),
+            input_pool_model: None,
 
             output: output.clone(),
 

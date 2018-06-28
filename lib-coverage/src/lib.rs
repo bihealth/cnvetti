@@ -112,6 +112,9 @@ fn build_header(samples: &Vec<String>, contigs: &GenomeRegions) -> bcf::Header {
         "##INFO=<ID=REF_MEAN,Number=1,Type=Flag,Description=\"Reference mean coverage\">",
         "##INFO=<ID=REF_STD_DEV,Number=1,Type=Flag,Description=\"Reference mean standard \
          deviation\">",
+        "##INFO=<ID=REF_IQR,Number=1,Type=Flag,Description=\"Inter-quartile range of reference\">",
+        "##INFO=<ID=REF_5SUMMARY,Number=5,Type=Flag,Description=\"Five-number summary of \
+         reference coverage\">",
         // FILTER fields
         "##FILTER=<ID=PILE,Description=\"Window masked in sample because piles make up a
          too large fraction of it.\">",
@@ -378,10 +381,10 @@ fn gather_piles(
     let mut abs_freq: Vec<usize> = Vec::new();
     for (chrom, _, _) in &regions.regions {
         for pile in chrom_pile_infos.get(&chrom.to_string()).unwrap() {
-                if abs_freq.len() <= (pile.size as usize) {
-                    abs_freq.resize(pile.size as usize + 1, 0);
-                }
-                abs_freq[pile.size as usize] += 1;
+            if abs_freq.len() <= (pile.size as usize) {
+                abs_freq.resize(pile.size as usize + 1, 0);
+            }
+            abs_freq[pile.size as usize] += 1;
         }
     }
     info!(logger, " => done");
@@ -404,7 +407,12 @@ fn gather_piles(
                 }
             }
         }
-        info!(logger, "Black-listing {} bp on contig {}", len_sum.separated_string(), chrom);
+        info!(
+            logger,
+            "Black-listing {} bp on contig {}",
+            len_sum.separated_string(),
+            chrom
+        );
         result.insert(chrom.clone(), interval_tree);
     }
     info!(logger, " => done");

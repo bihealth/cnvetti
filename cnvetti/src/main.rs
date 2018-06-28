@@ -37,6 +37,7 @@ pub use errors::*;
 extern crate lib_coverage;
 extern crate lib_merge_cov;
 extern crate lib_mod_cov;
+extern crate lib_model_pool;
 extern crate lib_model_wis;
 extern crate lib_normalize;
 extern crate lib_visualize;
@@ -121,7 +122,10 @@ fn run(matches: ArgMatches) -> Result<()> {
                     .chain_err(|| "Could not execute 'cmd merge-cov'")?
             }
             ("de-bias", Some(_m)) => bail!("cmd de-bias not implemented!"),
-            ("build-model-pool", Some(_m)) => bail!("cmd build-model-pool not implemented!"),
+            ("build-model-pool", Some(m)) => {
+                lib_model_pool::run(&mut logger, &lib_model_pool::BuildModelPoolOptions::new(&m))
+                    .chain_err(|| "Could not execute 'cmd build-model-pool'")?
+            }
             ("build-model-wis", Some(m)) => {
                 lib_model_wis::run(&mut logger, &lib_model_wis::BuildModelWisOptions::new(&m))
                     .chain_err(|| "Could not execute 'cmd build-model-wis'")?

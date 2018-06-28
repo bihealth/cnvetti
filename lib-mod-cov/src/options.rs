@@ -11,8 +11,10 @@ pub struct ModelBasedCoverageOptions {
     // I/O related
     /// Path to normalized counts BCF file.
     pub input: String,
-    /// Path to model input BCF file.
-    pub input_model: String,
+    /// Path to WIS model input BCF file.
+    pub input_wis_model: Option<String>,
+    /// Path to pool model input BCF file.
+    pub input_pool_model: Option<String>,
     /// Path to normalized coverage depth BCF file.
     pub output: String,
 }
@@ -22,7 +24,8 @@ impl ModelBasedCoverageOptions {
     pub fn new(matches: &ArgMatches) -> Self {
         Self {
             input: matches.value_of("input").unwrap().to_string(),
-            input_model: matches.value_of("input_model").unwrap().to_string(),
+            input_wis_model: matches.value_of("input_wis_model").map(|x| x.to_string()),
+            input_pool_model: matches.value_of("input_pool_model").map(|x| x.to_string()),
             output: matches.value_of("output").unwrap().to_string(),
 
             io_threads: matches

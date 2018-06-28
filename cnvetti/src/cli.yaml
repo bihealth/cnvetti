@@ -319,7 +319,7 @@ subcommands:
         - ColorAuto
     # Sub command: cmd build-model-pool -----------------------------------------------------------
     - build-model-pool:
-        about: Build model based on pooling a reference panel
+        about: Build model based on pooling a reference panel.
         after_help: >
           This command takes a multi-sample coverage BCF file and computes per-region statistics
           across the cohort.  The output of this step is a BCF without sample information that
@@ -331,6 +331,20 @@ subcommands:
         - GlobalVersion
         - UnifiedHelpMessage
         - ColorAuto
+        args:
+        - input:
+            multiple: false
+            takes_value: true
+            required: true
+            value_name: MULTICOV.bcf
+            help: Path to indexed BCF file that was merged from multiple coverage files.
+        - output:
+            long: output
+            short: o
+            takes_value: true
+            required: true
+            value_name: OUT.bcf
+            help: Path to output normalized counts BCF file.
     # Sub command: cmd build-model-wis ------------------------------------------------------------
     - build-model-wis:
         about: Build within-sample model.
@@ -434,13 +448,20 @@ subcommands:
             required: true
             value_name: INPUT.bcf
             help: Path to indexed BCF file containing normalized counts.
-        - input_model:
+        - input_wis_model:
             long: input-wis-model
             multiple: false
             takes_value: true
             required: true
             value_name: MODEL.bcf
             help: Path to BCF file with the within-sample model.
+        - input_pool_model:
+            long: input-pool-model
+            multiple: false
+            takes_value: true
+            required: true
+            value_name: MODEL.bcf
+            help: Path to BCF file with the pool-of-reference model.
         - output:
             long: output
             short: o
@@ -452,7 +473,8 @@ subcommands:
         - model:
             required: true
             args:
-            - input_model
+            - input_wis_model
+            - input_pool_model
     # Sub command: cmd discover -------------------------------------------------------------------
     - discover:
         about: Perform CNV discovery/calling.
