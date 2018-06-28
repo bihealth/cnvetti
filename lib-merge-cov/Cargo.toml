@@ -7,7 +7,7 @@ authors = ["Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>"]
 chrono = "*"
 clap = {version = "*", features = ["yaml", "color", "suggestions"]}
 error-chain = "*"
-rust-htslib = { git = "https://github.com/holtgrewe/rust-htslib.git", branch = "feature/synced-reader" }
+rust-htslib = { git = "https://github.com/rust-bio/rust-htslib.git", branch = "master" }
 separator = "*"
 shlex = "*"
 slog = {version = "*", features = ["max_level_trace", "release_max_level_debug"] }
