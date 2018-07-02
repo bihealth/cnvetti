@@ -1,4 +1,4 @@
-//! Implementation of the "cnvetti quick wis-build-model" command.
+//! Implementation of the "cnvetti quick pool-build-model" command.
 
 use std::env;
 
@@ -12,14 +12,14 @@ use tempdir::TempDir;
 
 use lib_coverage::{self, CoverageOptions};
 use lib_merge_cov::{self, MergeCovOptions};
-use lib_model_wis::{self, BuildModelWisOptions};
+use lib_model_pool::{self, BuildModelPoolOptions};
 use lib_normalize::{self, NormalizeOptions};
 
 use super::errors::*;
 
 /// Options for "cnvetti cmd coverage".
 #[derive(Clone, Debug)]
-pub struct QuickWisBuildModelOptions {
+pub struct QuickPoolBuildModelOptions {
     /// Path to input BCF file.
     pub input: Vec<String>,
     /// Path to tabix-indexed targets BED file.
@@ -36,7 +36,7 @@ pub struct QuickWisBuildModelOptions {
 }
 
 /// Conversion into CoverageOptions.
-impl QuickWisBuildModelOptions {
+impl QuickPoolBuildModelOptions {
     fn into_coverage_options(&self, input: &String, output: &String) -> CoverageOptions {
         CoverageOptions {
             io_threads: 0,
@@ -85,27 +85,20 @@ impl QuickWisBuildModelOptions {
         }
     }
 
-    fn into_build_model_wis_options(
+    fn into_build_model_pool_options(
         &self,
         input: &String,
         output: &String,
-    ) -> BuildModelWisOptions {
-        BuildModelWisOptions {
+    ) -> BuildModelPoolOptions {
+        BuildModelPoolOptions {
             input: input.clone(),
             output: output.clone(),
             io_threads: 0,
-            num_threads: self.num_threads,
-            filter_z_score: 5.64,
-            filter_rel: 0.35,
-            min_ref_targets: 10,
-            max_ref_targets: 100,
-            max_samples_reliable: 8,
-            min_samples_min_fragments: 10,
         }
     }
 }
 
-impl QuickWisBuildModelOptions {
+impl QuickPoolBuildModelOptions {
     /// Build options from ArgMatches.
     pub fn new(matches: &ArgMatches) -> Self {
         Self {
@@ -131,14 +124,14 @@ impl QuickWisBuildModelOptions {
     }
 }
 
-pub fn run(logger: &mut Logger, options: &QuickWisBuildModelOptions) -> Result<()> {
+pub fn run(logger: &mut Logger, options: &QuickPoolBuildModelOptions) -> Result<()> {
     // Set number of threads to use by rayon.
     env::set_var("RAYON_NUM_THREADS", format!("{}", options.num_threads));
 
-    info!(logger, "Running: cnvetti quick wis-build-model");
+    info!(logger, "Running: cnvetti quick pool-build-model");
     info!(logger, "Options: {:?}", options);
 
-    let tmp_dir = TempDir::new("cnvetti_quick_wis_build_model")
+    let tmp_dir = TempDir::new("cnvetti_quick_pool_build_model")
         .chain_err(|| "Could not create temporary directory.")?;
 
     // Parallel coverage computation and normalization.
@@ -201,9 +194,9 @@ pub fn run(logger: &mut Logger, options: &QuickWisBuildModelOptions) -> Result<(
 
     // Build within-sample model.
     info!(logger, "Build model and write out");
-    lib_model_wis::run(
-        &mut logger.new(o!("step" => "build-wis-model")),
-        &options.into_build_model_wis_options(&merge_out, &options.output),
+    lib_model_pool::run(
+        &mut logger.new(o!("step" => "build-pool-model")),
+        &options.into_build_model_pool_options(&merge_out, &options.output),
     ).chain_err(|| "Problem building the model")?;
 
     info!(logger, "All done. Have a nice day!");

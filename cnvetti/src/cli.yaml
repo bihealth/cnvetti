@@ -129,6 +129,16 @@ subcommands:
               Whether to consider alignment coverage or number of aligning fragments.  In the
               cases of WES data and low-coverage WGS data, counting fragment is recommended.
               Considering coverage is only recommended in the case of high-coverage WGS data.
+        - considered_regions:
+            long: considered-regions
+            takes_value: true
+            required: true
+            value_name: REGIONS
+            possible_values:
+            - GenomeWide
+            - TargetRegions
+            help: >
+              The region type to consider.
         - min_mapq:
             long: min-mapq
             takes_value: true
@@ -165,7 +175,7 @@ subcommands:
               Length of window for binning on coverage computation.  Required unless
             conflicts_with:
             - targets_bed
-            - wis_model_bcf
+            - model_bcf
         - targets_bed:
             long: targets-bed
             takes_value: true
@@ -173,12 +183,12 @@ subcommands:
             help: Path to tabix-indexed BED file with intervals of the targets of WES.
             conflicts_with:
             - window_length
-            - wis_model_bcf
-        - wis_model_bcf:
-            long: wis-model-bcf
+            - model_bcf
+        - model_bcf:
+            long: model-bcf
             takes_value: true
             value_name: MODEL.bcf
-            help: Path to WIS model BCF file.
+            help: Path to WIS or pool-based model BCF file.
             conflicts_with: window_length
             conflicts_with:
             - window_length
@@ -623,7 +633,7 @@ subcommands:
             required: false
             value_name: COV2.igv
             help: Optional path to IGV file to write log2-scaled coverage to.
-    # Sub command: quick wis_call_matched ---------------------------------------------------------
+    # Sub command: quick wis-call-matched ---------------------------------------------------------
     - wis-call-matched:
         about: Perform CNV calling on one matched tumor sample using the within-sample approach.
         after_help: >
@@ -638,6 +648,57 @@ subcommands:
         - GlobalVersion
         - UnifiedHelpMessage
         - ColorAuto
+    # Sub command: quick pool-build-model ---------------------------------------------------------
+    - pool-build-model:
+        about: Build a pool-based-sample model for targeted sequencing CNV calling.
+        after_help: >
+          This call takes a list of BAM files that are aligned to the same reference and are
+          ideally unrelated to reduce biases and skews in the resulting model.  Further, a tabix-
+          indexed BED file with target regions is required.
+
+          The command writes a BCF file that gives per-region coverage statistics.
+
+          The processing of the input files happens in parallel.
+        settings:
+        - ArgRequiredElseHelp
+        - DeriveDisplayOrder
+        - GlobalVersion
+        - UnifiedHelpMessage
+        - ColorAuto
+        args:
+        # TODO: allow more configuration options from the more fine-granular `cmd *` commands.
+        - input:
+            multiple: false
+            takes_value: true
+            required: true
+            multiple: true
+            value_name: INPUT.bam
+            help: Path to indexed input BAM file.
+        - targets_bed:
+            long: targets-bed
+            takes_value: true
+            value_name: TGT.bed.gz
+            required: true
+            help: Path to tabix-indexed BED file with intervals of the targets of WES.
+        - output:
+            long: output
+            short: o
+            takes_value: true
+            required: true
+            value_name: OUT.bcf
+            help: Path to output model BCF file.
+        - output_cov:
+            long: output-cov
+            takes_value: true
+            value_name: OUT.cov.bcf
+            help: Path to output per-sample coverage BCF file.
+        - num_threads:
+            long: num-threads
+            takes_value: true
+            required: false
+            value_name: THREADS
+            default_value: '1'
+            help: Number of threads to use.
 
 # Sub command: visualize ==========================================================================
 - visualize:

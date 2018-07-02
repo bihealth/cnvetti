@@ -216,8 +216,8 @@ fn load_bed_regions_from_tabix(
     Ok(result)
 }
 
-/// Load regions from WIS model BCF file.
-fn load_regions_from_wis_model_bcf(
+/// Load regions from WIS or pool-based model BCF file.
+fn load_regions_from_model_bcf(
     logger: &mut Logger,
     filename: &String,
     chrom: &str,
@@ -468,13 +468,13 @@ fn process_region(
             intervals.insert(start..end, i as u32);
         }
         Some((regions, intervals))
-    } else if let Some(wis_model_bcf) = &options.wis_model_bcf {
+    } else if let Some(model_bcf) = &options.model_bcf {
         info!(
             logger,
             "Loading target regions from WIS model BCF file file"
         );
         let regions =
-            load_regions_from_wis_model_bcf(logger, &wis_model_bcf, &chrom, contig_length)?;
+            load_regions_from_model_bcf(logger, &model_bcf, &chrom, contig_length)?;
         // TODO: extract this into function
         // Build interval tree.
         let mut intervals: IntervalTree<u32, u32> = IntervalTree::new();

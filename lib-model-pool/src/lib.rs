@@ -160,22 +160,22 @@ fn write_output(
             let q4 = cvs.max();
 
             rec_out
-                .push_format_float(b"CV_IQR", &[(q3 - q1) as f32])
+                .push_info_float(b"CV_IQR", &[(q3 - q1) as f32])
                 .chain_err(|| "Problem setting FORMAT/CV_IQR")?;
             rec_out
-                .push_format_float(b"CV_MEDIAN", &[q2 as f32])
+                .push_info_float(b"CV_MEDIAN", &[q2 as f32])
                 .chain_err(|| "Problem setting FORMAT/CV_MEDIAN")?;
             rec_out
-                .push_format_float(
+                .push_info_float(
                     b"CV_5SUMMARY",
                     &[q0 as f32, q1 as f32, q2 as f32, q3 as f32, q4 as f32],
                 )
                 .chain_err(|| "Problem setting FORMAT/CV_5SUMMARY")?;
             rec_out
-                .push_format_float(b"CV_MEAN", &[cvs.mean() as f32])
+                .push_info_float(b"CV_MEAN", &[cvs.mean() as f32])
                 .chain_err(|| "Problem setting FORMAT/CV_MEAN")?;
             rec_out
-                .push_format_float(b"CV_STD_DEV", &[cvs.std_dev() as f32])
+                .push_info_float(b"CV_STD_DEV", &[cvs.std_dev() as f32])
                 .chain_err(|| "Problem setting FORMAT/CV_STD_DEV")?;
 
             writer

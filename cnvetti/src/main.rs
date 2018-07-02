@@ -42,6 +42,8 @@ extern crate lib_model_wis;
 extern crate lib_normalize;
 extern crate lib_visualize;
 
+mod quick_pool_build_model;
+mod quick_pool_call;
 mod quick_wis_build_model;
 mod quick_wis_call;
 
@@ -138,8 +140,18 @@ fn run(matches: ArgMatches) -> Result<()> {
             ("genotype", Some(_m)) => bail!("cmd genotype not implemented!"),
             _ => bail!("Invalid command: {}", m.subcommand().0),
         },
-        // cnvetti quick <wis-build-model|wis-call>
+        // cnvetti quick <wis-build-model|wis-call|pool-build-model|pool-call>
         ("quick", Some(m)) => match m.subcommand() {
+            ("pool-build-model", Some(m)) => {
+                quick_pool_build_model::run(
+                    &mut logger,
+                    &quick_pool_build_model::QuickPoolBuildModelOptions::new(&m),
+                ).chain_err(|| "Could not execute 'cmd quick pool-build-models")?
+            }
+            ("pool-call", Some(m)) => {
+                quick_pool_call::run(&mut logger, &quick_pool_call::QuickPoolCallOptions::new(&m))
+                    .chain_err(|| "Could not execute 'cmd quick pool-call")?
+            }
             ("wis-build-model", Some(m)) => {
                 quick_wis_build_model::run(
                     &mut logger,

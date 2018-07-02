@@ -1,4 +1,4 @@
-//! Implementation of the "cnvetti quick wis-call" command.
+//! Implementation of the "cnvetti quick pool-call" command.
 
 use clap::ArgMatches;
 
@@ -15,7 +15,7 @@ use super::errors::*;
 
 /// Options for "cnvetti cmd coverage".
 #[derive(Clone, Debug)]
-pub struct QuickWisCallOptions {
+pub struct QuickPoolCallOptions {
     /// Path to input BCF file.
     pub input: String,
     /// Path to indexed BCF file with targets.
@@ -33,7 +33,7 @@ pub struct QuickWisCallOptions {
 }
 
 /// Conversion into CoverageOptions.
-impl QuickWisCallOptions {
+impl QuickPoolCallOptions {
     fn into_coverage_options(&self, input: &String, output: &String) -> CoverageOptions {
         CoverageOptions {
             io_threads: 0,
@@ -82,8 +82,8 @@ impl QuickWisCallOptions {
     ) -> ModelBasedCoverageOptions {
         ModelBasedCoverageOptions {
             input: input.clone(),
-            input_wis_model: Some(input_model.clone()),
-            input_pool_model: None,
+            input_wis_model: None,
+            input_pool_model: Some(input_model.clone()),
 
             output: output.clone(),
 
@@ -101,7 +101,7 @@ impl QuickWisCallOptions {
     }
 }
 
-impl QuickWisCallOptions {
+impl QuickPoolCallOptions {
     /// Build options from ArgMatches.
     pub fn new(matches: &ArgMatches) -> Self {
         Self {
@@ -123,11 +123,11 @@ impl QuickWisCallOptions {
     }
 }
 
-pub fn run(logger: &mut Logger, options: &QuickWisCallOptions) -> Result<()> {
-    info!(logger, "Running: cnvetti quick wis-call");
+pub fn run(logger: &mut Logger, options: &QuickPoolCallOptions) -> Result<()> {
+    info!(logger, "Running: cnvetti quick pool-call");
     info!(logger, "Options: {:?}", options);
 
-    let tmp_dir = TempDir::new("cnvetti_quick_wis_call")
+    let tmp_dir = TempDir::new("cnvetti_quick_pool_call")
         .chain_err(|| "Could not create temporary directory.")?;
 
     // Parallel coverage computation and normalization.
@@ -157,7 +157,7 @@ pub fn run(logger: &mut Logger, options: &QuickWisCallOptions) -> Result<()> {
         .chain_err(|| format!("Problem normalizing on {}", &cov_out))?;
     info!(logger, " => done");
 
-    // Compute coverage relative to WIS model.
+    // Compute coverage relative to pool-based model.
     info!(logger, "Compute model-based coverage normalization");
     let output_targets = if let Some(ref output_targets) = options.output_targets {
         output_targets.clone()
