@@ -582,7 +582,7 @@ subcommands:
         about: Perform CNV calling on germline or unmatched tumor using within-sample approach.
         after_help: >
           This shortcut takes as the input a BCF file with the within-sample model from
-          `cnvetti quick wis-build-model` and a BAM file of one germline or unmached tumor sample.
+          `cnvetti quick wis-build-model` and a BAM file of one germline or unmatched tumor sample.
 
           It will then generate on-target CNV analysis and perform CNV variant calling using the
           resulting on-target coverage result.
@@ -633,6 +633,12 @@ subcommands:
             required: false
             value_name: COV2.igv
             help: Optional path to IGV file to write log2-scaled coverage to.
+        - output_igv_covz:
+            long: output-igv-covz
+            takes_value: true
+            required: false
+            value_name: COVZ.igv
+            help: Optional path to IGV file to write coverage Z-score to.
     # Sub command: quick wis-call-matched ---------------------------------------------------------
     - wis-call-matched:
         about: Perform CNV calling on one matched tumor sample using the within-sample approach.
@@ -699,6 +705,68 @@ subcommands:
             value_name: THREADS
             default_value: '1'
             help: Number of threads to use.
+    # Sub command: quick pool-call -----------------------------------------------------------------
+    - pool-call:
+        about: Perform CNV calling on germline or unmatched tumor using pooling approach.
+        after_help: >
+          This shortcut takes as the input a BCF file with the pooling model from
+          `cnvetti quick pool-build-model` and a BAM file of one germline or unmatched tumor sample.
+
+          It will then generate on-target CNV analysis and perform CNV variant calling using the
+          resulting on-target coverage result.
+        settings:
+        - ArgRequiredElseHelp
+        - DeriveDisplayOrder
+        - GlobalVersion
+        - UnifiedHelpMessage
+        - ColorAuto
+        args:
+        - input:
+            multiple: false
+            takes_value: true
+            required: true
+            value_name: INPUT.bam
+            help: Path to indexed input BAM file.
+        - input_model:
+            long: input-model
+            multiple: false
+            takes_value: true
+            required: true
+            value_name: MODEL.bcf
+            help: Path to BCF file with the pool model.
+        - output:
+            long: output
+            short: o
+            takes_value: true
+            required: true
+            value_name: OUT.bcf
+            help: Path to output CNV call file.
+        - output_targets:
+            long: output-targets
+            takes_value: true
+            required: false
+            value_name: OUT.tgts.bcf
+            help: >
+              Optional path to BCF file with per-target coverage information (similar level of
+              information to probes in arrays).
+        - output_igv_cov:
+            long: output-igv-cov
+            takes_value: true
+            required: false
+            value_name: COV.igv
+            help: Optional path to IGV file to write (linear relative) coverage to.
+        - output_igv_cov2:
+            long: output-igv-cov2
+            takes_value: true
+            required: false
+            value_name: COV2.igv
+            help: Optional path to IGV file to write log2-scaled coverage to.
+        - output_igv_covz:
+            long: output-igv-covz
+            takes_value: true
+            required: false
+            value_name: COVZ.igv
+            help: Optional path to IGV file to write coverage Z-score to.
 
 # Sub command: visualize ==========================================================================
 - visualize:
@@ -749,6 +817,12 @@ subcommands:
             required: true
             value_name: OUT.cov2.igv
             help: Path to IGV coverage file writing out the log2-transformed coverage signal.
+        - output_igv_covz:
+            long: output-igv-covz
+            takes_value: true
+            required: false
+            value_name: COVZ.igv
+            help: Optional path to IGV file to write coverage Z-score to.
 
 # Sub command: annotate ===========================================================================
 - annotate:

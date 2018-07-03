@@ -30,6 +30,8 @@ pub struct QuickPoolCallOptions {
     pub output_igv_cov: Option<String>,
     /// Path to IGV file with CV2 information.
     pub output_igv_cov2: Option<String>,
+    /// Path to IGV file with CVZ information.
+    pub output_igv_covz: Option<String>,
 }
 
 /// Conversion into CoverageOptions.
@@ -96,6 +98,7 @@ impl QuickPoolCallOptions {
             input: input.clone(),
             output_igv_cov: self.output_igv_cov.clone(),
             output_igv_cov2: self.output_igv_cov2.clone(),
+            output_igv_covz: self.output_igv_covz.clone(),
             io_threads: 0,
         }
     }
@@ -119,6 +122,7 @@ impl QuickPoolCallOptions {
 
             output_igv_cov: matches.value_of("output_igv_cov").map(|s| s.to_string()),
             output_igv_cov2: matches.value_of("output_igv_cov2").map(|s| s.to_string()),
+            output_igv_covz: matches.value_of("output_igv_covz").map(|s| s.to_string()),
         }
     }
 }

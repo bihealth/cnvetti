@@ -33,7 +33,7 @@ pub mod cov_to_igv {
     use super::*;
 
     /// Write header to file for relative coverage (linear).
-    fn write_linear_header(header: &bcf::header::HeaderView, f: &mut File) -> Result<()> {
+    fn write_cov_header(header: &bcf::header::HeaderView, f: &mut File) -> Result<()> {
         f.write_all(
             "#track \
              color=000,000,000 \
@@ -58,13 +58,38 @@ pub mod cov_to_igv {
     }
 
     /// Write header to file for log2-scaled coverage.
-    fn write_log2_header(header: &bcf::header::HeaderView, f: &mut File) -> Result<()> {
+    fn write_cov2_header(header: &bcf::header::HeaderView, f: &mut File) -> Result<()> {
         f.write_all(
             "#track \
              color=255,000,000 \
              altColor=000,000,255 \
              graphType=points \
              viewLimits=-1.5:1.5 \
+             windowingFunction=mean\n"
+                .as_bytes(),
+        ).chain_err(|| "Problem writing header")?;
+        f.write_all(
+            format!(
+                "Chromosome\tStart\tEnd\tFeature\t{}\n",
+                header
+                    .samples()
+                    .iter()
+                    .map(|x| String::from_utf8(x.to_vec()).expect("Convertion from UTF-8 failed"))
+                    .collect::<Vec<String>>()
+                    .join("\t")
+            ).as_bytes(),
+        ).chain_err(|| "Could not write header")?;
+        Ok(())
+    }
+
+    /// Write header to file for coverage Z-score.
+    fn write_covz_header(header: &bcf::header::HeaderView, f: &mut File) -> Result<()> {
+        f.write_all(
+            "#track \
+             color=255,000,000 \
+             altColor=000,000,255 \
+             graphType=points \
+             viewLimits=-3:3 \
              windowingFunction=mean\n"
                 .as_bytes(),
         ).chain_err(|| "Problem writing header")?;
@@ -130,7 +155,7 @@ pub mod cov_to_igv {
         let mut file_linear = if let Some(path) = &options.output_igv_cov {
             info!(logger, "Open (linear) coverage file.");
             let mut file = File::create(&path).chain_err(|| format!("Problem opening {}", path))?;
-            write_linear_header(&reader.header(), &mut file)
+            write_cov_header(&reader.header(), &mut file)
                 .chain_err(|| format!("Problem writing header to {}", path))?;
             Some(file)
         } else {
@@ -142,11 +167,23 @@ pub mod cov_to_igv {
         let mut file_cov2 = if let Some(path) = &options.output_igv_cov2 {
             info!(logger, "Open log2-scaled coverage file.");
             let mut file = File::create(&path).chain_err(|| format!("Problem opening {}", path))?;
-            write_log2_header(&reader.header(), &mut file)
+            write_cov2_header(&reader.header(), &mut file)
                 .chain_err(|| format!("Problem writing header to {}", path))?;
             Some(file)
         } else {
             info!(logger, "No log2-scaled coverage file.");
+            None
+        };
+
+        // Open coverage Z-score IGV and write header.
+        let mut file_covz = if let Some(path) = &options.output_igv_covz {
+            info!(logger, "Open coverage Z-score file.");
+            let mut file = File::create(&path).chain_err(|| format!("Problem opening {}", path))?;
+            write_covz_header(&reader.header(), &mut file)
+                .chain_err(|| format!("Problem writing header to {}", path))?;
+            Some(file)
+        } else {
+            info!(logger, "No coverage Z-score file.");
             None
         };
 
@@ -165,6 +202,9 @@ pub mod cov_to_igv {
             }
             if let Some(ref mut file) = file_cov2 {
                 write_line(&mut record, b"CV2", file)?;
+            }
+            if let Some(ref mut file) = file_covz {
+                write_line(&mut record, b"CVZ", file)?;
             }
         }
         info!(logger, " => done");
