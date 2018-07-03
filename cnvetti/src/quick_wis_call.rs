@@ -1,5 +1,7 @@
 //! Implementation of the "cnvetti quick wis-call" command.
 
+use std::str::FromStr;
+
 use clap::ArgMatches;
 
 use slog::Logger;
@@ -38,6 +40,28 @@ pub struct QuickWisCallOptions {
     pub output_igv_seg: Option<String>,
     /// Path to IGV file with SG2 information.
     pub output_igv_seg2: Option<String>,
+
+    /// The segmentation method to employ.
+    pub segmentation: Segmentation,
+
+    /// Parameter for p-value thresholding.
+    pub thresh_p_value: f64,
+
+    // Parameters from Haar-Seg.
+    /// Value for l_min.
+    pub haar_seg_l_min: u32,
+    /// Value for l_max.
+    pub haar_seg_l_max: u32,
+    /// Value for FDR.
+    pub haar_seg_fdr: f64,
+
+    // Parameters from WISExome.
+    /// Maximal window size in "windowing" step.
+    pub wisexome_max_window_size: u32,
+    /// Threshold on relative coverage.
+    pub wisexome_thresh_rel_cov: f64,
+    /// Threshold on Z-score.
+    pub wisexome_thresh_z_score: f64,
 }
 
 /// Conversion into CoverageOptions.
@@ -103,9 +127,19 @@ impl QuickWisCallOptions {
         SegmentOptions {
             input: input.clone(),
             output: output.clone(),
-            segmentation: Segmentation::HaarSeg,
+            segmentation: self.segmentation,
 
             io_threads: 0,
+
+            thresh_p_value: self.thresh_p_value,
+
+            haar_seg_l_min: self.haar_seg_l_min,
+            haar_seg_l_max: self.haar_seg_l_max,
+            haar_seg_fdr: self.haar_seg_fdr,
+
+            wisexome_max_window_size: self.wisexome_max_window_size,
+            wisexome_thresh_rel_cov: self.wisexome_thresh_rel_cov,
+            wisexome_thresh_z_score: self.wisexome_thresh_z_score,
         }
     }
 
@@ -125,6 +159,9 @@ impl QuickWisCallOptions {
 impl QuickWisCallOptions {
     /// Build options from ArgMatches.
     pub fn new(matches: &ArgMatches) -> Self {
+        let segmentation = matches.value_of("segmentation").unwrap();
+        let segmentation = Segmentation::from_str(&segmentation).expect("Unknown segmentation");
+
         Self {
             input: matches
                 .value_of("input")
@@ -143,6 +180,46 @@ impl QuickWisCallOptions {
             output_igv_covz: matches.value_of("output_igv_covz").map(|s| s.to_string()),
             output_igv_seg: matches.value_of("output_igv_seg").map(|s| s.to_string()),
             output_igv_seg2: matches.value_of("output_igv_seg2").map(|s| s.to_string()),
+
+            segmentation: segmentation,
+
+            thresh_p_value: matches
+                .value_of("thresh_p_value")
+                .unwrap()
+                .parse::<f64>()
+                .unwrap(),
+
+            haar_seg_l_min: matches
+                .value_of("haar_seg_l_min")
+                .unwrap()
+                .parse::<u32>()
+                .unwrap(),
+            haar_seg_l_max: matches
+                .value_of("haar_seg_l_max")
+                .unwrap()
+                .parse::<u32>()
+                .unwrap(),
+            haar_seg_fdr: matches
+                .value_of("haar_seg_fdr")
+                .unwrap()
+                .parse::<f64>()
+                .unwrap(),
+
+            wisexome_max_window_size: matches
+                .value_of("wisexome_max_window_size")
+                .unwrap()
+                .parse::<u32>()
+                .unwrap(),
+            wisexome_thresh_rel_cov: matches
+                .value_of("wisexome_thresh_rel_cov")
+                .unwrap()
+                .parse::<f64>()
+                .unwrap(),
+            wisexome_thresh_z_score: matches
+                .value_of("wisexome_thresh_z_score")
+                .unwrap()
+                .parse::<f64>()
+                .unwrap(),
         }
     }
 }

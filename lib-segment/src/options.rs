@@ -5,7 +5,7 @@ use std::str::FromStr;
 use clap::ArgMatches;
 
 /// Define the method for segmentation.
-#[derive(Clone, EnumString, Debug, PartialEq)]
+#[derive(Clone, Copy, EnumString, Debug, PartialEq)]
 pub enum Segmentation {
     /// Segmentation using the Haar-Seg algorithm.
     HaarSeg,
@@ -31,6 +31,25 @@ pub struct SegmentOptions {
 
     /// The segmentation method to employ.
     pub segmentation: Segmentation,
+
+    /// Parameters for p-value thresholding.
+    pub thresh_p_value: f64,
+
+    // Parameters from Haar-Seg.
+    /// Value for l_min.
+    pub haar_seg_l_min: u32,
+    /// Value for l_max.
+    pub haar_seg_l_max: u32,
+    /// Value for FDR.
+    pub haar_seg_fdr: f64,
+
+    // Parameters from WISExome.
+    /// Maximal window size in "windowing" step.
+    pub wisexome_max_window_size: u32,
+    /// Threshold on relative coverage.
+    pub wisexome_thresh_rel_cov: f64,
+    /// Threshold on Z-score.
+    pub wisexome_thresh_z_score: f64,
 }
 
 impl SegmentOptions {
@@ -47,7 +66,46 @@ impl SegmentOptions {
                 .unwrap()
                 .parse::<u32>()
                 .unwrap(),
+
             segmentation: segmentation,
+
+            thresh_p_value: matches
+                .value_of("thresh_p_value")
+                .unwrap()
+                .parse::<f64>()
+                .unwrap(),
+
+            haar_seg_l_min: matches
+                .value_of("haar_seg_l_min")
+                .unwrap()
+                .parse::<u32>()
+                .unwrap(),
+            haar_seg_l_max: matches
+                .value_of("haar_seg_l_max")
+                .unwrap()
+                .parse::<u32>()
+                .unwrap(),
+            haar_seg_fdr: matches
+                .value_of("haar_seg_fdr")
+                .unwrap()
+                .parse::<f64>()
+                .unwrap(),
+
+            wisexome_max_window_size: matches
+                .value_of("wisexome_max_window_size")
+                .unwrap()
+                .parse::<u32>()
+                .unwrap(),
+            wisexome_thresh_rel_cov: matches
+                .value_of("wisexome_thresh_rel_cov")
+                .unwrap()
+                .parse::<f64>()
+                .unwrap(),
+            wisexome_thresh_z_score: matches
+                .value_of("wisexome_thresh_z_score")
+                .unwrap()
+                .parse::<f64>()
+                .unwrap(),
         }
     }
 }

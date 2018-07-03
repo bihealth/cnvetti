@@ -285,7 +285,7 @@ subcommands:
           This command takes a normalized coverage BCF file and performs a segmentation of the
           coverage values found therein with the selected segmentation algorithm.
         args:
-        # Input/Output File Arguments ---------------------------------------------
+        # Input/Output File Arguments -------------------------------------------------------------
         - input:
             long: input
             short: i
@@ -301,7 +301,7 @@ subcommands:
             required: true
             value_name: OUT.bcf
             help: Path to output BCF file (will also write .csi file)
-        # Algorithm-Related Arguments ----------------------------------------------
+        # Algorithm-Related Arguments -------------------------------------------------------------
         - segmentation:
             long: segmentation
             takes_value: true
@@ -314,6 +314,52 @@ subcommands:
             - ExomeHiddenMarkovModel
             - WISExome
             help: The method to use for the segmentation.
+        - thresh_p_value:
+            long: thresh-p-value
+            takes_value: true
+            required: false
+            value_name: P-VALUE
+            default_value: '0.05'
+        # Algorithm Parameters for HaarSeg --------------------------------------------------------
+        - haar_seg_l_min:
+            long: haar-seg-l-min
+            takes_value: true
+            required: false
+            value_name: VALUE
+            default_value: '1'
+        - haar_seg_l_max:
+            long: haar-seg-l-max
+            takes_value: true
+            required: false
+            value_name: VALUE
+            default_value: '5'
+        - haar_seg_fdr:
+            long: haar-seg-fdr
+            takes_value: true
+            required: false
+            value_name: VALUE
+            default_value: '0.001'
+        # Algorithm Parameters for WISExome Segmentation ------------------------------------------
+        - wisexome_max_window_size:
+            long: wisexome-max-window-size
+            takes_value: true
+            required: false
+            value_name: VALUE
+            default_value: '15'
+        - wisexome_thresh_rel_cov:
+            long: wisexome-thresh-rel-cov
+            takes_value: true
+            required: false
+            value_name: THRESH
+            default_value: '0.35'
+            help: Threshold on relative coverage deviation.
+        - wisexome_thresh_z_score:
+            long: wisexome-thresh-z-score
+            takes_value: true
+            required: false
+            value_name: THRESH
+            default_value: '5.64'
+            help: Threshold on Z-score
     # Sub command: cmd filter ---------------------------------------------------------------------
     - filter:
         about: Filter coverage information
@@ -438,7 +484,7 @@ subcommands:
             required: false
             value_name: MULT
             default_value: '5.64'
-            help: 'Threshold on z score (default: 5.64).'
+            help: 'Threshold on z score (default_value: 5.64).'
         - filter_rel:
             long: filter-rel
             takes_value: true
@@ -452,7 +498,7 @@ subcommands:
             required: false
             value_name: COUNT
             default_value: '10'
-            help: 'Minimal number of targets before filtering (default: 10).'
+            help: 'Minimal number of targets before filtering (default_value: 10).'
         - max_ref_targets:
             long: max-ref-targets
             takes_value: true
@@ -692,6 +738,65 @@ subcommands:
             required: false
             value_name: SEG.igv
             help: Optional path to IGV file to write log2-scaled segmented coverage to.
+        # Algorithm Parameters --------------------------------------------------------------------
+        - segmentation:
+            long: segmentation
+            takes_value: true
+            required: true
+            value_name: TYPE
+            possible_values:
+            - HaarSeg
+            - CircularBinarySegmentation
+            - GenomeHiddenMarkovModel
+            - ExomeHiddenMarkovModel
+            - WISExome
+            help: The method to use for the segmentation.
+        - thresh_p_value:
+            long: thresh-p-value
+            takes_value: true
+            required: false
+            value_name: P-VALUE
+            default_value: '0.05'
+        # Algorithm Parameters for HaarSeg --------------------------------------------------------
+        - haar_seg_l_min:
+            long: haar-seg-l-min
+            takes_value: true
+            required: false
+            value_name: VALUE
+            default_value: '1'
+        - haar_seg_l_max:
+            long: haar-seg-l-max
+            takes_value: true
+            required: false
+            value_name: VALUE
+            default_value: '5'
+        - haar_seg_fdr:
+            long: haar-seg-fdr
+            takes_value: true
+            required: false
+            value_name: VALUE
+            default_value: '0.001'
+        # Algorithm Parameters for WISExome Segmentation ------------------------------------------
+        - wisexome_max_window_size:
+            long: wisexome-max-window-size
+            takes_value: true
+            required: false
+            value_name: VALUE
+            default_value: '15'
+        - wisexome_thresh_rel_cov:
+            long: wisexome-thresh-rel-cov
+            takes_value: true
+            required: false
+            value_name: THRESH
+            default_value: '0.35'
+            help: Threshold on relative coverage deviation.
+        - wisexome_thresh_z_score:
+            long: wisexome-thresh-z-score
+            takes_value: true
+            required: false
+            value_name: THRESH
+            default_value: '5.64'
+            help: Threshold on Z-score
     # Sub command: quick wis-call-matched ---------------------------------------------------------
     - wis-call-matched:
         about: Perform CNV calling on one matched tumor sample using the within-sample approach.

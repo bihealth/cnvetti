@@ -36,7 +36,7 @@ fn skip_record(record: &mut bcf::Record) -> bool {
 }
 
 /// Perform segmentation using the Haar-Seg algorithm.
-pub fn run_haarseg_segmentation(logger: &mut Logger, options: &SegmentOptions) -> Result<()> {
+pub fn run_segmentation(logger: &mut Logger, options: &SegmentOptions) -> Result<()> {
     info!(logger, "Computing segmentation using Haar-Seg");
 
     debug!(logger, "Opening input file");
@@ -116,15 +116,14 @@ pub fn run_haarseg_segmentation(logger: &mut Logger, options: &SegmentOptions) -
         }
 
         trace!(logger, "Perform segmentation, yield breakpoints");
-        let p_value_thresh = 0.05;
         let segmentation = seg_haar(
             &cv2s,
             None,
             None,
             &[0..(cv2s.len())],
-            0.001, // FDR
-            1,     // l_min
-            5,     // l_max
+            options.haar_seg_fdr,
+            options.haar_seg_l_min,
+            options.haar_seg_l_max,
         );
         debug!(
             logger,
@@ -137,7 +136,7 @@ pub fn run_haarseg_segmentation(logger: &mut Logger, options: &SegmentOptions) -
         for seg in &segmentation.segments {
             let new_len = p_values.len() + seg.range.len();
             let p_val = if seg.range.len() > 2 {
-                seg.p_value_significant_student(p_value_thresh) as f32
+                seg.p_value_significant_student(options.thresh_p_value) as f32
             } else {
                 1.0
             };
@@ -145,7 +144,7 @@ pub fn run_haarseg_segmentation(logger: &mut Logger, options: &SegmentOptions) -
         }
 
         trace!(logger, "Reject segments not passing P-value filter");
-        let segmentation = reject_nonaberrant_pvalue(&segmentation, &cvs, p_value_thresh);
+        let segmentation = reject_nonaberrant_pvalue(&segmentation, &cvs, options.thresh_p_value);
         debug!(
             logger,
             "Segments after selecting aberrant (p): {}",

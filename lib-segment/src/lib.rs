@@ -7,6 +7,7 @@ extern crate error_chain;
 
 extern crate clap;
 
+extern crate ordered_float;
 extern crate quantiles;
 
 #[macro_use]
@@ -26,6 +27,7 @@ extern crate lib_shared;
 use lib_shared::bcf_utils;
 
 mod seg_haar;
+mod seg_wisexome;
 
 mod options;
 pub use options::*;
@@ -44,11 +46,11 @@ pub fn run(logger: &mut Logger, options: &SegmentOptions) -> Result<()> {
     info!(logger, "Options: {:?}", options);
 
     match options.segmentation {
-        Segmentation::HaarSeg => seg_haar::run_haarseg_segmentation(logger, options)?,
+        Segmentation::HaarSeg => seg_haar::run_segmentation(logger, options)?,
         Segmentation::CircularBinarySegmentation => bail!("Not implemented yet!"),
         Segmentation::GenomeHiddenMarkovModel => bail!("Not implemented yet!"),
         Segmentation::ExomeHiddenMarkovModel => bail!("Not implemented yet!"),
-        Segmentation::WISExome => bail!("Not implemented yet!"),
+        Segmentation::WISExome => seg_wisexome::run_segmentation(logger, options)?,
     }
 
     // Finally, create index on created output file.
