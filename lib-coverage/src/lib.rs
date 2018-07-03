@@ -122,6 +122,7 @@ fn build_header(samples: &Vec<String>, contigs: &GenomeRegions) -> bcf::Header {
          only used for targeted sequencing CNVs)\">",
         "##FILTER=<ID=NO_REF,Description=\"No reference targets in WIS method for this \
          target\">",
+        "##FILTER=<ID=SKIPPED_SEG,Description=\"Skipped region on segmentation.\">",
         // "##INFO=<ID=BLACKLIST,Number=0,Type=Flag,Description=\"Interval overlaps with \
         //  blacklist site\">",
         "##INFO=<ID=GAP,Number=0,Type=Flag,Description=\"Window overlaps with N in \
@@ -154,8 +155,9 @@ fn build_header(samples: &Vec<String>, contigs: &GenomeRegions) -> bcf::Header {
         "##FORMAT=<ID=FRM,Number=1,Type=Float,Description=\"Fraction of window that was masked
          in the sample.\">",
         "##FORMAT=<ID=SG,Number=1,Type=Float,Description=\"Coverage value in current segment.\">",
-        "##FORMAT=<ID=SG2,Number=1,Type=Float,Description=\"Log2-scale overage value in current \
+        "##FORMAT=<ID=SG2,Number=1,Type=Float,Description=\"Log2-scale coverage value in current \
          segment.\">",
+        "##FORMAT=<ID=SGP,Number=1,Type=Float,Description=\"P-value of original segment.\">",
         "##FORMAT=<ID=SGZ,Number=1,Type=Float,Description=\"Coverage Z-score value in current \
          segment.\">",
         // TODO: we might need to add a "TNCV" here for "total-normalized coverage" as generate

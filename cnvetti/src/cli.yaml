@@ -680,6 +680,18 @@ subcommands:
             required: false
             value_name: COVZ.igv
             help: Optional path to IGV file to write coverage Z-score to.
+        - output_igv_seg:
+            long: output-igv-seg
+            takes_value: true
+            required: false
+            value_name: SEG.igv
+            help: Optional path to IGV file to write (linear relative) segmented coverage to.
+        - output_igv_seg2:
+            long: output-igv-seg2
+            takes_value: true
+            required: false
+            value_name: SEG.igv
+            help: Optional path to IGV file to write log2-scaled segmented coverage to.
     # Sub command: quick wis-call-matched ---------------------------------------------------------
     - wis-call-matched:
         about: Perform CNV calling on one matched tumor sample using the within-sample approach.
@@ -808,6 +820,18 @@ subcommands:
             required: false
             value_name: COVZ.igv
             help: Optional path to IGV file to write coverage Z-score to.
+        - output_igv_seg:
+            long: output-igv-seg
+            takes_value: true
+            required: false
+            value_name: SEG.igv
+            help: Optional path to IGV file to write (linear relative) segmented coverage to.
+        - output_igv_seg2:
+            long: output-igv-seg2
+            takes_value: true
+            required: false
+            value_name: SEG2.igv
+            help: Optional path to IGV file to write log2-scaled segmented coverage to.
 
 # Sub command: visualize ==========================================================================
 - visualize:
@@ -864,6 +888,18 @@ subcommands:
             required: false
             value_name: COVZ.igv
             help: Optional path to IGV file to write coverage Z-score to.
+        - output_igv_seg:
+            long: output-igv-seg
+            takes_value: true
+            required: false
+            value_name: SEG.igv
+            help: Optional path to IGV file to write (linear relative) segmented coverage to.
+        - output_igv_seg2:
+            long: output-igv-seg2
+            takes_value: true
+            required: false
+            value_name: SEG2.igv
+            help: Optional path to IGV file to write log2-scaled segmented coverage to.
 
 # Sub command: annotate ===========================================================================
 - annotate:

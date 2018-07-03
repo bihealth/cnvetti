@@ -12,6 +12,10 @@ pub struct CovToIgvOptions {
     pub output_igv_cov2: Option<String>,
     /// Path to output IGV file with coverage Z-score.
     pub output_igv_covz: Option<String>,
+    /// Path to output IGV file with segmented coverage.
+    pub output_igv_seg: Option<String>,
+    /// Path to output IGV file with log2-scaled segmented coverage.
+    pub output_igv_seg2: Option<String>,
 
     // Number of additional threads to use for I/O.
     pub io_threads: u32,
@@ -29,6 +33,8 @@ impl CovToIgvOptions {
             output_igv_cov: matches.value_of("output_igv_cov").map(|s| s.to_string()),
             output_igv_cov2: matches.value_of("output_igv_cov2").map(|s| s.to_string()),
             output_igv_covz: matches.value_of("output_igv_covz").map(|s| s.to_string()),
+            output_igv_seg: matches.value_of("output_igv_seg").map(|s| s.to_string()),
+            output_igv_seg2: matches.value_of("output_igv_seg2").map(|s| s.to_string()),
             io_threads: matches
                 .value_of("io_threads")
                 .unwrap()

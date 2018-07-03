@@ -10,6 +10,7 @@ clap = {version = "*", features = ["yaml", "color", "suggestions"]}
 quantiles = "*"
 rust-htslib = { git = "https://github.com/rust-bio/rust-htslib.git", branch = "master" }
 rust-segment = { path = "../../rust-segment" }
+separator = "*"
 shlex = "*"
 slog = {version = "*", features = ["max_level_trace", "release_max_level_debug"] }
 slog-term = "*"

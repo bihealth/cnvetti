@@ -51,7 +51,7 @@ impl QuickWisBuildModelOptions {
             count_kind: lib_coverage::CountKind::Fragments,
             blacklist_bed: None,
             considered_regions: lib_coverage::ConsideredRegions::TargetRegions,
-            min_mapq: 0,
+            min_mapq: 40,
             min_unclipped: 0.6,
 
             min_window_remaining: 0.5,

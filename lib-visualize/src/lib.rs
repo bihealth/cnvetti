@@ -106,6 +106,54 @@ pub mod cov_to_igv {
         ).chain_err(|| "Could not write header")?;
         Ok(())
     }
+    /// Write header to file for segmented coverage.
+    fn write_seg_header(header: &bcf::header::HeaderView, f: &mut File) -> Result<()> {
+        f.write_all(
+            "#track \
+             color=000,000,000 \
+             graphType=points \
+             viewLimits=0:2.0 \
+             midRange=1:1 \
+             windowingFunction=mean\n"
+                .as_bytes(),
+        ).chain_err(|| "Problem writing header")?;
+        f.write_all(
+            format!(
+                "Chromosome\tStart\tEnd\tFeature\t{}\n",
+                header
+                    .samples()
+                    .iter()
+                    .map(|x| String::from_utf8(x.to_vec()).expect("Convertion from UTF-8 failed"))
+                    .collect::<Vec<String>>()
+                    .join("\t")
+            ).as_bytes(),
+        ).chain_err(|| "Could not write header")?;
+        Ok(())
+    }
+    /// Write header to file for log2-scaled segmented coverage.
+    fn write_seg2_header(header: &bcf::header::HeaderView, f: &mut File) -> Result<()> {
+        f.write_all(
+            "#track \
+             color=255,000,000 \
+             altColor=000,000,255 \
+             graphType=points \
+             viewLimits=-1.5:1.5 \
+             windowingFunction=mean\n"
+                .as_bytes(),
+        ).chain_err(|| "Problem writing header")?;
+        f.write_all(
+            format!(
+                "Chromosome\tStart\tEnd\tFeature\t{}\n",
+                header
+                    .samples()
+                    .iter()
+                    .map(|x| String::from_utf8(x.to_vec()).expect("Convertion from UTF-8 failed"))
+                    .collect::<Vec<String>>()
+                    .join("\t")
+            ).as_bytes(),
+        ).chain_err(|| "Could not write header")?;
+        Ok(())
+    }
 
     /// Convert one BCF record to IGV file.
     fn write_line(record: &mut bcf::Record, key: &[u8], file: &mut File) -> Result<()> {
@@ -187,6 +235,30 @@ pub mod cov_to_igv {
             None
         };
 
+        // Open linear segmented coverage IGV and write header.
+        let mut file_seg = if let Some(path) = &options.output_igv_seg {
+            info!(logger, "Open (linear) segmented coverage file.");
+            let mut file = File::create(&path).chain_err(|| format!("Problem opening {}", path))?;
+            write_seg_header(&reader.header(), &mut file)
+                .chain_err(|| format!("Problem writing header to {}", path))?;
+            Some(file)
+        } else {
+            info!(logger, "No (linear) coverage file.");
+            None
+        };
+
+        // Open log2-scaled segmented coverage IGV and write header.
+        let mut file_seg2 = if let Some(path) = &options.output_igv_seg2 {
+            info!(logger, "Open log2-scaled segmented coverage file.");
+            let mut file = File::create(&path).chain_err(|| format!("Problem opening {}", path))?;
+            write_seg2_header(&reader.header(), &mut file)
+                .chain_err(|| format!("Problem writing header to {}", path))?;
+            Some(file)
+        } else {
+            info!(logger, "No log2-scaled coverage file.");
+            None
+        };
+
         // Open reader and start writing out.
         info!(logger, "Extracting information from BCF file...");
         let mut record = reader.empty_record();
@@ -205,6 +277,12 @@ pub mod cov_to_igv {
             }
             if let Some(ref mut file) = file_covz {
                 write_line(&mut record, b"CVZ", file)?;
+            }
+            if let Some(ref mut file) = file_seg {
+                write_line(&mut record, b"SG", file)?;
+            }
+            if let Some(ref mut file) = file_seg2 {
+                write_line(&mut record, b"SG2", file)?;
             }
         }
         info!(logger, " => done");
