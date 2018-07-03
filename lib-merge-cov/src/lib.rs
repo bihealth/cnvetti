@@ -156,6 +156,8 @@ pub fn merge_files(
                         .collect::<Vec<Vec<u8>>>();
                     if tmp_v.iter().any(|ref x| !x.is_empty()) {
                         values_v.append(&mut tmp_v);
+                    } else {
+                        values_v.push(b"".to_vec());
                     }
                 } else {
                     let num_samples = reader.header(i).sample_count();
