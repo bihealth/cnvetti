@@ -153,6 +153,11 @@ fn build_header(samples: &Vec<String>, contigs: &GenomeRegions) -> bcf::Header {
          of reference targets distribution.\">",
         "##FORMAT=<ID=FRM,Number=1,Type=Float,Description=\"Fraction of window that was masked
          in the sample.\">",
+        "##FORMAT=<ID=SG,Number=1,Type=Float,Description=\"Coverage value in current segment.\">",
+        "##FORMAT=<ID=SG2,Number=1,Type=Float,Description=\"Log2-scale overage value in current \
+         segment.\">",
+        "##FORMAT=<ID=SGZ,Number=1,Type=Float,Description=\"Coverage Z-score value in current \
+         segment.\">",
         // TODO: we might need to add a "TNCV" here for "total-normalized coverage" as generate
         //       when normalizing counts for the WIS approach.
         // FORMAT fields used when calling by coverage (deep WGS only)
@@ -473,8 +478,7 @@ fn process_region(
             logger,
             "Loading target regions from WIS model BCF file file"
         );
-        let regions =
-            load_regions_from_model_bcf(logger, &model_bcf, &chrom, contig_length)?;
+        let regions = load_regions_from_model_bcf(logger, &model_bcf, &chrom, contig_length)?;
         // TODO: extract this into function
         // Build interval tree.
         let mut intervals: IntervalTree<u32, u32> = IntervalTree::new();

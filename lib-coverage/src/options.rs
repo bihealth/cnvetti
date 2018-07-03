@@ -115,7 +115,9 @@ impl CoverageOptions {
                 Some(x) => Some(x.to_string()),
                 None => None,
             },
-            considered_regions: ConsideredRegions::from_str(matches.value_of("considered_regions").unwrap()).expect("Unknown considered regions"),
+            considered_regions: ConsideredRegions::from_str(
+                matches.value_of("considered_regions").unwrap(),
+            ).expect("Unknown considered regions"),
             min_mapq: matches.value_of("min_mapq").unwrap().parse::<u8>().unwrap(),
             min_unclipped: matches
                 .value_of("min_unclipped")

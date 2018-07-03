@@ -20,5 +20,6 @@ lib-model-wis = { path = "../lib-model-wis" }
 lib-merge-cov = { path = "../lib-merge-cov" }
 lib-mod-cov = { path = "../lib-mod-cov" }
 lib-normalize = { path = "../lib-normalize" }
+lib-segment = { path = "../lib-segment" }
 lib-shared = { path = "../lib-shared" }
 lib-visualize = { path = "../lib-visualize" }

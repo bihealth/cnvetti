@@ -273,6 +273,47 @@ subcommands:
             - TotalCovSum
             - MedianGcBinned
             help: The method to use for read count/coverage normalization.
+    # Sub command: cmd segment --------------------------------------------------------------------
+    - segment:
+        about: Segment normalized coverage.
+        settings:
+        - DeriveDisplayOrder
+        - GlobalVersion
+        - UnifiedHelpMessage
+        - ColorAuto
+        after_help: >
+          This command takes a normalized coverage BCF file and performs a segmentation of the
+          coverage values found therein with the selected segmentation algorithm.
+        args:
+        # Input/Output File Arguments ---------------------------------------------
+        - input:
+            long: input
+            short: i
+            multiple: false
+            takes_value: true
+            required: true
+            value_name: INPUT.bcf
+            help: Path to indexed input BCF or VCF file from `cnvetti cmd coverage` output.
+        - output:
+            long: output
+            short: o
+            takes_value: true
+            required: true
+            value_name: OUT.bcf
+            help: Path to output BCF file (will also write .csi file)
+        # Algorithm-Related Arguments ----------------------------------------------
+        - segmentation:
+            long: segmentation
+            takes_value: true
+            required: true
+            value_name: TYPE
+            possible_values:
+            - HaarSeg
+            - CircularBinarySegmentation
+            - GenomeHiddenMarkovModel
+            - ExomeHiddenMarkovModel
+            - WISExome
+            help: The method to use for the segmentation.
     # Sub command: cmd filter ---------------------------------------------------------------------
     - filter:
         about: Filter coverage information

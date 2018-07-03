@@ -40,6 +40,7 @@ extern crate lib_mod_cov;
 extern crate lib_model_pool;
 extern crate lib_model_wis;
 extern crate lib_normalize;
+extern crate lib_segment;
 extern crate lib_visualize;
 
 mod quick_pool_build_model;
@@ -122,6 +123,10 @@ fn run(matches: ArgMatches) -> Result<()> {
             ("merge-cov", Some(m)) => {
                 lib_merge_cov::run(&mut logger, &lib_merge_cov::MergeCovOptions::new(&m))
                     .chain_err(|| "Could not execute 'cmd merge-cov'")?
+            }
+            ("segment", Some(m)) => {
+                lib_segment::run(&mut logger, &lib_segment::SegmentOptions::new(&m))
+                    .chain_err(|| "Could not execute 'cmd segment'")?
             }
             ("de-bias", Some(_m)) => bail!("cmd de-bias not implemented!"),
             ("build-model-pool", Some(m)) => {
