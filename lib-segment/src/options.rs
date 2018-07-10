@@ -50,6 +50,16 @@ pub struct SegmentOptions {
     pub wisexome_thresh_rel_cov: f64,
     /// Threshold on Z-score.
     pub wisexome_thresh_z_score: f64,
+
+    // Parameters from XHMM.
+    /// Z-score threshold to use.
+    pub xhmm_z_score_threshold: f64,
+    /// Expected exome-wide CNV rate.
+    pub xhmm_cnv_rate: f64,
+    /// Expected mean number of targets.
+    pub xhmm_mean_target_count: f64,
+    /// Expected mean target distance in a CNV.
+    pub xhmm_mean_target_dist: f64,
 }
 
 impl SegmentOptions {
@@ -103,6 +113,27 @@ impl SegmentOptions {
                 .unwrap(),
             wisexome_thresh_z_score: matches
                 .value_of("wisexome_thresh_z_score")
+                .unwrap()
+                .parse::<f64>()
+                .unwrap(),
+
+            xhmm_z_score_threshold: matches
+                .value_of("xhmm_z_score_threshold")
+                .unwrap()
+                .parse::<f64>()
+                .unwrap(),
+            xhmm_cnv_rate: matches
+                .value_of("xhmm_cnv_rate")
+                .unwrap()
+                .parse::<f64>()
+                .unwrap(),
+            xhmm_mean_target_count: matches
+                .value_of("xhmm_mean_target_count")
+                .unwrap()
+                .parse::<f64>()
+                .unwrap(),
+            xhmm_mean_target_dist: matches
+                .value_of("xhmm_mean_target_dist")
                 .unwrap()
                 .parse::<f64>()
                 .unwrap(),

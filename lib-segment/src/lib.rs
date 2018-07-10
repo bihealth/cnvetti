@@ -1,9 +1,10 @@
 //! Implementation of `cnvetti cmd segment`.
 
+extern crate bio;
 extern crate chrono;
-
 #[macro_use]
 extern crate error_chain;
+extern crate statrs;
 
 extern crate clap;
 
@@ -28,6 +29,7 @@ use lib_shared::bcf_utils;
 
 mod seg_haar;
 mod seg_wisexome;
+mod seg_xhmm;
 
 mod options;
 pub use options::*;
@@ -49,7 +51,7 @@ pub fn run(logger: &mut Logger, options: &SegmentOptions) -> Result<()> {
         Segmentation::HaarSeg => seg_haar::run_segmentation(logger, options)?,
         Segmentation::CircularBinarySegmentation => bail!("Not implemented yet!"),
         Segmentation::GenomeHiddenMarkovModel => bail!("Not implemented yet!"),
-        Segmentation::ExomeHiddenMarkovModel => bail!("Not implemented yet!"),
+        Segmentation::ExomeHiddenMarkovModel => seg_xhmm::run_segmentation(logger, options)?,
         Segmentation::WISExome => seg_wisexome::run_segmentation(logger, options)?,
     }
 

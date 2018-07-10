@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>"]
 
 [dependencies]
-bio = "*"
+bio = { path = "../../rust-bio" }
 error-chain = "*"
 regex = "*"
 rust-htslib = { git = "https://github.com/rust-bio/rust-htslib.git", branch = "master" }

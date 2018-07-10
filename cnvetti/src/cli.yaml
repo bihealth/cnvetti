@@ -360,6 +360,31 @@ subcommands:
             value_name: THRESH
             default_value: '5.64'
             help: Threshold on Z-score
+        # Algorithm Parameters for Exome HMM Segmentation -----------------------------------------
+        - xhmm_z_score_threshold:
+            long: xhmm-z-score-threshold
+            takes_value: true
+            value_name: THRESH
+            default_value: '3.0'
+            help: Z-score threshold to use.
+        - xhmm_cnv_rate:
+            long: xhmm-cnv-rate
+            takes_value: true
+            value_name: RATE
+            default_value: '1e-08'
+            help: Expected exome-wide CNV rate for exome HMM segmentation.
+        - xhmm_mean_target_count:
+            long: xhmm-mean-target-count
+            takes_value: true
+            value_name: DIST
+            default_value: '6'
+            help: Mean number of targets in a CNV for exome HMM segmentation.
+        - xhmm_mean_target_dist:
+            long: xhmm-mean-target-dist
+            takes_value: true
+            value_name: DIST
+            default_value: '70000'
+            help: Mean distance of targets in a CNV for exome HMM segmentation.
     # Sub command: cmd filter ---------------------------------------------------------------------
     - filter:
         about: Filter coverage information
@@ -797,6 +822,31 @@ subcommands:
             value_name: THRESH
             default_value: '5.64'
             help: Threshold on Z-score
+        # Algorithm Parameters for Exome HMM Segmentation -----------------------------------------
+        - xhmm_z_score_threshold:
+            long: xhmm-z-score-threshold
+            takes_value: true
+            value_name: THRESH
+            default_value: '3.0'
+            help: Z-score threshold to use.
+        - xhmm_cnv_rate:
+            long: xhmm-cnv-rate
+            takes_value: true
+            value_name: RATE
+            default_value: '1e-08'
+            help: Expected exome-wide CNV rate for exome HMM segmentation.
+        - xhmm_mean_target_count:
+            long: xhmm-cnv-target-count
+            takes_value: true
+            value_name: DIST
+            default_value: '6'
+            help: Mean number of targets in a CNV for exome HMM segmentation.
+        - xhmm_mean_target_dist:
+            long: xhmm-mean-target-dist
+            takes_value: true
+            value_name: DIST
+            default_value: '70000'
+            help: Mean distance of targets in a CNV for exome HMM segmentation.
     # Sub command: quick wis-call-matched ---------------------------------------------------------
     - wis-call-matched:
         about: Perform CNV calling on one matched tumor sample using the within-sample approach.

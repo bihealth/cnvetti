@@ -62,6 +62,16 @@ pub struct QuickWisCallOptions {
     pub wisexome_thresh_rel_cov: f64,
     /// Threshold on Z-score.
     pub wisexome_thresh_z_score: f64,
+
+    // Parameters from XHMM.
+    /// Threshold on Z-score.
+    pub xhmm_z_score_threshold: f64,
+    /// Expected exome-wide CNV rate.
+    pub xhmm_cnv_rate: f64,
+    /// Expected mean number of targets.
+    pub xhmm_mean_target_count: f64,
+    /// Expected mean target distance in a CNV.
+    pub xhmm_mean_target_dist: f64,
 }
 
 /// Conversion into CoverageOptions.
@@ -140,6 +150,11 @@ impl QuickWisCallOptions {
             wisexome_max_window_size: self.wisexome_max_window_size,
             wisexome_thresh_rel_cov: self.wisexome_thresh_rel_cov,
             wisexome_thresh_z_score: self.wisexome_thresh_z_score,
+
+            xhmm_z_score_threshold: self.xhmm_z_score_threshold,
+            xhmm_cnv_rate: self.xhmm_cnv_rate,
+            xhmm_mean_target_count: self.xhmm_mean_target_count,
+            xhmm_mean_target_dist: self.xhmm_mean_target_dist,
         }
     }
 
@@ -217,6 +232,27 @@ impl QuickWisCallOptions {
                 .unwrap(),
             wisexome_thresh_z_score: matches
                 .value_of("wisexome_thresh_z_score")
+                .unwrap()
+                .parse::<f64>()
+                .unwrap(),
+
+            xhmm_z_score_threshold: matches
+                .value_of("xhmm_z_score_threshold")
+                .unwrap()
+                .parse::<f64>()
+                .unwrap(),
+            xhmm_cnv_rate: matches
+                .value_of("xhmm_cnv_rate")
+                .unwrap()
+                .parse::<f64>()
+                .unwrap(),
+            xhmm_mean_target_count: matches
+                .value_of("xhmm_mean_target_count")
+                .unwrap()
+                .parse::<f64>()
+                .unwrap(),
+            xhmm_mean_target_dist: matches
+                .value_of("xhmm_mean_target_dist")
                 .unwrap()
                 .parse::<f64>()
                 .unwrap(),

@@ -160,6 +160,8 @@ fn build_header(samples: &Vec<String>, contigs: &GenomeRegions) -> bcf::Header {
         "##FORMAT=<ID=SGP,Number=1,Type=Float,Description=\"P-value of original segment.\">",
         "##FORMAT=<ID=SGZ,Number=1,Type=Float,Description=\"Coverage Z-score value in current \
          segment.\">",
+        "##FORMAT=<ID=SGS,Number=1,Type=Integer,Description=\"Copy number state of current
+         segment from HMM (0: del, 1: neutral, 2: dup).\">",
         // TODO: we might need to add a "TNCV" here for "total-normalized coverage" as generate
         //       when normalizing counts for the WIS approach.
         // FORMAT fields used when calling by coverage (deep WGS only)
