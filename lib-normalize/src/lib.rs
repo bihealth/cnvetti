@@ -21,6 +21,7 @@ extern crate shlex;
 
 extern crate lib_shared;
 use lib_shared::bcf_utils;
+use lib_shared::stats::Stats;
 
 mod options;
 pub use options::*;
@@ -55,7 +56,12 @@ pub fn run(logger: &mut Logger, options: &NormalizeOptions) -> Result<()> {
     // }
 
     match options.normalization {
-        Normalization::TotalCovSum => run_uncorrected_normalization(logger, options)?,
+        Normalization::TotalCoverageSum => {
+            run_simple_normalization(logger, options, |x: &[f64]| x.sum())?
+        }
+        Normalization::CoverageMedian => {
+            run_simple_normalization(logger, options, |x: &[f64]| x.median())?
+        }
         Normalization::MedianGcBinned => run_binned_correction(logger, options)?,
     }
 

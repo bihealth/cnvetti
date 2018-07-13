@@ -270,7 +270,8 @@ subcommands:
             required: true
             value_name: TYPE
             possible_values:
-            - TotalCovSum
+            - TotalCoverageSum
+            - CoverageMedian
             - MedianGcBinned
             help: The method to use for read count/coverage normalization.
     # Sub command: cmd segment --------------------------------------------------------------------

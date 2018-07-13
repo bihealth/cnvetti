@@ -1,4 +1,4 @@
-/// Implementation normalization without GC correction.
+//! Implementation normalizations without GC correction.
 use std::str;
 
 use slog::Logger;
@@ -8,16 +8,22 @@ use rust_htslib::bcf::{self, Read};
 use super::errors::*;
 use options::*;
 
-use lib_shared::stats::Stats;
-
 use shared::*;
 
-// TODO: actually, this is not uncorrected by "normalize by total count"
-
-/// Compute total number of fragments per bp for normalization.
+/// Compute summary from all FORMAT values of key `key` in BCF file `input`.
 ///
 /// The input is already assumed to be length-normalized.
-fn compute_format_tag_sum(logger: &mut Logger, input: &String, key: &[u8]) -> Result<f64> {
+///
+/// The summary is computed using `summary`.
+fn compute_format_tag_sum<S>(
+    logger: &mut Logger,
+    input: &String,
+    key: &[u8],
+    summary: S,
+) -> Result<f64>
+where
+    S: Fn(&[f64]) -> f64,
+{
     debug!(
         logger,
         "Computing sum of {} in {}",
@@ -45,18 +51,24 @@ fn compute_format_tag_sum(logger: &mut Logger, input: &String, key: &[u8]) -> Re
         );
     }
 
-    Ok(vals.as_slice().sum())
+    Ok(summary(vals.as_slice()))
 }
 
-pub fn run_uncorrected_normalization(
+/// Perform a simple normalization of the coverage values calling a function on the vector
+/// of all coverages.
+pub fn run_simple_normalization<S>(
     logger: &mut Logger,
     options: &NormalizeOptions,
-) -> Result<()> {
+    summary: S,
+) -> Result<()>
+where
+    S: Fn(&[f64]) -> f64,
+{
     info!(
         logger,
         "Computing overal normalized coverage sum for length-normalized coverage FORMAT/LCV"
     );
-    let lcv_sum = compute_format_tag_sum(logger, &options.input, &b"LCV"[..])?;
+    let lcv_sum = compute_format_tag_sum(logger, &options.input, &b"LCV"[..], summary)?;
 
     // The processing closure.
     let process = |record: &mut bcf::Record| -> Result<()> {

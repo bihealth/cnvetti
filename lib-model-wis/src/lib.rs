@@ -256,11 +256,11 @@ fn count_per_probe_calls(
             let ref_dist = ref_dist.as_slice();
             // Compute z-score
             let x = ncovs[target_idx][sample_idx] as f64;
-            let z_score = (x - ref_dist.mean()).abs() / ref_dist.std_dev();
+            let z_score = (x - ref_dist.mean()) / ref_dist.std_dev();
             // Compute relative value.
             let rel = x / ref_dist.mean();
             // Increment per-probe counter for target.
-            if z_score > options.filter_z_score && (rel - 1.0).abs() > options.filter_rel {
+            if z_score.abs() > options.filter_z_score && (rel - 1.0).abs() > options.filter_rel {
                 num_calls[target_idx] += 1;
             }
         }

@@ -7,6 +7,7 @@ use options::CoverageOptions;
 use bio::data_structures::interval_tree;
 
 use rust_htslib::bam;
+use rust_htslib::bcf::record::Numeric;
 use rust_htslib::prelude::*;
 
 use lib_shared::regions::GenomeRegions;
@@ -237,7 +238,12 @@ impl<'a> BamRecordAggregator for FragmentsGenomeWideAggregator<'a> {
             start: window_id * window_length,
             end: min(self.base.contig_length, (window_id + 1) * window_length),
             frac_removed: Some((masked_count as f32) / (window_length as f32)),
-            mean_mapq: 60.0, // TODO: actually compute
+            mean_mapq: if self.counters[window_id as usize] != 0 {
+                ((self.mapq_sums[window_id as usize] as f64)
+                    / (self.counters[window_id as usize] as f64)) as f32
+            } else {
+                f32::missing()
+            },
         }
     }
 
@@ -424,7 +430,12 @@ impl BamRecordAggregator for FragmentsTargetRegionsAggregator {
             start: self.target_regions.regions[target_id].1 as usize,
             end: self.target_regions.regions[target_id].2 as usize,
             frac_removed: None,
-            mean_mapq: 60.0, // TODO: actually compute
+            mean_mapq: if self.counters[target_id as usize] != 0 {
+                ((self.mapq_sums[target_id as usize] as f64)
+                    / (self.counters[target_id as usize] as f64)) as f32
+            } else {
+                f32::missing()
+            },
         }
     }
 
@@ -578,7 +589,7 @@ impl BamRecordAggregator for CoverageAggregator {
             start: window_id * window_length,
             end: min(self.base.contig_length, (window_id + 1) * window_length),
             frac_removed: None,
-            mean_mapq: 60.0, // TODO: actually compute
+            mean_mapq: self.coverage[window_id as usize].mapq_mean,
         }
     }
 

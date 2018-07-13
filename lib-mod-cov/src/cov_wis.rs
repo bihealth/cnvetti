@@ -51,20 +51,20 @@ pub struct ProbeInfo {
     norm_cov: f64,
 
     // Reference mean.
-    ref_mean: f64,
+    ref_median: f64,
     // Reference std deviation.
-    ref_std_dev: f64,
+    ref_median_abs_dev: f64,
 }
 
 impl ProbeInfo {
     /// Return relative coverage.
     fn cov_rel(&self) -> f64 {
-        self.norm_cov / self.ref_mean
+        self.norm_cov / self.ref_median
     }
 
     /// Return coverage as Z-score of reference.
     fn cov_z_score(&self) -> f64 {
-        (self.norm_cov - self.ref_mean) / self.ref_std_dev
+        (self.norm_cov - self.ref_median) / self.ref_median_abs_dev
     }
 }
 
@@ -129,15 +129,15 @@ pub fn load_target_infos(
 
         // Compute initial set of statistics.
         if !ref_norm_covs.is_empty() {
-            let ref_mean = ref_norm_covs.as_slice().mean();
-            let ref_std_dev = ref_norm_covs.as_slice().std_dev();
+            let ref_median = ref_norm_covs.as_slice().median();
+            let ref_median_abs_dev = ref_norm_covs.as_slice().median_abs_dev();
 
             probe_infos.insert(
                 id,
                 ProbeInfo {
                     norm_cov,
-                    ref_mean,
-                    ref_std_dev,
+                    ref_median,
+                    ref_median_abs_dev,
                 },
             );
         }
@@ -189,10 +189,10 @@ pub fn write_mod_cov(
 
         if let Some(probe_info) = probe_infos.get(&target_id) {
             record
-                .push_info_float(b"REF_MEAN", &[probe_info.ref_mean as f32])
+                .push_info_float(b"REF_MEAN", &[probe_info.ref_median as f32])
                 .chain_err(|| "Could not write INFO/REF_MEAN")?;
             record
-                .push_info_float(b"REF_STD_DEV", &[probe_info.ref_std_dev as f32])
+                .push_info_float(b"REF_STD_DEV", &[probe_info.ref_median_abs_dev as f32])
                 .chain_err(|| "Could not write INFO/REF_STD_DEV")?;
 
             record

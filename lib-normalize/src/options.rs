@@ -5,9 +5,10 @@ use clap::ArgMatches;
 /// Define the method for normalization.
 #[derive(Clone, EnumString, Debug, PartialEq)]
 pub enum Normalization {
-    // TODO: naming is not precise; this normalizes based on total coverage and not mean/median coverage.
-    /// Perform normalization only.
-    TotalCovSum,
+    /// Normalize by sum of coverages.
+    TotalCoverageSum,
+    /// Normalize by median of coverages.
+    CoverageMedian,
     /// Perform binning-based GC correction.
     MedianGcBinned,
 }

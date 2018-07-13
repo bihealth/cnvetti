@@ -112,7 +112,7 @@ impl QuickWisCallOptions {
             output: output.clone(),
 
             io_threads: 0,
-            normalization: lib_normalize::Normalization::TotalCovSum,
+            normalization: lib_normalize::Normalization::CoverageMedian,
         }
     }
 
