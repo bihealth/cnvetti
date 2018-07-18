@@ -205,10 +205,18 @@ fn xhmm_seg(
 
     info!(logger, " => Done with Viterbi");
 
+    let mut cvs = Vec::new();
+    let mut cv2s = Vec::new();
+    for ref seg in &segments {
+        let old_len = cvs.len();
+        cvs.resize(old_len + seg.range.len(), seg.mean);
+        cv2s.resize(old_len + seg.range.len(), seg.mean);
+    }
+
     Segmentation {
         segments,
-        values: cvs.clone(),
-        values_log2: cv2s.clone(),
+        values: cvs,
+        values_log2: cv2s,
         cn_states: Some(cn_states),
     }
 }
@@ -374,7 +382,7 @@ pub fn run_segmentation(logger: &mut Logger, options: &SegmentOptions) -> Result
                     (
                         (segmentation.values[idx] - PSEUDO_EPSILON) as f32,
                         segmentation.values_log2[idx] as f32,
-                        1.0, //p_values[idx],
+                        1.0, //p_values[idx],  // TODO: compute empirical p value
                         match segmentation.cn_states.as_ref().unwrap()[idx] {
                             CopyState::Deletion => 0,
                             CopyState::Neutral => 1,
