@@ -312,43 +312,45 @@ pub fn run_segmentation(logger: &mut Logger, options: &SegmentOptions) -> Result
                 _ => bail!("Error reading BCF record"),
             }
 
-            if !skip_record(&mut record) {
-                let end = record
-                    .info(b"END")
-                    .integer()
-                    .expect("Could not access FORMAT/END")
-                    .unwrap()[0] as usize;
-                let center = (record.pos() as usize + end) / 2;
-
-                let cv = record
-                    .format(b"CV")
-                    .float()
-                    .expect("Could not access FORMAT/CV")[0][0] as f64;
-                let cvz = record
-                    .format(b"CVZ")
-                    .float()
-                    .expect("Could not access FORMAT/CVZ")[0][0] as f64;
-                let cv2 = record
-                    .format(b"CV2")
-                    .float()
-                    .expect("Could not access FORMAT/CV2")[0][0] as f64;
-
-                // Limit outliers. TODO: think of something smarter.
-                const Z_SCORE_LIMIT_FACTOR: f64 = 5.0;
-                let z_score_limit = options.xhmm_z_score_threshold * Z_SCORE_LIMIT_FACTOR;
-                let cvz = if cvz < -z_score_limit {
-                    -z_score_limit
-                } else if cvz > z_score_limit {
-                    z_score_limit
-                } else {
-                    cvz
-                };
-
-                pos.push(center);
-                cvs.push(cv);
-                cvzs.push(cvz);
-                cv2s.push(cv2);
+            if skip_record(&mut record) {
+                continue;
             }
+
+            let end = record
+                .info(b"END")
+                .integer()
+                .expect("Could not access FORMAT/END")
+                .unwrap()[0] as usize;
+            let center = (record.pos() as usize + end) / 2;
+
+            let cv = record
+                .format(b"CV")
+                .float()
+                .expect("Could not access FORMAT/CV")[0][0] as f64;
+            let cvz = record
+                .format(b"CVZ")
+                .float()
+                .expect("Could not access FORMAT/CVZ")[0][0] as f64;
+            let cv2 = record
+                .format(b"CV2")
+                .float()
+                .expect("Could not access FORMAT/CV2")[0][0] as f64;
+
+            // Limit outliers. TODO: think of something smarter.
+            const Z_SCORE_LIMIT_FACTOR: f64 = 5.0;
+            let z_score_limit = options.xhmm_z_score_threshold * Z_SCORE_LIMIT_FACTOR;
+            let cvz = if cvz < -z_score_limit {
+                -z_score_limit
+            } else if cvz > z_score_limit {
+                z_score_limit
+            } else {
+                cvz
+            };
+
+            pos.push(center);
+            cvs.push(cv);
+            cvzs.push(cvz);
+            cv2s.push(cv2);
         }
 
         info!(logger, "Computing segmentation");

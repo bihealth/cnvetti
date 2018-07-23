@@ -19,11 +19,13 @@ extern crate strum;
 #[macro_use]
 extern crate strum_macros;
 
+extern crate ndarray;
 extern crate rust_htslib;
 extern crate rust_segment;
 extern crate separator;
 extern crate shlex;
 
+extern crate lib_segment;
 extern crate lib_shared;
 use lib_shared::bcf_utils;
 

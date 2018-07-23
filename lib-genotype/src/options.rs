@@ -40,9 +40,10 @@ pub struct GenotypeOptions {
 impl GenotypeOptions {
     /// Build options from ArgMatches.
     pub fn new(matches: &ArgMatches) -> Self {
-        let genotyping = matches.value_of("genotyping-method").unwrap();
+        println!("{:?}", matches);
+        let genotyping = matches.value_of("genotyping").unwrap();
         let genotyping =
-            GenotypingMethod::from_str(&genotyping).expect("Unknown genotyping-method");
+            GenotypingMethod::from_str(&genotyping).expect("Unknown genotyping");
 
         Self {
             input: matches.value_of("input").unwrap().to_string(),

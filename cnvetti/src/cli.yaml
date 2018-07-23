@@ -417,12 +417,13 @@ subcommands:
         - output:
             long: output
             short: o
+            multiple: false
             takes_value: true
             required: true
             value_name: OUT.bcf
             help: Path to output BCF file (will also write .csi file)
         # Algorithm-Related Arguments -------------------------------------------------------------
-        - segmentation:
+        - genotyping:
             long: genotyping
             takes_value: true
             required: true
@@ -676,19 +677,6 @@ subcommands:
           `cmd mod-coverage` to take information from a larger cohort or the within-sample model
           into consideration.  The output will be a call BCF file that contains copy number
           call information inferred from the coverage BCF file.
-        settings:
-        - DeriveDisplayOrder
-        - GlobalVersion
-        - UnifiedHelpMessage
-        - ColorAuto
-    # Sub command: cmd genotype -------------------------------------------------------------------
-    - genotype:
-        about: Perform CNV genotyping.
-        after_help: >
-          This command takes both a call BCF file, a coverage BCF file, and optionally the
-          original alignment BAM file (only sensible for deep WGS data) and performs genotyping
-          of the CNV calls from the call BCF file using the coverage information in the coverage
-          BCF file and the raw read information.
         settings:
         - DeriveDisplayOrder
         - GlobalVersion

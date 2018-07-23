@@ -143,7 +143,7 @@ fn run(matches: ArgMatches) -> Result<()> {
                 &lib_mod_cov::ModelBasedCoverageOptions::new(&m),
             ).chain_err(|| "Could not execute 'cmd mod-coverage'")?,
             ("discover", Some(_m)) => bail!("cmd discover not implemented!"),
-            ("genotype", Some(_m)) => {
+            ("genotype", Some(m)) => {
                 lib_genotype::run(&mut logger, &lib_genotype::GenotypeOptions::new(&m))
                     .chain_err(|| "Could not execute 'cmd genotype'")?
             }
