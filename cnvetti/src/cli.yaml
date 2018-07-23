@@ -386,6 +386,75 @@ subcommands:
             value_name: DIST
             default_value: '70000'
             help: Mean distance of targets in a CNV for exome HMM segmentation.
+    # Sub command: cmd genotype -------------------------------------------------------------------
+    - genotype:
+        about: Genotype calls from segmentation or calls and coverage BCF files.
+        settings:
+        - DeriveDisplayOrder
+        - GlobalVersion
+        - UnifiedHelpMessage
+        - ColorAuto
+        after_help: >
+          This command either creates genotype calls from a segmetation or from a call and
+          a coverage BCF file. It will write out a variant call file.
+        args:
+        # Input/Output File Arguments -------------------------------------------------------------
+        - input:
+            long: input
+            short: i
+            multiple: false
+            takes_value: true
+            required: true
+            value_name: REGIONS.bcf
+            help: Path to indexed input per-region segmentation or coverage file.
+        - input_calls:
+            long: input-calls
+            multiple: false
+            takes_value: false
+            required: false
+            value_name: CALLS.bcf
+            help: Optional path to indexed call file.
+        - output:
+            long: output
+            short: o
+            takes_value: true
+            required: true
+            value_name: OUT.bcf
+            help: Path to output BCF file (will also write .csi file)
+        # Algorithm-Related Arguments -------------------------------------------------------------
+        - segmentation:
+            long: genotyping
+            takes_value: true
+            required: true
+            value_name: TYPE
+            possible_values:
+            - ExomeHiddenMarkovModel
+            help: The method to use for the genotyping.
+        # Algorithm Parameters for Exome HMM Segmentation -----------------------------------------
+        - xhmm_z_score_threshold:
+            long: xhmm-z-score-threshold
+            takes_value: true
+            value_name: THRESH
+            default_value: '3.0'
+            help: Z-score threshold to use.
+        - xhmm_cnv_rate:
+            long: xhmm-cnv-rate
+            takes_value: true
+            value_name: RATE
+            default_value: '1e-08'
+            help: Expected exome-wide CNV rate for exome HMM segmentation.
+        - xhmm_mean_target_count:
+            long: xhmm-mean-target-count
+            takes_value: true
+            value_name: DIST
+            default_value: '6'
+            help: Mean number of targets in a CNV for exome HMM segmentation.
+        - xhmm_mean_target_dist:
+            long: xhmm-mean-target-dist
+            takes_value: true
+            value_name: DIST
+            default_value: '70000'
+            help: Mean distance of targets in a CNV for exome HMM segmentation.
     # Sub command: cmd filter ---------------------------------------------------------------------
     - filter:
         about: Filter coverage information

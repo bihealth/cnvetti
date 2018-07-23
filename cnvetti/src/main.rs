@@ -35,6 +35,7 @@ mod errors {
 pub use errors::*;
 
 extern crate lib_coverage;
+extern crate lib_genotype;
 extern crate lib_merge_cov;
 extern crate lib_mod_cov;
 extern crate lib_model_pool;
@@ -142,7 +143,10 @@ fn run(matches: ArgMatches) -> Result<()> {
                 &lib_mod_cov::ModelBasedCoverageOptions::new(&m),
             ).chain_err(|| "Could not execute 'cmd mod-coverage'")?,
             ("discover", Some(_m)) => bail!("cmd discover not implemented!"),
-            ("genotype", Some(_m)) => bail!("cmd genotype not implemented!"),
+            ("genotype", Some(_m)) => {
+                lib_genotype::run(&mut logger, &lib_genotype::GenotypeOptions::new(&m))
+                    .chain_err(|| "Could not execute 'cmd genotype'")?
+            }
             _ => bail!("Invalid command: {}", m.subcommand().0),
         },
         // cnvetti quick <wis-build-model|wis-call|pool-build-model|pool-call>

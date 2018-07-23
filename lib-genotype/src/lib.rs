@@ -1,4 +1,4 @@
-//! Implementation of `cnvetti cmd segment`.
+//! Genotyping from segmentation BCF and optional a CNV call file.
 
 extern crate bio;
 extern crate chrono;
@@ -27,9 +27,7 @@ extern crate shlex;
 extern crate lib_shared;
 use lib_shared::bcf_utils;
 
-mod seg_haar;
-mod seg_wisexome;
-pub mod seg_xhmm;
+mod gt_xhmm;
 
 mod options;
 pub use options::*;
@@ -42,17 +40,13 @@ mod errors {
 
 pub use errors::*;
 
-/// Main entry point for the `segment` command.
-pub fn run(logger: &mut Logger, options: &SegmentOptions) -> Result<()> {
-    info!(logger, "Running: cnvetti cmd segment");
+/// Main entry point for the `genotype` command.
+pub fn run(logger: &mut Logger, options: &GenotypeOptions) -> Result<()> {
+    info!(logger, "Running: cnvetti cmd genotype");
     info!(logger, "Options: {:?}", options);
 
-    match options.segmentation {
-        Segmentation::HaarSeg => seg_haar::run_segmentation(logger, options)?,
-        Segmentation::CircularBinarySegmentation => bail!("Not implemented yet!"),
-        Segmentation::GenomeHiddenMarkovModel => bail!("Not implemented yet!"),
-        Segmentation::ExomeHiddenMarkovModel => seg_xhmm::run_segmentation(logger, options)?,
-        Segmentation::WISExome => seg_wisexome::run_segmentation(logger, options)?,
+    match options.genotyping {
+        GenotypingMethod::ExomeHiddenMarkovModel => gt_xhmm::run_genotyping(logger, options)?,
     }
 
     // Finally, create index on created output file.

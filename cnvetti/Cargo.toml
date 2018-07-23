@@ -15,6 +15,7 @@ slog-async = "*"
 tempdir = "*"
 
 lib-coverage = { path = "../lib-coverage" }
+lib-genotype = { path = "../lib-genotype" }
 lib-model-pool = { path = "../lib-model-pool" }
 lib-model-wis = { path = "../lib-model-wis" }
 lib-merge-cov = { path = "../lib-merge-cov" }

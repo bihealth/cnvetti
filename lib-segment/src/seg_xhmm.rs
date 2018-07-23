@@ -16,7 +16,7 @@ use lib_shared::bcf_utils;
 use rust_segment::shared::{CopyState, Segment, Segmentation};
 
 /// Code for implementing the XHMM-based segmentation.
-mod xhmm {
+pub mod xhmm {
     use bio::stats::hmm::{Model, State, StateIter, StateTransitionIter};
     use bio::stats::{LogProb, Prob};
     use statrs::distribution::{Continuous, Normal};
