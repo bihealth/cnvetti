@@ -17,7 +17,7 @@ pub struct GenotypeOptions {
     /// Path to input segmentation or coverage BCF file.
     pub input: String,
     /// Path to input call BCF file.
-    pub input_calls: String,
+    pub input_calls: Option<String>,
     /// Path to output BCF file.
     pub output: String,
     /// Number of additional threads to use for (de-)compression in I/O.
@@ -46,7 +46,7 @@ impl GenotypeOptions {
 
         Self {
             input: matches.value_of("input").unwrap().to_string(),
-            input_calls: matches.value_of("input_calls").unwrap().to_string(),
+            input_calls: matches.value_of("input_calls").map(|s| s.to_string()),
             output: matches.value_of("output").unwrap().to_string(),
             io_threads: matches
                 .value_of("io_threads")

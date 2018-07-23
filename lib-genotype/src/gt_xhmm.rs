@@ -3,6 +3,8 @@
 use std::env;
 
 use bio::stats::hmm::{viterbi, State};
+use bio::stats::probs::PHREDProb;
+use chrono;
 use rust_htslib::bcf::{self, Read};
 // use rust_segment::{reject_nonaberrant_pvalue, seg_haar};
 // use separator::Separatable;
@@ -13,42 +15,210 @@ use super::errors::*;
 use options::*;
 
 use lib_shared::bcf_utils;
+use lib_shared::regions::GenomeRegions;
 use rust_segment::shared::{CopyState, Segment, Segmentation};
+
+/// Write out segmentation.
+fn write_result(
+    filtered_segmentation: &Vec<(bool, CnvGenotypeInfo)>,
+    writer: &mut bcf::Writer,
+) -> Result<()> {
+    bail!("Implmenet me!")
+}
+
+/// Filter segmentation.
+fn filter_segmentation(
+    segmentation: &Vec<CnvGenotypeInfo>,
+    options: &GenotypeOptions,
+) -> Result<Vec<(bool, CnvGenotypeInfo)>> {
+    bail!("Implement me!")
+}
+
+/// Struct with quality values and other metrics from XHMM describing an CNV.
+struct XhmmCnvQuals {
+    /// Probability for "exact deletion".
+    qExactDel: PHREDProb,
+    /// Probability for "some deletion".
+    qSomeDel: PHREDProb,
+    /// Probability for "no deletion".
+    qNoDel: PHREDProb,
+    /// Probability for "left deletion breakpoint".
+    qLeftDelBp: PHREDProb,
+    /// Probability for "right deletion breakpoint".
+    qRightDelBp: PHREDProb,
+
+    /// Probability for "exact duplication".
+    qExactDup: PHREDProb,
+    /// Probability for "some duplication".
+    qSomeDup: PHREDProb,
+    /// Probability for "no duplication".
+    qNoDup: PHREDProb,
+    /// Probability for "left duplication breakpoint".
+    qLeftDupBp: PHREDProb,
+    /// Probability for "right duplication breakpoint".
+    qRightDupBp: PHREDProb,
+
+    /// Probability for "is not".
+    qNotDiploid: PHREDProb,
+    /// Probability for "is diploid".
+    qDiploid: PHREDProb,
+
+    /// Mean normalized read depth throughout the CNV.
+    meanReadDepth: f64,
+    /// Mean Z-score of read depth through the CNV.
+    meanZScore: f64,
+    /// Number of target region in the cnv.
+    numTargetRegions: u32,
+}
+
+/// Description of a CNV as called by XHMM.
+pub struct CnvGenotypeInfo {
+    /// Segment with region information etc.
+    segment: Segment,
+    /// Qualities associated with the CNV.
+    quals: XhmmCnvQuals,
+}
+
+/// Compute metrics associated with each segment.
+fn compute_seg_metrics(
+    segmentation: &Segmentation,
+    cvs: &Vec<f64>,
+    covzs: &Vec<f64>,
+) -> Result<Vec<CnvGenotypeInfo>> {
+    bail!("Implement me!")
+}
+
+/// Read segmentation and region-wise coverage from input file(s).
+fn read_seg_and_cov(
+    reader: &mut bcf::IndexedReader,
+    reader_calls: Option<&mut bcf::IndexedReader>,
+) -> Result<(Segmentation, Vec<f64>, Vec<f64>)> {
+    bail!("Implement me!")
+}
+
+/// Build header for the output BCF file.
+///
+/// This defines all values used throughout the whole window/target specific BAM files,
+/// regardless whether they are actually used in the file.
+///
+/// Note that we use shared FORMAT tags for coverage and fragment count, such that we get
+/// unified processing of copy number data in BCF files.
+fn build_header(samples: &Vec<String>, contigs: &GenomeRegions) -> bcf::Header {
+    let mut header = bcf::Header::new();
+
+    // Put overall meta information into the BCF header.
+    let now = chrono::Utc::now();
+    header.push_record(format!("##fileDate={}", now.format("%Y%m%d").to_string()).as_bytes());
+
+    // Put creating tool version and call into file.
+    header.push_record(format!("##cnvetti_cmdGenotypeVersion={}", "0.1.0").as_bytes());
+    header.push_record(
+        format!(
+            "##cnvetti_cmdGentypeCommand={}",
+            env::args()
+                .map(|s| shlex::quote(&s).to_string())
+                .collect::<Vec<String>>()
+                .join(" ")
+        ).as_bytes(),
+    );
+
+    // Add samples to BCF header.
+    for sample in samples {
+        header.push_sample(sample.as_bytes());
+    }
+
+    // Put contig information into BCF header.
+    for (name, _, length) in &contigs.regions {
+        header.push_record(format!("##contig=<ID={},length={}>", name, length).as_bytes());
+    }
+
+    // Push the relevant header records.
+    let lines = vec![
+        // Define ALT column <DEL>/<DUP>/<CNV>
+        "##ALT=<ID=DEL,Description=\"Record describes a deletion, with respect to the
+         reference\">",
+        "##ALT=<ID=DUP,Description=\"Record describes a duplication, with respect to the
+         reference\">",
+        "##ALT=<ID=CNV,Description=\"Record describes a copy number variant with respect
+         to the reference, results from merging two overlapping DEL/DUP regions or from
+         an inconclusive \"missing genotype\" call, e.g., using Exome HMM method\">",
+        // INFO fields describing the window
+        "##INFO=<ID=CENTER,Number=1,Type=Integer,Description=\"Mid-point of the CNV, to have a
+         single number, e.g., for plotting.\">",
+        "##INFO=<ID=END,Number=1,Type=Integer,Description=\"Window end\">",
+        "##INFO=<ID=SVTYPE,Number=1,Type=String,Description=\"Type of the SV\">",
+        "##INFO=<ID=SVLEN,Number=1,Type=Integer,Description=\"Length of the SV in bp\">",
+        // FILTER fields
+        "##FILTER=<ID=LowQual,Description=\"Low-quality call or genotype.\">",
+        // Generic FORMAT fields
+        "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"The genotype in the sample\">",
+        "##FORMAT=<ID=FT,Number=1,Type=String,Description=\"Genotype-wise filter, \
+         semicolon-separated.\">",
+        // Coverage- and quality-related FORMAT fields.
+        "##FORMAT=<ID=CN,Number=1,Type=Integer,Description=\"Predicted copy number;
+         0=no-call, 1=del, 2=diploid, 3=duplication\">",
+        "##FORMAT=<ID=QED,Number=1,Type=Float,Description=\"Phred-scaled probability for \
+         'exact del/dup'\">",
+        "##FORMAT=<ID=QSD,Number=1,Type=Float,Description=\"Phred-scaled probability for \
+         'some del/dup'\">",
+        "##FORMAT=<ID=QND,Number=1,Type=Float,Description=\"Phred-scaled probability for \
+         'no del/dup'\">",
+        "##FORMAT=<ID=QLD,Number=1,Type=Float,Description=\"Phred-scaled probability for \
+         'left del/dup breakpoint'\">",
+        "##FORMAT=<ID=QRD,Number=1,Type=Float,Description=\"Phred-scaled probability for \
+         'right del/dup breakpoint'\">",
+        "##FORMAT=<ID=QED,Number=1,Type=Float,Description=\"Phred-scaled probability for \
+         'exact del/dup'\">",
+        "##FORMAT=<ID=CV,Number=1,Type=Float,Description=\"Mean coverage over the CNV region\">",
+        "##FORMAT=<ID=CV2,Number=1,Type=Float,Description=\"Mean log2-scaled coverage over
+         the CNV region\">",
+        "##FORMAT=<ID=CVZ,Number=1,Type=Float,Description=\"Mean Z-score over the CNV region\">",
+    ];
+    for line in lines {
+        header.push_record(line.as_bytes());
+    }
+
+    header
+}
+
+/// Build bcf::Writer with appropriate header.
+fn build_bcf_writer(path: &String, reader: &bcf::IndexedReader) -> Result<bcf::Writer> {
+    let uncompressed = !path.ends_with(".bcf") && !path.ends_with(".vcf.gz");
+    let vcf = path.ends_with(".vcf") || path.ends_with(".vcf.gz");
+
+    let chroms = bcf_utils::extract_chroms(&reader.header());
+    let samples = reader
+        .header()
+        .samples()
+        .iter()
+        .map(|s| {
+            String::from_utf8(s.to_vec()).expect(&format!("Could not decode sample name: {:?}", s))
+        })
+        .collect::<Vec<String>>();
+
+    let header = build_header(&samples, &chroms);
+    bcf::Writer::from_path(&path, &header, uncompressed, vcf)
+        .chain_err(|| "Could not open BCF file for writing")
+}
 
 /// Perform genotyping using the XHMM algorithm.
 pub fn run_genotyping(logger: &mut Logger, options: &GenotypeOptions) -> Result<()> {
     info!(logger, "Computing genotyping using XHMM");
 
-    debug!(logger, "Opening input file");
+    debug!(logger, "Opening input file(s)");
     let mut reader = bcf::IndexedReader::from_path(options.input.clone())
         .chain_err(|| "Could not open input BCF file")?;
+    let mut reader_calls: Option<bcf::IndexedReader> = options
+        .input_calls
+        .as_ref()
+        .map(|ref path| {
+            bcf::IndexedReader::from_path(path.clone())
+                .chain_err(|| "Could not open input BCF file")
+        })
+        .map_or(Ok(None), |r| r.map(Some))?;
 
     debug!(logger, "Opening output file");
-    let mut writer = {
-        // Construct extended header.
-        let mut header = bcf::Header::from_template(reader.header());
-        // let lines = vec![];
-        // for line in lines {
-        //     header.push_record(line.as_bytes());
-        // }
-        header.push_record(format!("##cnvetti_genotypeVersion={}", "0.1.0").as_bytes());
-        header.push_record(
-            format!(
-                "##cnvetti_genotypeCommand={}",
-                env::args()
-                    .map(|s| shlex::quote(&s).to_string())
-                    .collect::<Vec<String>>()
-                    .join(" ")
-            ).as_bytes(),
-        );
-
-        let uncompressed =
-            !options.output.ends_with(".bcf") && !options.output.ends_with(".vcf.gz");
-        let vcf = options.output.ends_with(".vcf") || options.output.ends_with(".vcf.gz");
-
-        bcf::Writer::from_path(options.output.clone(), &header, uncompressed, vcf)
-            .chain_err(|| "Could not open output BCF file")?
-    };
+    let mut writer = build_bcf_writer(&options.output, &reader)?;
     if options.io_threads > 0 {
         writer
             .set_threads(options.io_threads as usize)
@@ -60,124 +230,35 @@ pub fn run_genotyping(logger: &mut Logger, options: &GenotypeOptions) -> Result<
     for (chrom, _, chrom_len) in &chroms.regions {
         debug!(logger, "Processing chrom {}", &chrom);
 
-        // trace!(logger, "Jumping in coverage BCF file");
-        // let rid = reader
-        //     .header()
-        //     .name2rid(chrom.as_bytes())
-        //     .chain_err(|| format!("Could not translate header name {}", chrom))?;
-        // reader
-        //     .fetch(rid, 0, *chrom_len as u32)
-        //     .chain_err(|| format!("Could not fetch chromosome {}", chrom))?;
+        trace!(logger, "Jumping in BCF file(s)");
+        let rid = reader
+            .header()
+            .name2rid(chrom.as_bytes())
+            .chain_err(|| format!("[Regions BCF] Could not translate header name {}", chrom))?;
+        reader
+            .fetch(rid, 0, *chrom_len as u32)
+            .chain_err(|| format!("[Regions BCF] Could not fetch chromosome {}", chrom))?;
+        if let Some(ref mut reader_calls) = reader_calls.as_mut() {
+            let rid = reader_calls
+                .header()
+                .name2rid(chrom.as_bytes())
+                .chain_err(|| format!("[Calls BCF] Could not translate header name {}", chrom))?;
+            reader_calls
+                .fetch(rid, 0, *chrom_len as u32)
+                .chain_err(|| format!("[Calls BCF] Could not fetch chromosome {}", chrom))?;
+        }
 
-        // trace!(logger, "Load coverage Z scores");
-        // let mut cvzs: Vec<f64> = Vec::new();
-        // let mut cvs: Vec<f64> = Vec::new();
-        // let mut cv2s: Vec<f64> = Vec::new();
-        // let mut pos: Vec<usize> = Vec::new();
-        // let mut record = reader.empty_record();
-        // loop {
-        //     match reader.read(&mut record) {
-        //         Ok(_) => (),
-        //         Err(bcf::ReadError::NoMoreRecord) => break,
-        //         _ => bail!("Error reading BCF record"),
-        //     }
+        trace!(logger, "Loading coverage and segmentation");
+        let (segmentation, covs, covzs) = read_seg_and_cov(&mut reader, reader_calls.as_mut())?;
 
-        //     if !skip_record(&mut record) {
-        //         let end = record
-        //             .info(b"END")
-        //             .integer()
-        //             .expect("Could not access FORMAT/END")
-        //             .unwrap()[0] as usize;
-        //         let center = (record.pos() as usize + end) / 2;
+        trace!(logger, "Computing quality metrics of the segmentation");
+        let gt_infos = compute_seg_metrics(&segmentation, &covs, &covzs)?;
 
-        //         let cv = record
-        //             .format(b"CV")
-        //             .float()
-        //             .expect("Could not access FORMAT/CV")[0][0] as f64;
-        //         let cvz = record
-        //             .format(b"CVZ")
-        //             .float()
-        //             .expect("Could not access FORMAT/CVZ")[0][0] as f64;
-        //         let cv2 = record
-        //             .format(b"CV2")
-        //             .float()
-        //             .expect("Could not access FORMAT/CV2")[0][0] as f64;
+        trace!(logger, "Post-filtering segments");
+        let gt_infos = filter_segmentation(&gt_infos, &options)?;
 
-        //         // Limit outliers. TODO: think of something smarter.
-        //         const Z_SCORE_LIMIT_FACTOR: f64 = 5.0;
-        //         let z_score_limit = options.xhmm_z_score_threshold * Z_SCORE_LIMIT_FACTOR;
-        //         let cvz = if cvz < -z_score_limit {
-        //             -z_score_limit
-        //         } else if cvz > z_score_limit {
-        //             z_score_limit
-        //         } else {
-        //             cvz
-        //         };
-
-        //         pos.push(center);
-        //         cvs.push(cv);
-        //         cvzs.push(cvz);
-        //         cv2s.push(cv2);
-        //     }
-        // }
-
-        info!(logger, "Computing genotype");
-        // let segmentation = xhmm_seg(logger, pos, &cvs, &cv2s, &cvzs, options);
-
-        trace!(logger, "Write out genotypes");
-        // let mut idx = 0; // current index into ncov
-        // let mut prev_val: Option<(f32, f32, f32, i32)> = None; // (val, log2(val), p_value, cn_state)
-        // reader
-        //     .fetch(rid, 0, *chrom_len as u32)
-        //     .chain_err(|| format!("Could not fetch chromosome {}", chrom))?;
-        // assert_eq!(
-        //     segmentation.values.len(),
-        //     segmentation.cn_states.as_ref().unwrap().len()
-        // );
-        // while reader.read(&mut record).is_ok() {
-        //     writer.translate(&mut record);
-        //     let (val, val_log2, p_value, cn_state) = if skip_record(&mut record) {
-        //         record.push_filter(writer.header().name_to_id(b"SKIPPED_SEG").unwrap());
-        //         if let Some(prev_val) = prev_val {
-        //             prev_val
-        //         } else {
-        //             (1.0, 0.0, 1.0, 1)
-        //         }
-        //     } else {
-        //         let val = if segmentation.values[idx] > 0.0
-        //             && segmentation.values[idx] < PSEUDO_EPSILON
-        //         {
-        //             (1.0, 0.0, 1.0, 1)
-        //         } else {
-        //             (
-        //                 (segmentation.values[idx] - PSEUDO_EPSILON) as f32,
-        //                 segmentation.values_log2[idx] as f32,
-        //                 1.0, //p_values[idx],  // TODO: compute empirical p value
-        //                 match segmentation.cn_states.as_ref().unwrap()[idx] {
-        //                     CopyState::Deletion => 0,
-        //                     CopyState::Neutral => 1,
-        //                     CopyState::Duplication => 2,
-        //                 },
-        //             )
-        //         };
-        //         prev_val = Some(val);
-        //         idx += 1;
-        //         val
-        //     };
-        //     record
-        //         .push_format_float(b"SGP", &[p_value])
-        //         .chain_err(|| "Could not write FORMAT/SGP")?;
-        //     record
-        //         .push_format_float(b"SG", &[val])
-        //         .chain_err(|| "Could not write FORMAT/SG")?;
-        //     record
-        //         .push_format_float(b"SG2", &[val_log2])
-        //         .chain_err(|| "Could not write FORMAT/SG2")?;
-        //     record
-        //         .push_format_integer(b"SGS", &[cn_state])
-        //         .chain_err(|| "Could not write FORMAT/SGS")?;
-        //     writer.write(&record).expect("Writing the record failed!");
-        // }
+        trace!(logger, "Write out calls BCF file");
+        write_result(&gt_infos, &mut writer)?;
     }
 
     info!(logger, "=> OK");
