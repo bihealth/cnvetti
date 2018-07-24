@@ -41,12 +41,6 @@ fn write_result(
         assert!(cnv_info.quals.copy_state != CopyState::Neutral);
         let mut record = writer.empty_record();
 
-        let (sv_type, sv_len) = if cnv_info.quals.copy_state == CopyState::Deletion {
-            ("DEL", -(cnv_info.segment.range.len() as i32))
-        } else {
-            ("DUP", cnv_info.segment.range.len() as i32)
-        };
-
         // Columns: CHROM, POS, ID, REF, ALT, (FILTER)
         let pos = ranges[cnv_info.segment.range.start].start;
         let end = ranges[cnv_info.segment.range.end].end;
@@ -63,6 +57,13 @@ fn write_result(
             .map(|x| x.as_slice())
             .collect::<Vec<&[u8]>>();
 
+        let (sv_type, sv_len) = if cnv_info.quals.copy_state == CopyState::Deletion {
+            ("DEL", -((end - pos) as i32))
+        } else {
+            ("DUP", (end - pos) as i32)
+        };
+        let num_targets = cnv_info.segment.range.len() as i32;
+
         record.set_rid(&Some(rid));
         record.set_pos(pos as i32);
         record
@@ -77,14 +78,17 @@ fn write_result(
             .push_info_integer(b"END", &[end as i32])
             .chain_err(|| "Could not write INFO/END")?;
         record
-            .push_info_integer(b"CENTER", &[((pos + end) / 2) as i32])
-            .chain_err(|| "Could not write INFO/END")?;
-        record
             .push_info_string(b"SVTYPE", &[sv_type.as_bytes()])
             .chain_err(|| "Could not write INFO/SVTYPE")?;
         record
             .push_info_integer(b"SVLEN", &[sv_len])
-            .chain_err(|| "Could not write INFO/SVTYPE")?;
+            .chain_err(|| "Could not write INFO/SVLEN")?;
+        record
+            .push_info_integer(b"TARGETS", &[num_targets])
+            .chain_err(|| "Could not write INFO/TARGETS")?;
+        record
+            .push_info_integer(b"CENTER", &[((pos + end) / 2) as i32])
+            .chain_err(|| "Could not write INFO/END")?;
 
         // Columns: FORMAT/GT
         // TODO: what to push as GT here?
@@ -200,22 +204,15 @@ pub fn restricted_forward<O, M: Model<O>>(
     observations: &[O],
     impossible_state: &State,
     impossible_range: &Range<usize>,
-) -> (Array2<LogProb>, LogProb)
-where
-    O: Debug,
-{
-    // The matrix with probabilities.
-    let mut vals = Array2::<LogProb>::zeros((observations.len(), hmm.num_states()));
-
+    vals: &mut Array2<LogProb>,
+) {
     // Compute matrix.
-    for (i, o) in observations.iter().enumerate() {
+    for i in impossible_range.clone() {
+        let o = &observations[i];
         if i == 0 {
             // Initial column.
             for s in hmm.states() {
-                if (i >= impossible_range.start)
-                    && (i < impossible_range.end)
-                    && (s == *impossible_state)
-                {
+                if s == *impossible_state {
                     vals[[0, *s]] = LogProb::ln_zero();
                 } else {
                     vals[[0, *s]] = hmm.initial_prob(s) + hmm.observation_prob(s, o);
@@ -224,54 +221,21 @@ where
         } else {
             // Subsequent columns.
             for j in hmm.states() {
-                if (i >= impossible_range.start)
-                    && (i < impossible_range.end)
-                    && (j == *impossible_state)
-                {
+                if j == *impossible_state {
                     vals[[i, *j]] = LogProb::ln_zero();
-                // println!(
-                //     "i = {:?}, *j= {:?}, vals[[i, *j]] = {:?}",
-                //     i,
-                //     *j,
-                //     &vals[[i, *j]]
-                // );
                 } else {
                     let xs = hmm.states()
                         .map(|k| {
-                            // println!(
-                            //     "i = {:?}, *j = {:?}, *k = {:?}, vals[[i - 1, *k]] = {:?}, \
-                            //      hmm.transition_prob_idx(k, j, i) = {:?}, \
-                            //      hmm.observation_prob(j, o) = {:?}, o = {:?}",
-                            //     &i,
-                            //     &*j,
-                            //     &*k,
-                            //     &vals[[i - 1, *k]],
-                            //     &hmm.transition_prob_idx(k, j, i),
-                            //     &hmm.observation_prob(j, o),
-                            //     &o
-                            // );
                             vals[[i - 1, *k]]
                                 + hmm.transition_prob_idx(k, j, i)
                                 + hmm.observation_prob(j, o)
                         })
                         .collect::<Vec<LogProb>>();
                     vals[[i, *j]] = LogProb::ln_sum_exp(&xs);
-                    // println!(
-                    //     "i = {:?}, *j= {:?}, xs = {:?}, vals[[i, *j]] = {:?}",
-                    //     i,
-                    //     *j,
-                    //     &xs,
-                    //     &vals[[i, *j]]
-                    // );
                 }
             }
         }
     }
-
-    // Compute final probability.
-    let prob = LogProb::ln_sum_exp(vals.row(observations.len() - 1).into_slice().unwrap());
-
-    (vals, prob)
 }
 
 /// Restricted version of the backward algorithm, sets probability to `0.0` for `impossible_state`,
@@ -281,13 +245,13 @@ pub fn restricted_backward<O, M: Model<O>>(
     observations: &[O],
     impossible_state: &State,
     impossible_range: &Range<usize>,
-) -> (Array2<LogProb>, LogProb) {
-    // The matrix with probabilities.
-    let mut vals = Array2::<LogProb>::zeros((observations.len(), hmm.num_states()));
-
+    vals: &mut Array2<LogProb>,
+) {
     // Compute matrix.
     let n = observations.len();
-    for (i, o) in observations.iter().rev().enumerate() {
+    for r in impossible_range.clone().rev() {
+        let o = &observations[r];
+        let i = n - (r + 1);
         if i == 0 {
             for j in hmm.states() {
                 if (i >= impossible_range.start)
@@ -331,11 +295,6 @@ pub fn restricted_backward<O, M: Model<O>>(
             }
         }
     }
-
-    // Compute final probability.
-    let prob = LogProb::ln_sum_exp(vals.row(observations.len() - 1).into_slice().unwrap());
-
-    (vals, prob)
 }
 
 /// Convert copy state to idx.
@@ -413,7 +372,7 @@ fn compute_seg_metrics(
     };
 
     for (i, ref segment) in segmentation.segments.iter().enumerate() {
-        debug!(
+        trace!(
             logger,
             "Segment {} of {}",
             i + 1,
@@ -429,15 +388,30 @@ fn compute_seg_metrics(
         let state = State(cs_to_idx(copy_state));
         let start = segment.range.start;
         let end = segment.range.end;
-        // println!("=> segment = {:?}", &segment);
 
         // Compute restricted forward and backward probability (\in {1,2})
-        let (b_restr12, _) = restricted_backward(&model, &covzs, &State(2), &segment.range);
-        let (f_restr12, _) = restricted_forward(&model, &covzs, &State(2), &segment.range);
+        let b_restr12 = {
+            let mut vals = b.clone();
+            restricted_backward(&model, &covzs, &State(2), &segment.range, &mut vals);
+            vals
+        };
+        let f_restr12 = {
+            let mut vals = f.clone();
+            restricted_forward(&model, &covzs, &State(2), &segment.range, &mut vals);
+            vals
+        };
 
         // Compute restricted forward and backward probability (\in {2,3})
-        let (b_restr23, _) = restricted_backward(&model, &covzs, &State(0), &segment.range);
-        let (f_restr23, _) = restricted_forward(&model, &covzs, &State(0), &segment.range);
+        let b_restr23 = {
+            let mut vals = b.clone();
+            restricted_backward(&model, &covzs, &State(0), &segment.range, &mut vals);
+            vals
+        };
+        let f_restr23 = {
+            let mut vals = f.clone();
+            restricted_forward(&model, &covzs, &State(0), &segment.range, &mut vals);
+            vals
+        };
 
         let q_exact_cnv = PHREDProb::from(pr_cs_equals(segment.range.clone(), copy_state));
         let (q_some_cnv, q_no_cnv) = if state == State(0) {
@@ -450,10 +424,6 @@ fn compute_seg_metrics(
                 CopyState::Neutral,
             );
             let q_some_del_b = pr_cs_equals(segment.range.clone(), CopyState::Neutral);
-            // println!(
-            //     "q_some_del_a={:?}, q_some_del_b={:?}",
-            //     &q_some_del_a, &q_some_del_b
-            // );
             let q_no_del = PHREDProb::from(pr_cs_one_of(
                 segment.range.clone(),
                 &b_restr23,
@@ -475,14 +445,6 @@ fn compute_seg_metrics(
                 CopyState::Duplication,
             );
             let q_some_dup_b = pr_cs_equals(segment.range.clone(), CopyState::Neutral);
-            // if segment.range.len() < 2 {
-            //     println!("f_restr23={:?}", &f_restr23);
-            //     println!("b_restr23={:?}", &b_restr23);
-            //     println!(
-            //         "q_some_dup_a={:?}, q_some_dup_b={:?}",
-            //         &q_some_dup_a, &q_some_dup_b
-            //     );
-            // }
             let q_no_dup = PHREDProb::from(pr_cs_one_of(
                 segment.range.clone(),
                 &b_restr12,
@@ -745,6 +707,8 @@ fn build_header(samples: &Vec<String>, contigs: &GenomeRegions) -> bcf::Header {
         "##INFO=<ID=END,Number=1,Type=Integer,Description=\"Window end\">",
         "##INFO=<ID=SVTYPE,Number=1,Type=String,Description=\"Type of the SV\">",
         "##INFO=<ID=SVLEN,Number=.,Type=Integer,Description=\"Length of the SV in bp\">",
+        "##INFO=<ID=TARGETS,Number=.,Type=Integer,Description=\"Number of target regions
+         used for calling\">",
         // FILTER fields
         "##FILTER=<ID=LowQual,Description=\"Low-quality call or genotype.\">",
         // Generic FORMAT fields
@@ -860,7 +824,6 @@ pub fn run_genotyping(logger: &mut Logger, options: &GenotypeOptions) -> Result<
 
         trace!(logger, "Write out calls BCF file");
         write_result(&gt_infos, &chrom, &ranges, &mut writer)?;
-        break;
     }
 
     info!(logger, "=> OK");
