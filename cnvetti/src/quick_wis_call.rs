@@ -9,6 +9,7 @@ use slog::Logger;
 use tempdir::TempDir;
 
 use lib_coverage::{self, CoverageOptions};
+use lib_genotype::{self, GenotypeOptions, GenotypingMethod};
 use lib_mod_cov::{self, ModelBasedCoverageOptions};
 use lib_normalize::{self, NormalizeOptions};
 use lib_segment::{self, SegmentOptions, Segmentation};
@@ -167,6 +168,22 @@ impl QuickWisCallOptions {
             output_igv_seg: self.output_igv_seg.clone(),
             output_igv_seg2: self.output_igv_seg2.clone(),
             io_threads: 0,
+        }
+    }
+
+    fn into_genotype_options(&self, input: &String) -> GenotypeOptions {
+        GenotypeOptions {
+            input: input.clone(),
+            input_calls: None,
+            output: self.output.clone(),
+            io_threads: 0,
+
+            genotyping: GenotypingMethod::ExomeHiddenMarkovModel,
+
+            xhmm_z_score_threshold: self.xhmm_z_score_threshold,
+            xhmm_cnv_rate: self.xhmm_cnv_rate,
+            xhmm_mean_target_count: self.xhmm_mean_target_count,
+            xhmm_mean_target_dist: self.xhmm_mean_target_dist,
         }
     }
 }
@@ -338,7 +355,15 @@ pub fn run(logger: &mut Logger, options: &QuickWisCallOptions) -> Result<()> {
     ).chain_err(|| "Problem with merging coverage file")?;
     info!(logger, " => done");
 
-    warn!(logger, "Actual calling step has not been implemented yet!");
+    // Generate Call output file.
+    info!(logger, "Generate genotype output files");
+    lib_genotype::run(
+        &mut logger.new(o!("step" => "mod-genotype")),
+        &options.into_genotype_options(&output_targets),
+    ).chain_err(|| "Problem genotyping file")?;
+    info!(logger, " => done");
+
+    warn!(logger, "Generating visualization for genotype not implemented yet!");
 
     info!(logger, "All done. Have a nice day!");
     Ok(())

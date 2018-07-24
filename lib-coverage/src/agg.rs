@@ -128,7 +128,6 @@ impl<'a> FragmentsGenomeWideAggregator<'a> {
                 record.pos()
                     + record
                         .cigar()
-                        .unwrap()
                         .end_pos()
                         .expect("Problem interpreting CIGAR string")
             } as u32;
@@ -176,7 +175,7 @@ impl<'a> FragmentsGenomeWideAggregator<'a> {
 
         let mut num_clipped = 0;
         let mut num_unclipped = 0;
-        for c in record.cigar().unwrap().iter() {
+        for c in record.cigar().iter() {
             match c {
                 Match(num) | Ins(num) | Equal(num) | Diff(num) => {
                     num_unclipped += num;
@@ -222,7 +221,6 @@ impl<'a> BamRecordAggregator for FragmentsGenomeWideAggregator<'a> {
     fn put_fetched_records(&mut self, reader: &mut bam::IndexedReader) {
         let mut record = bam::Record::new();
         while reader.read(&mut record).is_ok() {
-            record.unpack_cigar();
             self.put_bam_record(&record);
         }
     }
@@ -318,7 +316,6 @@ impl FragmentsTargetRegionsAggregator {
             } else {
                 record
                     .cigar()
-                    .unwrap()
                     .end_pos()
                     .expect("Problem interpreting CIGAR string")
             } as u32;
@@ -391,7 +388,7 @@ impl FragmentsTargetRegionsAggregator {
 
         let mut num_clipped = 0;
         let mut num_unclipped = 0;
-        for c in record.cigar().unwrap().iter() {
+        for c in record.cigar().iter() {
             match c {
                 Match(num) | Ins(num) | Equal(num) | Diff(num) => {
                     num_unclipped += num;
@@ -417,7 +414,6 @@ impl BamRecordAggregator for FragmentsTargetRegionsAggregator {
     fn put_fetched_records(&mut self, reader: &mut bam::IndexedReader) {
         let mut record = bam::Record::new();
         while reader.read(&mut record).is_ok() {
-            record.unpack_cigar();
             self.put_bam_record(&record);
         }
     }

@@ -1045,6 +1045,90 @@ subcommands:
             required: false
             value_name: SEG2.igv
             help: Optional path to IGV file to write log2-scaled segmented coverage to.
+        # Algorithm Parameters --------------------------------------------------------------------
+        - segmentation:
+            long: segmentation
+            takes_value: true
+            required: true
+            value_name: TYPE
+            possible_values:
+            - HaarSeg
+            - CircularBinarySegmentation
+            - GenomeHiddenMarkovModel
+            - ExomeHiddenMarkovModel
+            - WISExome
+            help: The method to use for the segmentation.
+        - thresh_p_value:
+            long: thresh-p-value
+            takes_value: true
+            required: false
+            value_name: P-VALUE
+            default_value: '0.05'
+        # Algorithm Parameters for HaarSeg --------------------------------------------------------
+        - haar_seg_l_min:
+            long: haar-seg-l-min
+            takes_value: true
+            required: false
+            value_name: VALUE
+            default_value: '1'
+        - haar_seg_l_max:
+            long: haar-seg-l-max
+            takes_value: true
+            required: false
+            value_name: VALUE
+            default_value: '5'
+        - haar_seg_fdr:
+            long: haar-seg-fdr
+            takes_value: true
+            required: false
+            value_name: VALUE
+            default_value: '0.001'
+        # Algorithm Parameters for WISExome Segmentation ------------------------------------------
+        - wisexome_max_window_size:
+            long: wisexome-max-window-size
+            takes_value: true
+            required: false
+            value_name: VALUE
+            default_value: '15'
+        - wisexome_thresh_rel_cov:
+            long: wisexome-thresh-rel-cov
+            takes_value: true
+            required: false
+            value_name: THRESH
+            default_value: '0.35'
+            help: Threshold on relative coverage deviation.
+        - wisexome_thresh_z_score:
+            long: wisexome-thresh-z-score
+            takes_value: true
+            required: false
+            value_name: THRESH
+            default_value: '5.64'
+            help: Threshold on Z-score
+        # Algorithm Parameters for Exome HMM Segmentation -----------------------------------------
+        - xhmm_z_score_threshold:
+            long: xhmm-z-score-threshold
+            takes_value: true
+            value_name: THRESH
+            default_value: '3.0'
+            help: Z-score threshold to use.
+        - xhmm_cnv_rate:
+            long: xhmm-cnv-rate
+            takes_value: true
+            value_name: RATE
+            default_value: '1e-08'
+            help: Expected exome-wide CNV rate for exome HMM segmentation.
+        - xhmm_mean_target_count:
+            long: xhmm-cnv-target-count
+            takes_value: true
+            value_name: DIST
+            default_value: '6'
+            help: Mean number of targets in a CNV for exome HMM segmentation.
+        - xhmm_mean_target_dist:
+            long: xhmm-mean-target-dist
+            takes_value: true
+            value_name: DIST
+            default_value: '70000'
+            help: Mean distance of targets in a CNV for exome HMM segmentation.
 
 # Sub command: visualize ==========================================================================
 - visualize:

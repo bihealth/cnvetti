@@ -62,6 +62,10 @@ fn load_region_infos(
                 {
                     continue;
                 }
+                else
+                {
+                    record.unpack();
+                }
             }
             Err(bcf::ReadError::NoMoreRecord) => break,
             _ => bail!("Could not read record"),
@@ -117,7 +121,7 @@ fn process_contig(
     let mut record = reader.empty_record();
     loop {
         match reader.read(&mut record) {
-            Ok(_) => (),
+            Ok(_) => record.unpack(),
             Err(bcf::ReadError::NoMoreRecord) => break,
             _ => bail!("Could not read record"),
         }

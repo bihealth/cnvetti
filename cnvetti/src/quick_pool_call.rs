@@ -1,5 +1,7 @@
 //! Implementation of the "cnvetti quick pool-call" command.
 
+use std::str::FromStr;
+
 use clap::ArgMatches;
 
 use slog::Logger;
@@ -7,8 +9,10 @@ use slog::Logger;
 use tempdir::TempDir;
 
 use lib_coverage::{self, CoverageOptions};
+use lib_genotype::{self, GenotypeOptions, GenotypingMethod};
 use lib_mod_cov::{self, ModelBasedCoverageOptions};
 use lib_normalize::{self, NormalizeOptions};
+use lib_segment::{self, SegmentOptions, Segmentation};
 use lib_visualize::{self, CovToIgvOptions};
 
 use super::errors::*;
@@ -36,6 +40,38 @@ pub struct QuickPoolCallOptions {
     pub output_igv_seg: Option<String>,
     /// Path to IGV file with SG2 information.
     pub output_igv_seg2: Option<String>,
+
+    /// The segmentation method to employ.
+    pub segmentation: Segmentation,
+
+    /// Parameter for p-value thresholding.
+    pub thresh_p_value: f64,
+
+    // Parameters from Haar-Seg.
+    /// Value for l_min.
+    pub haar_seg_l_min: u32,
+    /// Value for l_max.
+    pub haar_seg_l_max: u32,
+    /// Value for FDR.
+    pub haar_seg_fdr: f64,
+
+    // Parameters from WISExome.
+    /// Maximal window size in "windowing" step.
+    pub wisexome_max_window_size: u32,
+    /// Threshold on relative coverage.
+    pub wisexome_thresh_rel_cov: f64,
+    /// Threshold on Z-score.
+    pub wisexome_thresh_z_score: f64,
+
+    // Parameters from XHMM.
+    /// Threshold on Z-score.
+    pub xhmm_z_score_threshold: f64,
+    /// Expected exome-wide CNV rate.
+    pub xhmm_cnv_rate: f64,
+    /// Expected mean number of targets.
+    pub xhmm_mean_target_count: f64,
+    /// Expected mean target distance in a CNV.
+    pub xhmm_mean_target_dist: f64,
 }
 
 /// Conversion into CoverageOptions.
@@ -97,6 +133,31 @@ impl QuickPoolCallOptions {
         }
     }
 
+    fn into_segment_options(&self, input: &String, output: &String) -> SegmentOptions {
+        SegmentOptions {
+            input: input.clone(),
+            output: output.clone(),
+            segmentation: self.segmentation,
+
+            io_threads: 0,
+
+            thresh_p_value: self.thresh_p_value,
+
+            haar_seg_l_min: self.haar_seg_l_min,
+            haar_seg_l_max: self.haar_seg_l_max,
+            haar_seg_fdr: self.haar_seg_fdr,
+
+            wisexome_max_window_size: self.wisexome_max_window_size,
+            wisexome_thresh_rel_cov: self.wisexome_thresh_rel_cov,
+            wisexome_thresh_z_score: self.wisexome_thresh_z_score,
+
+            xhmm_z_score_threshold: self.xhmm_z_score_threshold,
+            xhmm_cnv_rate: self.xhmm_cnv_rate,
+            xhmm_mean_target_count: self.xhmm_mean_target_count,
+            xhmm_mean_target_dist: self.xhmm_mean_target_dist,
+        }
+    }
+
     fn into_cov_to_igv_options(&self, input: &String) -> CovToIgvOptions {
         CovToIgvOptions {
             input: input.clone(),
@@ -108,11 +169,30 @@ impl QuickPoolCallOptions {
             io_threads: 0,
         }
     }
+
+    fn into_genotype_options(&self, input: &String) -> GenotypeOptions {
+        GenotypeOptions {
+            input: input.clone(),
+            input_calls: None,
+            output: self.output.clone(),
+            io_threads: 0,
+
+            genotyping: GenotypingMethod::ExomeHiddenMarkovModel,
+
+            xhmm_z_score_threshold: self.xhmm_z_score_threshold,
+            xhmm_cnv_rate: self.xhmm_cnv_rate,
+            xhmm_mean_target_count: self.xhmm_mean_target_count,
+            xhmm_mean_target_dist: self.xhmm_mean_target_dist,
+        }
+    }
 }
 
 impl QuickPoolCallOptions {
     /// Build options from ArgMatches.
     pub fn new(matches: &ArgMatches) -> Self {
+        let segmentation = matches.value_of("segmentation").unwrap();
+        let segmentation = Segmentation::from_str(&segmentation).expect("Unknown segmentation");
+
         Self {
             input: matches
                 .value_of("input")
@@ -131,6 +211,67 @@ impl QuickPoolCallOptions {
             output_igv_covz: matches.value_of("output_igv_covz").map(|s| s.to_string()),
             output_igv_seg: matches.value_of("output_igv_seg").map(|s| s.to_string()),
             output_igv_seg2: matches.value_of("output_igv_seg2").map(|s| s.to_string()),
+
+            segmentation: segmentation,
+
+            thresh_p_value: matches
+                .value_of("thresh_p_value")
+                .unwrap()
+                .parse::<f64>()
+                .unwrap(),
+
+            haar_seg_l_min: matches
+                .value_of("haar_seg_l_min")
+                .unwrap()
+                .parse::<u32>()
+                .unwrap(),
+            haar_seg_l_max: matches
+                .value_of("haar_seg_l_max")
+                .unwrap()
+                .parse::<u32>()
+                .unwrap(),
+            haar_seg_fdr: matches
+                .value_of("haar_seg_fdr")
+                .unwrap()
+                .parse::<f64>()
+                .unwrap(),
+
+            wisexome_max_window_size: matches
+                .value_of("wisexome_max_window_size")
+                .unwrap()
+                .parse::<u32>()
+                .unwrap(),
+            wisexome_thresh_rel_cov: matches
+                .value_of("wisexome_thresh_rel_cov")
+                .unwrap()
+                .parse::<f64>()
+                .unwrap(),
+            wisexome_thresh_z_score: matches
+                .value_of("wisexome_thresh_z_score")
+                .unwrap()
+                .parse::<f64>()
+                .unwrap(),
+
+            xhmm_z_score_threshold: matches
+                .value_of("xhmm_z_score_threshold")
+                .unwrap()
+                .parse::<f64>()
+                .unwrap(),
+            xhmm_cnv_rate: matches
+                .value_of("xhmm_cnv_rate")
+                .unwrap()
+                .parse::<f64>()
+                .unwrap(),
+            xhmm_mean_target_count: matches
+                .value_of("xhmm_mean_target_count")
+                .unwrap()
+                .parse::<f64>()
+                .unwrap(),
+            xhmm_mean_target_dist: matches
+                .value_of("xhmm_mean_target_dist")
+                .unwrap()
+                .parse::<f64>()
+                .unwrap(),
         }
     }
 }
@@ -171,24 +312,38 @@ pub fn run(logger: &mut Logger, options: &QuickPoolCallOptions) -> Result<()> {
 
     // Compute coverage relative to pool-based model.
     info!(logger, "Compute model-based coverage normalization");
-    let output_targets = if let Some(ref output_targets) = options.output_targets {
-        output_targets.clone()
-    } else {
-        tmp_dir
-            .path()
-            .join(format!("output_targets.bcf"))
-            .to_str()
-            .unwrap()
-            .to_string()
-    };
+    let mod_cov_out = tmp_dir
+        .path()
+        .join(format!("output_mod_cov.bcf"))
+        .to_str()
+        .unwrap()
+        .to_string();
     lib_mod_cov::run(
         &mut logger.new(o!("step" => "mod-coverage")),
         &options.into_build_model_based_coverage_options(
             &norm_out,
             &options.input_model,
-            &output_targets,
+            &mod_cov_out,
         ),
     ).chain_err(|| "Problem with merging coverage file")?;
+    info!(logger, " => done");
+
+    // Compute segmentation using the normalized WIS file.
+    info!(logger, "Computing segmentation");
+    let output_targets = if let Some(ref output_targets) = options.output_targets {
+        output_targets.clone()
+    } else {
+        tmp_dir
+            .path()
+            .join(format!("output_segments.bcf"))
+            .to_str()
+            .unwrap()
+            .to_string()
+    };
+    lib_segment::run(
+        logger,
+        &options.into_segment_options(&mod_cov_out, &output_targets),
+    ).chain_err(|| format!("Problem segmenting on {}", &mod_cov_out))?;
     info!(logger, " => done");
 
     // Generate IGV output files for coverage.
@@ -199,7 +354,15 @@ pub fn run(logger: &mut Logger, options: &QuickPoolCallOptions) -> Result<()> {
     ).chain_err(|| "Problem with merging coverage file")?;
     info!(logger, " => done");
 
-    warn!(logger, "Actual calling step has not been implemented yet!");
+    // Generate Call output file.
+    info!(logger, "Generate genotype output files");
+    lib_genotype::run(
+        &mut logger.new(o!("step" => "mod-genotype")),
+        &options.into_genotype_options(&output_targets),
+    ).chain_err(|| "Problem genotyping file")?;
+    info!(logger, " => done");
+
+    warn!(logger, "Generating visualization for genotype not implemented yet!");
 
     info!(logger, "All done. Have a nice day!");
     Ok(())

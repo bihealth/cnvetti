@@ -374,9 +374,10 @@ fn compute_seg_metrics(
     for (i, ref segment) in segmentation.segments.iter().enumerate() {
         trace!(
             logger,
-            "Segment {} of {}",
+            "Segment {} of {}: {:?}",
             i + 1,
-            segmentation.segments.len()
+            segmentation.segments.len(),
+            &segment,
         );
         let copy_state = segment
             .copy_state
@@ -384,6 +385,19 @@ fn compute_seg_metrics(
         if copy_state == CopyState::Neutral {
             continue;
         }
+
+        let segment = if segment.range.start == 0 {
+            if segment.range.len() == 1 {
+                continue;
+            } else {
+                Segment {
+                    range: (segment.range.start + 1)..(segment.range.end),
+                    ..(*segment).clone()
+                }
+            }
+        } else {
+            Segment { ..(*segment).clone() }
+        };
 
         let state = State(cs_to_idx(copy_state));
         let start = segment.range.start;
@@ -476,7 +490,7 @@ fn compute_seg_metrics(
         let mean_z_score = covzs[segment.range.clone()].mean();
         let num_target_regions = segment.range.len();
 
-        let segment = (*segment).clone();
+        let segment = segment.clone();
         let quals = XhmmCnvQuals {
             copy_state,
             q_exact_cnv,
@@ -539,7 +553,7 @@ fn read_seg_and_cov(
     // Load values from file.
     loop {
         match reader.read(&mut record) {
-            Ok(_) => (),
+            Ok(_) => record.unpack(),
             Err(bcf::ReadError::NoMoreRecord) => break,
             _ => bail!("Could not read BCF record"),
         }
@@ -673,7 +687,7 @@ fn build_header(samples: &Vec<String>, contigs: &GenomeRegions) -> bcf::Header {
     header.push_record(format!("##cnvetti_cmdGenotypeVersion={}", "0.1.0").as_bytes());
     header.push_record(
         format!(
-            "##cnvetti_cmdGentypeCommand={}",
+            "##cnvetti_cmdGenotypeCommand={}",
             env::args()
                 .map(|s| shlex::quote(&s).to_string())
                 .collect::<Vec<String>>()

@@ -201,7 +201,7 @@ fn prune_distances(
     logger: &mut Logger,
     distances: &Vec<Vec<(f32, usize)>>,
     options: &BuildModelWisOptions,
-) -> Vec<Vec<usize>> {
+) -> (Vec<Vec<usize>>, Vec<Vec<f32>>) {
     info!(logger, "Pruning distances...");
     // Compute distance error statistics.
     let error_stats: Vec<f64> = distances
@@ -209,14 +209,15 @@ fn prune_distances(
         .map(|xs| xs[0].0 as f64)
         .collect::<Vec<f64>>();
     if error_stats.len() < 2 {
-        return Vec::new();
+        return (Vec::new(), Vec::new())
     }
-    let mean = error_stats.as_slice().mean();
-    let std_dev = error_stats.as_slice().std_dev();
-    let threshold = (mean + options.filter_z_score * std_dev) as f32;
+    let median = error_stats.as_slice().median();
+    let mad = error_stats.as_slice().median_abs_dev();
+    let threshold = (median + options.filter_z_score * mad) as f32;
 
     // Actually collect the reliable regions and flag for reliability.
     let mut ref_targets: Vec<Vec<usize>> = Vec::new();
+    let mut ref_distances: Vec<Vec<f32>> = Vec::new();
 
     for row in distances.iter() {
         ref_targets.push(
@@ -225,10 +226,16 @@ fn prune_distances(
                 .map(|(_, idx)| *idx)
                 .collect::<Vec<usize>>(),
         );
+        ref_distances.push(
+            row.iter()
+                .filter(|(dist, _)| *dist <= threshold)
+                .map(|(dist, _)| *dist)
+                .collect::<Vec<f32>>(),
+        );
     }
     info!(logger, " => done");
 
-    ref_targets
+    (ref_targets, ref_distances)
 }
 
 /// Compute per-probe calls for determining UNRELIABLE flag.
@@ -313,6 +320,8 @@ fn build_header(contigs: &GenomeRegions) -> bcf::Header {
          calls\">",
         "##INFO=<ID=REF_TARGETS,Number=.,Type=String,Description=\"List of target regions that \
          are used as within-sample reference.\">",
+        "##INFO=<ID=REF_TARGETS2,Number=.,Type=String,Description=\"List of target regions that \
+         are used as within-sample reference plus distances.\">",
         // FILTER fields
         "##FILTER=<ID=FEW_REF,Description=\"Target is masked because there were not enough
          reference targets.\">",
@@ -341,6 +350,7 @@ fn write_output(
     model_input: &ModelInput,
     num_calls: &Vec<u32>,
     ref_targets: &Vec<Vec<usize>>,
+    ref_distances: &Vec<Vec<f32>>,
     options: &BuildModelWisOptions,
 ) -> Result<()> {
     // Actually collect the reliable regions and flag for reliability.
@@ -389,7 +399,7 @@ fn write_output(
                 .push_info_integer(b"NUM_CALLS", &[num_calls[i] as i32])
                 .chain_err(|| "Could not write INFO/NUM_CALLS")?;
 
-            let ref_targets = ref_targets[i]
+            let ref_targets2 = ref_targets[i]
                 .iter()
                 .map(|idx| {
                     format!(
@@ -400,13 +410,34 @@ fn write_output(
                     )
                 })
                 .collect::<Vec<String>>();
-            let ref_targets_b = ref_targets
+            let ref_targets_b = ref_targets2
                 .iter()
                 .map(|s| s.as_bytes())
                 .collect::<Vec<&[u8]>>();
             record
                 .push_info_string(b"REF_TARGETS", ref_targets_b.as_slice())
                 .chain_err(|| "Could not write INFO/REF_TARGETS")?;
+
+            let ref_targets2 = ref_targets[i]
+                .iter()
+                .enumerate()
+                .map(|(j, idx)| {
+                    format!(
+                        "{}:{}-{}({})",
+                        model_input.regions.regions[*idx].0,
+                        model_input.regions.regions[*idx].1 + 1,
+                        model_input.regions.regions[*idx].2,
+                        ref_distances[i][j]
+                    )
+                })
+                .collect::<Vec<String>>();
+            let ref_targets_b = ref_targets2
+                .iter()
+                .map(|s| s.as_bytes())
+                .collect::<Vec<&[u8]>>();
+            record
+                .push_info_string(b"REF_TARGETS2", ref_targets_b.as_slice())
+                .chain_err(|| "Could not write INFO/REF_TARGETS2")?;
 
             writer
                 .write(&record)
@@ -424,7 +455,7 @@ pub fn run(logger: &mut Logger, options: &BuildModelWisOptions) -> Result<()> {
 
     let model_input = read_coverage_bcf(logger, &options)?;
     let distances = compute_distances(logger, &model_input.tids, &model_input.ncovs, &options);
-    let ref_targets = prune_distances(logger, &distances, &options);
+    let (ref_targets, ref_distances) = prune_distances(logger, &distances, &options);
     let num_calls = count_per_probe_calls(
         logger,
         model_input.num_regions,
@@ -435,7 +466,7 @@ pub fn run(logger: &mut Logger, options: &BuildModelWisOptions) -> Result<()> {
     );
 
     // Write the output file.
-    write_output(logger, &model_input, &num_calls, &ref_targets, options)?;
+    write_output(logger, &model_input, &num_calls, &ref_targets, &ref_distances, options)?;
 
     // Finally, create index on created output file.
     info!(logger, "Building index for output file...");

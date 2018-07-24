@@ -23,7 +23,7 @@ pub fn load_counts(input: &String) -> Result<HashMap<String, f64>> {
     let mut record = reader.empty_record();
     loop {
         match reader.read(&mut record) {
-            Ok(_) => {}
+            Ok(_) => record.unpack(),
             Err(bcf::ReadError::NoMoreRecord) => break,
             _ => bail!("Could not read record"),
         }
@@ -92,6 +92,10 @@ pub fn load_target_infos(
                     .any(|s| s != "PASS")
                 {
                     continue;
+                }
+                else
+                {
+                    record.unpack();
                 }
             }
             Err(bcf::ReadError::NoMoreRecord) => break,
@@ -178,7 +182,7 @@ pub fn write_mod_cov(
     let mut record = reader.empty_record();
     loop {
         match reader.read(&mut record) {
-            Ok(_) => (),
+            Ok(_) => record.unpack(),
             Err(bcf::ReadError::NoMoreRecord) => break,
             _ => bail!("Could not read record"),
         }
