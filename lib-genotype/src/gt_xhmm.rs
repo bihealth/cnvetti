@@ -29,6 +29,7 @@ use rust_segment::shared::{CopyState, Segment, Segmentation};
 fn write_result(
     filtered_segmentation: &Vec<(bool, CnvGenotypeInfo)>,
     chrom: &String,
+    ranges: &Vec<Range<usize>>,
     writer: &mut bcf::Writer,
 ) -> Result<()> {
     let rid = writer
@@ -47,8 +48,8 @@ fn write_result(
         };
 
         // Columns: CHROM, POS, ID, REF, ALT, (FILTER)
-        let pos = cnv_info.segment.range.start;
-        let end = cnv_info.segment.range.end;
+        let pos = ranges[cnv_info.segment.range.start].start;
+        let end = ranges[cnv_info.segment.range.end].end;
         let alleles_v = vec![
             Vec::from("N"),
             if cnv_info.quals.copy_state == CopyState::Deletion {
@@ -190,6 +191,8 @@ pub struct CnvGenotypeInfo {
     quals: XhmmCnvQuals,
 }
 
+use std::fmt::Debug;
+
 /// Restricted version of the forward algorithm, sets probability to `0.0` for `impossible_state`,
 /// states in `impossible_range`.
 pub fn restricted_forward<O, M: Model<O>>(
@@ -197,7 +200,10 @@ pub fn restricted_forward<O, M: Model<O>>(
     observations: &[O],
     impossible_state: &State,
     impossible_range: &Range<usize>,
-) -> (Array2<LogProb>, LogProb) {
+) -> (Array2<LogProb>, LogProb)
+where
+    O: Debug,
+{
     // The matrix with probabilities.
     let mut vals = Array2::<LogProb>::zeros((observations.len(), hmm.num_states()));
 
@@ -223,15 +229,40 @@ pub fn restricted_forward<O, M: Model<O>>(
                     && (j == *impossible_state)
                 {
                     vals[[i, *j]] = LogProb::ln_zero();
+                // println!(
+                //     "i = {:?}, *j= {:?}, vals[[i, *j]] = {:?}",
+                //     i,
+                //     *j,
+                //     &vals[[i, *j]]
+                // );
                 } else {
                     let xs = hmm.states()
                         .map(|k| {
+                            // println!(
+                            //     "i = {:?}, *j = {:?}, *k = {:?}, vals[[i - 1, *k]] = {:?}, \
+                            //      hmm.transition_prob_idx(k, j, i) = {:?}, \
+                            //      hmm.observation_prob(j, o) = {:?}, o = {:?}",
+                            //     &i,
+                            //     &*j,
+                            //     &*k,
+                            //     &vals[[i - 1, *k]],
+                            //     &hmm.transition_prob_idx(k, j, i),
+                            //     &hmm.observation_prob(j, o),
+                            //     &o
+                            // );
                             vals[[i - 1, *k]]
                                 + hmm.transition_prob_idx(k, j, i)
                                 + hmm.observation_prob(j, o)
                         })
                         .collect::<Vec<LogProb>>();
                     vals[[i, *j]] = LogProb::ln_sum_exp(&xs);
+                    // println!(
+                    //     "i = {:?}, *j= {:?}, xs = {:?}, vals[[i, *j]] = {:?}",
+                    //     i,
+                    //     *j,
+                    //     &xs,
+                    //     &vals[[i, *j]]
+                    // );
                 }
             }
         }
@@ -290,7 +321,7 @@ pub fn restricted_backward<O, M: Model<O>>(
                     let xs = hmm.states()
                         .map(|k| {
                             vals[[i - 1, *k]]
-                                + hmm.transition_prob_idx(j, k, n - i - 1)
+                                + hmm.transition_prob_idx(j, k, n - i)
                                 + hmm.observation_prob(j, o)
                                 + maybe_initial
                         })
@@ -318,12 +349,15 @@ fn cs_to_idx(state: CopyState) -> usize {
 
 /// Compute metrics associated with each segment.
 fn compute_seg_metrics(
+    logger: &Logger,
     segmentation: &Segmentation,
-    pos: &Vec<usize>,
+    ranges: &Vec<Range<usize>>,
     covzs: &Vec<f64>,
     options: &GenotypeOptions,
 ) -> Result<Vec<CnvGenotypeInfo>> {
     let mut result = Vec::new();
+
+    let pos = ranges.iter().map(|r| r.start).collect::<Vec<usize>>();
 
     // Construct XHMM model for computing qualities.
     let model = xhmm::ExomeModel::new(
@@ -331,7 +365,7 @@ fn compute_seg_metrics(
         options.xhmm_mean_target_dist,
         options.xhmm_mean_target_count,
         options.xhmm_z_score_threshold,
-        pos.clone(),
+        pos,
     );
 
     // Compute f/b from XHMM paper.
@@ -348,15 +382,15 @@ fn compute_seg_metrics(
     // Probability that copy state is equal to a given value within the given range.
     let pr_cs_equals = |range: Range<usize>, cs: CopyState| -> LogProb {
         let state = State(cs_to_idx(cs));
-        let trans_probs = ((range.start + 1)..range.end)
+        let total_trans_prob: LogProb = ((range.start + 1)..range.end)
             .map(|i| model.transition_prob_idx(state, state, i))
-            .collect::<Vec<LogProb>>();
-        let emiss_probs = ((range.start + 1)..range.end)
+            .sum();
+        let total_emiss_prob: LogProb = ((range.start + 1)..range.end)
             .map(|i| model.observation_prob(state, &covzs[i]))
-            .collect::<Vec<LogProb>>();
+            .sum();
 
-        LogProb::ln_sum_exp(&trans_probs)
-            + LogProb::ln_sum_exp(&emiss_probs)
+        total_trans_prob
+            + total_emiss_prob
             + f[[range.start, cs_to_idx(cs)]]
             + b[[range.end - 1, cs_to_idx(cs)]] - data_likelihood
     };
@@ -375,10 +409,16 @@ fn compute_seg_metrics(
         LogProb::ln_sum_exp(&[
             f_restr[[t, s1]] + b_restr[[t, s1]],
             f_restr[[t, s2]] + b_restr[[t, s2]],
-        ])
+        ]) - data_likelihood
     };
 
-    for segment in &segmentation.segments {
+    for (i, ref segment) in segmentation.segments.iter().enumerate() {
+        debug!(
+            logger,
+            "Segment {} of {}",
+            i + 1,
+            segmentation.segments.len()
+        );
         let copy_state = segment
             .copy_state
             .expect("Segment must have copy state set!");
@@ -389,6 +429,7 @@ fn compute_seg_metrics(
         let state = State(cs_to_idx(copy_state));
         let start = segment.range.start;
         let end = segment.range.end;
+        // println!("=> segment = {:?}", &segment);
 
         // Compute restricted forward and backward probability (\in {1,2})
         let (b_restr12, _) = restricted_backward(&model, &covzs, &State(2), &segment.range);
@@ -409,6 +450,10 @@ fn compute_seg_metrics(
                 CopyState::Neutral,
             );
             let q_some_del_b = pr_cs_equals(segment.range.clone(), CopyState::Neutral);
+            // println!(
+            //     "q_some_del_a={:?}, q_some_del_b={:?}",
+            //     &q_some_del_a, &q_some_del_b
+            // );
             let q_no_del = PHREDProb::from(pr_cs_one_of(
                 segment.range.clone(),
                 &b_restr23,
@@ -430,6 +475,14 @@ fn compute_seg_metrics(
                 CopyState::Duplication,
             );
             let q_some_dup_b = pr_cs_equals(segment.range.clone(), CopyState::Neutral);
+            // if segment.range.len() < 2 {
+            //     println!("f_restr23={:?}", &f_restr23);
+            //     println!("b_restr23={:?}", &b_restr23);
+            //     println!(
+            //         "q_some_dup_a={:?}, q_some_dup_b={:?}",
+            //         &q_some_dup_a, &q_some_dup_b
+            //     );
+            // }
             let q_no_dup = PHREDProb::from(pr_cs_one_of(
                 segment.range.clone(),
                 &b_restr12,
@@ -461,7 +514,7 @@ fn compute_seg_metrics(
         let mean_z_score = covzs[segment.range.clone()].mean();
         let num_target_regions = segment.range.len();
 
-        let segment = segment.clone();
+        let segment = (*segment).clone();
         let quals = XhmmCnvQuals {
             copy_state,
             q_exact_cnv,
@@ -483,7 +536,10 @@ fn compute_seg_metrics(
 
 /// Whether or not to skip the record.
 fn skip_record(record: &mut bcf::Record) -> bool {
-    if !record.format(b"CV").float().is_ok() || !record.format(b"CV2").float().is_ok() {
+    if !record.format(b"CV").float().is_ok()
+        || !record.format(b"CV2").float().is_ok()
+        || !record.format(b"CVZ").float().is_ok()
+    {
         return true;
     }
 
@@ -495,8 +551,12 @@ fn skip_record(record: &mut bcf::Record) -> bool {
         .format(b"CV2")
         .float()
         .expect("Could not access FORMAT/CV2")[0][0] as f64;
+    let cvz = record
+        .format(b"CVZ")
+        .float()
+        .expect("Could not access FORMAT/CVZ")[0][0] as f64;
 
-    !cv.is_finite() || !cv2.is_finite()
+    !cv.is_finite() || !cv2.is_finite() || !cvz.is_finite()
 }
 
 /// Read segmentation and region-wise coverage from input file(s).
@@ -504,8 +564,9 @@ fn read_seg_and_cov(
     logger: &mut Logger,
     reader: &mut bcf::IndexedReader,
     reader_calls: Option<&mut bcf::IndexedReader>,
-) -> Result<(Segmentation, Vec<usize>, Vec<f64>)> {
-    let mut pos = Vec::new();
+    options: &GenotypeOptions,
+) -> Result<(Segmentation, Vec<Range<usize>>, Vec<f64>)> {
+    let mut ranges = Vec::new();
     let mut covs = Vec::new();
     let mut cov2s = Vec::new();
     let mut covzs = Vec::new();
@@ -525,7 +586,14 @@ fn read_seg_and_cov(
             continue;
         }
 
-        pos.push(record.pos() as usize);
+        let pos = record.pos() as usize;
+        let end = record
+            .info(b"END")
+            .integer()
+            .chain_err(|| "Could not acess INFO/END")?
+            .expect("Could not extract INFO/END")[0] as usize;
+        ranges.push(pos..end);
+
         covs.push(
             record
                 .format(b"CV")
@@ -538,12 +606,22 @@ fn read_seg_and_cov(
                 .float()
                 .chain_err(|| "Could not access FORMAT/CV2")?[0][0] as f64,
         );
-        covzs.push(
-            record
-                .format(b"CVZ")
-                .float()
-                .chain_err(|| "Could not access FORMAT/CVZ")?[0][0] as f64,
-        );
+
+        let cvz = record
+            .format(b"CVZ")
+            .float()
+            .chain_err(|| "Could not access FORMAT/CVZ")?[0][0] as f64;
+        const Z_SCORE_LIMIT_FACTOR: f64 = 5.0;
+        let z_score_limit = options.xhmm_z_score_threshold * Z_SCORE_LIMIT_FACTOR;
+        let cvz = if cvz < -z_score_limit {
+            -z_score_limit
+        } else if cvz > z_score_limit {
+            z_score_limit
+        } else {
+            cvz
+        };
+
+        covzs.push(cvz);
 
         let cn_state = record
             .format(b"SGS")
@@ -612,7 +690,7 @@ fn read_seg_and_cov(
         cn_states: Some(cn_states),
     };
 
-    Ok((segmentation, pos, covzs))
+    Ok((segmentation, ranges, covzs))
 }
 
 /// Build header for the output BCF file.
@@ -771,16 +849,18 @@ pub fn run_genotyping(logger: &mut Logger, options: &GenotypeOptions) -> Result<
         }
 
         trace!(logger, "Loading coverage and segmentation");
-        let (segmentation, pos, covzs) = read_seg_and_cov(logger, &mut reader, reader_calls.as_mut())?;
+        let (segmentation, ranges, covzs) =
+            read_seg_and_cov(logger, &mut reader, reader_calls.as_mut(), &options)?;
 
         trace!(logger, "Computing quality metrics of the segmentation");
-        let gt_infos = compute_seg_metrics(&segmentation, &pos, &covzs, &options)?;
+        let gt_infos = compute_seg_metrics(logger, &segmentation, &ranges, &covzs, &options)?;
 
         trace!(logger, "Post-filtering segments");
         let gt_infos = filter_segmentation(&gt_infos, &options)?;
 
         trace!(logger, "Write out calls BCF file");
-        write_result(&gt_infos, &chrom, &mut writer)?;
+        write_result(&gt_infos, &chrom, &ranges, &mut writer)?;
+        break;
     }
 
     info!(logger, "=> OK");

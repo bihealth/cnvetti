@@ -42,8 +42,7 @@ impl GenotypeOptions {
     pub fn new(matches: &ArgMatches) -> Self {
         println!("{:?}", matches);
         let genotyping = matches.value_of("genotyping").unwrap();
-        let genotyping =
-            GenotypingMethod::from_str(&genotyping).expect("Unknown genotyping");
+        let genotyping = GenotypingMethod::from_str(&genotyping).expect("Unknown genotyping");
 
         Self {
             input: matches.value_of("input").unwrap().to_string(),
