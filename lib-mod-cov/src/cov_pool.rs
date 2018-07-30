@@ -61,9 +61,7 @@ fn load_region_infos(
                     .any(|s| s != "PASS")
                 {
                     continue;
-                }
-                else
-                {
+                } else {
                     record.unpack();
                 }
             }

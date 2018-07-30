@@ -11,6 +11,8 @@ pub enum Normalization {
     CoverageMedian,
     /// Perform binning-based GC correction.
     MedianGcBinned,
+    /// Perform Exon Mean Read Count normalization a la excavator.
+    ExcavatorStyle,
 }
 
 /// Options for "cnvetti cmd coverage".

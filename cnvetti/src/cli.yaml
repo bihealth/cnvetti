@@ -273,6 +273,7 @@ subcommands:
             - TotalCoverageSum
             - CoverageMedian
             - MedianGcBinned
+            - ExcavatorStyle
             help: The method to use for read count/coverage normalization.
     # Sub command: cmd segment --------------------------------------------------------------------
     - segment:
@@ -682,6 +683,47 @@ subcommands:
         - GlobalVersion
         - UnifiedHelpMessage
         - ColorAuto
+    # Sub command: cmd ratio ----------------------------------------------------------------------
+    - ratio:
+        about: Compute the ratio between the coverages in two files.
+        after_help: >
+          After computing coverage of tumor and normal samples and merging the resulting
+          files, use this command to compute the ratio and log2-ratio between the two samples.
+        settings:
+        - DeriveDisplayOrder
+        - GlobalVersion
+        - UnifiedHelpMessage
+        - ColorAuto
+        args:
+        # Input/Output File Arguments -------------------------------------------------------------
+        - input:
+            takes_value: true
+            multiple: false
+            required: true
+            value_name: INPUT.bcf
+            help: Path to BCF or VCF file with merged coverages
+        - output:
+            long: output
+            short: o
+            takes_value: true
+            required: true
+            value_name: OUT.bcf
+            help: Path to output BCF file (will also write .csi file)
+        # Sample Selection Arguments --------------------------------------------------------------
+        - numerator_sample:
+            long: numerator-sample
+            takes_value: true
+            multiple: false
+            required: true
+            value_name: NUMERATOR
+            help: Name of numerator sample name (tumor).
+        - denominator_sample:
+            long: denominator-sample
+            takes_value: true
+            multiple: false
+            required: true
+            value_name: DENOMINATOR
+            help: Name of denominator sample name (normal).
 
 # Sub command: quick ==============================================================================
 - quick:
@@ -803,6 +845,18 @@ subcommands:
             required: false
             value_name: COV2.igv
             help: Optional path to IGV file to write log2-scaled coverage to.
+        - output_igv_scov:
+            long: output-igv-scov
+            takes_value: true
+            required: false
+            value_name: SCOV.igv
+            help: Optional path to IGV file to write (linear relative) smoothed coverage to.
+        - output_igv_scov2:
+            long: output-igv-scov2
+            takes_value: true
+            required: false
+            value_name: SCOV2.igv
+            help: Optional path to IGV file to write log2-scaled smoothed coverage to.
         - output_igv_covz:
             long: output-igv-covz
             takes_value: true
@@ -1033,6 +1087,18 @@ subcommands:
             required: false
             value_name: COVZ.igv
             help: Optional path to IGV file to write coverage Z-score to.
+        - output_igv_scov:
+            long: output-igv-scov
+            takes_value: true
+            required: false
+            value_name: SCOV.igv
+            help: Optional path to IGV file to write (linear relative) smoothed coverage to.
+        - output_igv_scov2:
+            long: output-igv-scov2
+            takes_value: true
+            required: false
+            value_name: SCOV2.igv
+            help: Optional path to IGV file to write log2-scaled smoothed coverage to.
         - output_igv_seg:
             long: output-igv-seg
             takes_value: true
@@ -1185,6 +1251,18 @@ subcommands:
             required: false
             value_name: COVZ.igv
             help: Optional path to IGV file to write coverage Z-score to.
+        - output_igv_scov:
+            long: output-igv-scov
+            takes_value: true
+            required: false
+            value_name: SCOV.igv
+            help: Optional path to IGV file to write (linear relative) smoothed coverage to.
+        - output_igv_scov2:
+            long: output-igv-scov2
+            takes_value: true
+            required: false
+            value_name: SCOV2.igv
+            help: Optional path to IGV file to write log2-scaled smoothed coverage to.
         - output_igv_seg:
             long: output-igv-seg
             takes_value: true

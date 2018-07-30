@@ -209,7 +209,7 @@ fn prune_distances(
         .map(|xs| xs[0].0 as f64)
         .collect::<Vec<f64>>();
     if error_stats.len() < 2 {
-        return (Vec::new(), Vec::new())
+        return (Vec::new(), Vec::new());
     }
     let median = error_stats.as_slice().median();
     let mad = error_stats.as_slice().median_abs_dev();
@@ -466,7 +466,14 @@ pub fn run(logger: &mut Logger, options: &BuildModelWisOptions) -> Result<()> {
     );
 
     // Write the output file.
-    write_output(logger, &model_input, &num_calls, &ref_targets, &ref_distances, options)?;
+    write_output(
+        logger,
+        &model_input,
+        &num_calls,
+        &ref_targets,
+        &ref_distances,
+        options,
+    )?;
 
     // Finally, create index on created output file.
     info!(logger, "Building index for output file...");

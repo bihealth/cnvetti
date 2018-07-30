@@ -92,9 +92,7 @@ pub fn load_target_infos(
                     .any(|s| s != "PASS")
                 {
                     continue;
-                }
-                else
-                {
+                } else {
                     record.unpack();
                 }
             }

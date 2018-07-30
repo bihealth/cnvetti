@@ -10,6 +10,10 @@ pub struct CovToIgvOptions {
     pub output_igv_cov: Option<String>,
     /// Path to output IGV file with log2-scaled coverage.
     pub output_igv_cov2: Option<String>,
+    /// Path to output IGV file with relative smoothed coverage.
+    pub output_igv_scov: Option<String>,
+    /// Path to output IGV file with log2-scaled smoothed coverage.
+    pub output_igv_scov2: Option<String>,
     /// Path to output IGV file with coverage Z-score.
     pub output_igv_covz: Option<String>,
     /// Path to output IGV file with segmented coverage.
@@ -32,6 +36,8 @@ impl CovToIgvOptions {
                 .to_string(),
             output_igv_cov: matches.value_of("output_igv_cov").map(|s| s.to_string()),
             output_igv_cov2: matches.value_of("output_igv_cov2").map(|s| s.to_string()),
+            output_igv_scov: matches.value_of("output_igv_scov").map(|s| s.to_string()),
+            output_igv_scov2: matches.value_of("output_igv_scov2").map(|s| s.to_string()),
             output_igv_covz: matches.value_of("output_igv_covz").map(|s| s.to_string()),
             output_igv_seg: matches.value_of("output_igv_seg").map(|s| s.to_string()),
             output_igv_seg2: matches.value_of("output_igv_seg2").map(|s| s.to_string()),

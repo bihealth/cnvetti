@@ -1,19 +1,17 @@
 [package]
-name = "lib-normalize"
+name = "lib-ratio"
 version = "0.1.0"
 authors = ["Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>"]
 
 [dependencies]
 chrono = "*"
-error-chain = "*"
 clap = {version = "*", features = ["yaml", "color", "suggestions"]}
-quantiles = "*"
+error-chain = "*"
 rust-htslib = { path = "../../rust-htslib" }
+separator = "*"
 shlex = "*"
 slog = {version = "*", features = ["max_level_trace", "release_max_level_debug"] }
 slog-term = "*"
 slog-async = "*"
-strum = "*"
-strum_macros = "*"
 
 lib-shared = { path = "../lib-shared" }

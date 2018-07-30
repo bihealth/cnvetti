@@ -235,6 +235,30 @@ pub mod cov_to_igv {
             None
         };
 
+        // Open linear smoothed coverage IGV and write header.
+        let mut file_slinear = if let Some(path) = &options.output_igv_scov {
+            info!(logger, "Open (linear) smoothed coverage file.");
+            let mut file = File::create(&path).chain_err(|| format!("Problem opening {}", path))?;
+            write_cov_header(&reader.header(), &mut file)
+                .chain_err(|| format!("Problem writing header to {}", path))?;
+            Some(file)
+        } else {
+            info!(logger, "No (linear) smoothed coverage file.");
+            None
+        };
+
+        // Open log2-scaled smoothed coverage IGV and write header.
+        let mut file_scov2 = if let Some(path) = &options.output_igv_scov2 {
+            info!(logger, "Open log2-scaled smoothed coverage file.");
+            let mut file = File::create(&path).chain_err(|| format!("Problem opening {}", path))?;
+            write_cov2_header(&reader.header(), &mut file)
+                .chain_err(|| format!("Problem writing header to {}", path))?;
+            Some(file)
+        } else {
+            info!(logger, "No log2-scaled smoothed coverage file.");
+            None
+        };
+
         // Open linear segmented coverage IGV and write header.
         let mut file_seg = if let Some(path) = &options.output_igv_seg {
             info!(logger, "Open (linear) segmented coverage file.");
@@ -277,6 +301,12 @@ pub mod cov_to_igv {
             }
             if let Some(ref mut file) = file_covz {
                 write_line(&mut record, b"CVZ", file)?;
+            }
+            if let Some(ref mut file) = file_slinear {
+                write_line(&mut record, b"SCV", file)?;
+            }
+            if let Some(ref mut file) = file_scov2 {
+                write_line(&mut record, b"SCV2", file)?;
             }
             if let Some(ref mut file) = file_seg {
                 write_line(&mut record, b"SG", file)?;

@@ -16,11 +16,12 @@ tempdir = "*"
 
 lib-coverage = { path = "../lib-coverage" }
 lib-genotype = { path = "../lib-genotype" }
-lib-model-pool = { path = "../lib-model-pool" }
-lib-model-wis = { path = "../lib-model-wis" }
 lib-merge-cov = { path = "../lib-merge-cov" }
 lib-mod-cov = { path = "../lib-mod-cov" }
+lib-model-pool = { path = "../lib-model-pool" }
+lib-model-wis = { path = "../lib-model-wis" }
 lib-normalize = { path = "../lib-normalize" }
+lib-ratio = { path = "../lib-ratio" }
 lib-segment = { path = "../lib-segment" }
 lib-shared = { path = "../lib-shared" }
 lib-visualize = { path = "../lib-visualize" }

@@ -396,7 +396,9 @@ fn compute_seg_metrics(
                 }
             }
         } else {
-            Segment { ..(*segment).clone() }
+            Segment {
+                ..(*segment).clone()
+            }
         };
 
         let state = State(cs_to_idx(copy_state));

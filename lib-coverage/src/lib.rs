@@ -28,7 +28,7 @@ extern crate strum_macros;
 extern crate rust_htslib;
 use rust_htslib::bam::{self, Read as BamRead};
 use rust_htslib::bcf::{self, Read as BcfRead};
-use rust_htslib::tbx::{self, Read as TbxRead};
+use rust_htslib::tbx;
 
 extern crate shlex;
 
@@ -38,6 +38,7 @@ use statrs::distribution::{Discrete, Poisson, Univariate};
 extern crate lib_shared;
 use lib_shared::bam_utils;
 use lib_shared::bcf_utils;
+use lib_shared::regions;
 
 mod agg;
 use agg::*;
@@ -150,6 +151,8 @@ fn build_header(samples: &Vec<String>, contigs: &GenomeRegions) -> bcf::Header {
          (or similar steps such as segmentation); only when considering base-wise coverage\">",
         "##FORMAT=<ID=CV2,Number=1,Type=Float,Description=\"Log2-scaled, finalized coverage \
          value as input to discovery step (or similar steps such as segmentation)\">",
+        "##FORMAT=<ID=SCV,Number=1,Type=Float,Description=\"Smoothed CV value\">",
+        "##FORMAT=<ID=SCV2,Number=1,Type=Float,Description=\"Smoothed CV2 value\">",
         "##FORMAT=<ID=CVZ,Number=1,Type=Float,Description=\"Finalized coverage value as Z-score
          of reference targets distribution.\">",
         "##FORMAT=<ID=FRM,Number=1,Type=Float,Description=\"Fraction of window that was masked
@@ -188,41 +191,6 @@ fn build_bcf_writer(
     let header = build_header(samples, ref_contigs);
     bcf::Writer::from_path(&path, &header, uncompressed, vcf)
         .chain_err(|| "Could not open BCF file for writing")
-}
-
-/// Load genome regions from tabix-indexed BED file.
-///
-/// This can be used for loading blacklists or target regions.
-fn load_bed_regions_from_tabix(
-    logger: &mut Logger,
-    tbx_reader: &mut tbx::Reader,
-    chrom: &str,
-    len: usize,
-) -> Result<GenomeRegions> {
-    let tid = match tbx_reader.tid(&chrom) {
-        Ok(tid) => tid,
-        Err(e) => {
-            debug!(logger, "Could not map contig to ID: {}: {}", &chrom, e);
-            return Ok(GenomeRegions::new());
-        }
-    };
-    tbx_reader
-        .fetch(tid, 0, len as u32)
-        .chain_err(|| format!("Could not fetch region {}:1-{}", &chrom, len))?;
-    let mut result = GenomeRegions::new();
-
-    for buf in tbx_reader.records() {
-        let s = String::from_utf8(buf.unwrap()).unwrap();
-        let arr: Vec<&str> = s.split('\t').collect();
-        if arr.len() < 3 {
-            bail!("BED file line had too few columns! {} (<3)");
-        }
-        let begin = arr[1].parse::<usize>().unwrap();
-        let end = arr[2].parse::<usize>().unwrap();
-        result.regions.push((chrom.to_string(), begin, end));
-    }
-
-    Ok(result)
 }
 
 /// Load regions from WIS or pool-based model BCF file.
@@ -448,13 +416,32 @@ fn process_region(
 
     // Load statistics for the given contig.
     // TODO: -> function
-    let ref_stats = match (&options.reference, options.window_length) {
-        (Some(reference), Some(window_length)) => {
-            info!(logger, "Loading reference statistics from FASTA file");
-            Some(ReferenceStats::from_path(
+    let ref_stats = match (
+        &options.reference,
+        options.window_length,
+        &options.targets_bed,
+    ) {
+        (Some(reference), Some(window_length), _) => {
+            info!(
+                logger,
+                "Loading reference statistics from FASTA file (window-lengths)"
+            );
+            Some(ReferenceStats::from_path_with_window_size(
                 reference,
                 chrom,
                 window_length as usize,
+                logger,
+            )?)
+        }
+        (Some(reference), _, Some(targets_bed)) => {
+            info!(
+                logger,
+                "Loading reference statistics from FASTA file (target regions)"
+            );
+            Some(ReferenceStats::from_path_with_targets_bed(
+                reference,
+                chrom,
+                targets_bed,
                 logger,
             )?)
         }
@@ -468,7 +455,9 @@ fn process_region(
         info!(logger, "Loading target regions from BED file");
         let mut tbx_reader =
             tbx::Reader::from_path(targets_bed).chain_err(|| "Could not open targets BED file")?;
-        let regions = load_bed_regions_from_tabix(logger, &mut tbx_reader, &chrom, contig_length)?;
+        let regions =
+            regions::load_bed_regions_from_tabix(logger, &mut tbx_reader, &chrom, contig_length)
+                .chain_err(|| "Could not load BED regions")?;
         // Build interval tree.
         let mut intervals: IntervalTree<u32, u32> = IntervalTree::new();
         for (i, (_, start, end)) in regions.regions.iter().enumerate() {
@@ -501,7 +490,9 @@ fn process_region(
     let blacklist_tree = if let Some(blacklist_bed) = &options.blacklist_bed {
         let mut tbx_reader = tbx::Reader::from_path(blacklist_bed)
             .chain_err(|| "Could not open blacklist BED file")?;
-        let regions = load_bed_regions_from_tabix(logger, &mut tbx_reader, &chrom, contig_length)?;
+        let regions =
+            regions::load_bed_regions_from_tabix(logger, &mut tbx_reader, &chrom, contig_length)
+                .chain_err(|| "Could not load BED regions")?;
         // TODO: extract this into function
         // Build interval tree.
         let mut intervals: IntervalTree<usize, usize> = IntervalTree::new();

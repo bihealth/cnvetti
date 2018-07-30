@@ -12,5 +12,6 @@ members = [
     "lib-model-pool",
     "lib-model-wis",
     "lib-normalize",
+    "lib-ratio",
     "lib-segment",
 ]

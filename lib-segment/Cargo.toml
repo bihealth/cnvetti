@@ -10,7 +10,7 @@ error-chain = "*"
 clap = {version = "*", features = ["yaml", "color", "suggestions"]}
 ordered-float = "*"
 quantiles = "*"
-rust-htslib = { git = "https://github.com/rust-bio/rust-htslib.git", branch = "master" }
+rust-htslib = { path = "../../rust-htslib" }
 rust-segment = { path = "../../rust-segment" }
 separator = "*"
 shlex = "*"

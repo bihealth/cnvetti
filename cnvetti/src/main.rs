@@ -41,6 +41,7 @@ extern crate lib_mod_cov;
 extern crate lib_model_pool;
 extern crate lib_model_wis;
 extern crate lib_normalize;
+extern crate lib_ratio;
 extern crate lib_segment;
 extern crate lib_visualize;
 
@@ -125,6 +126,8 @@ fn run(matches: ArgMatches) -> Result<()> {
                 lib_merge_cov::run(&mut logger, &lib_merge_cov::MergeCovOptions::new(&m))
                     .chain_err(|| "Could not execute 'cmd merge-cov'")?
             }
+            ("ratio", Some(m)) => lib_ratio::run(&mut logger, &lib_ratio::RatioOptions::new(&m))
+                .chain_err(|| "Could not execute 'cmd ratio'")?,
             ("segment", Some(m)) => {
                 lib_segment::run(&mut logger, &lib_segment::SegmentOptions::new(&m))
                     .chain_err(|| "Could not execute 'cmd segment'")?

@@ -16,6 +16,41 @@ use lib_shared::bcf_utils;
 /// Epsilon to add normalized metric to prevent -nan through log2()
 const PSEUDO_EPSILON: f64 = 1e-12;
 
+/// Return Gaussian smoothing filter for convolution.
+fn gaussian_kernel(sigma: f64, n: isize) -> Vec<f64> {
+    assert!(n % 2 == 1);
+    return (0..n)
+        .map(|i| {
+            use std::f64::consts::PI;
+            let x: f64 = (i - n / 2) as f64;
+
+            1.0 / (2.0 * PI * sigma * sigma) * (-(x * x) / (2.0 * sigma * sigma)).exp()
+        })
+        .collect::<Vec<f64>>();
+}
+
+/// Perform gaussian smoothing.
+fn perform_smoothing(cvs: &[f64], cv2s: &[f64], sigma: f64, n: isize) -> (Vec<f64>, Vec<f64>) {
+    let mut res = vec![0.0; cvs.len()];
+    let kernel = gaussian_kernel(sigma, n);
+    let m = cvs.len() as isize;
+    let o = n / 2;
+
+    for i in 0..m {
+        let mut fac = 0.0;
+        for j in (-n / 2)..(n / 2) {
+            if i + j >= 0 && i + j < m {
+                res[i as usize] += kernel[(o + j) as usize] * cvs[(i + j) as usize];
+                fac += kernel[(o + j) as usize]
+            }
+        }
+        res[i as usize] /= fac;
+    }
+
+    let res2 = res.iter().map(|x| x.log2()).collect::<Vec<f64>>();
+    (res, res2)
+}
+
 /// Whether or not to skip the record.
 fn skip_record(record: &mut bcf::Record) -> bool {
     if !record.format(b"CV").float().is_ok() || !record.format(b"CV2").float().is_ok() {
@@ -115,12 +150,27 @@ pub fn run_segmentation(logger: &mut Logger, options: &SegmentOptions) -> Result
             }
         }
 
+        if false {
+            // TODO: keep smoothing?
+            const SMOOTH_SIGMA: f64 = 10.0;
+            const SMOOTH_N: isize = 1001;
+            trace!(
+                logger,
+                "Performing smoothing, sigma={}, n={}",
+                SMOOTH_SIGMA,
+                SMOOTH_N
+            );
+            let (scvs, scv2s) = perform_smoothing(&cvs, &cv2s, SMOOTH_SIGMA, SMOOTH_N);
+        }
+        let scvs = cvs.clone();
+        let scv2s = cv2s.clone();
+
         trace!(logger, "Perform segmentation, yield breakpoints");
         let segmentation = seg_haar(
-            &cv2s,
+            &scv2s,
             None,
             None,
-            &[0..(cv2s.len())],
+            &[0..(scv2s.len())],
             options.haar_seg_fdr,
             options.haar_seg_l_min,
             options.haar_seg_l_max,
@@ -130,6 +180,7 @@ pub fn run_segmentation(logger: &mut Logger, options: &SegmentOptions) -> Result
             "Raw segments: {}",
             segmentation.segments.len().separated_string()
         );
+        trace!(logger, "segments: {:?}", &segmentation.segments);
 
         trace!(logger, "Compute P-values");
         let mut p_values = Vec::new();
@@ -150,6 +201,13 @@ pub fn run_segmentation(logger: &mut Logger, options: &SegmentOptions) -> Result
             "Segments after selecting aberrant (p): {}",
             segmentation.segments.len().separated_string()
         );
+        trace!(
+            logger,
+            "segments: {:?}\n{:?}\n{:?}",
+            &segmentation.segments,
+            &segmentation.values[0..10],
+            &segmentation.values_log2[0..10],
+        );
 
         trace!(logger, "Write out segmentation");
         let mut idx = 0; // current index into ncov
@@ -159,7 +217,7 @@ pub fn run_segmentation(logger: &mut Logger, options: &SegmentOptions) -> Result
             .chain_err(|| format!("Could not fetch chromosome {}", chrom))?;
         while reader.read(&mut record).is_ok() {
             writer.translate(&mut record);
-            let (val, val_log2, p_value) = if !skip_record(&mut record) {
+            let (val, val_log2, p_value) = if skip_record(&mut record) {
                 record.push_filter(writer.header().name_to_id(b"SKIPPED_SEG").unwrap());
                 if let Some(prev_val) = prev_val {
                     prev_val
@@ -182,6 +240,14 @@ pub fn run_segmentation(logger: &mut Logger, options: &SegmentOptions) -> Result
                 idx += 1;
                 val
             };
+
+            // record
+            //     .push_format_float(b"SCV", &[scvs[idx - 1] as f32])
+            //     .chain_err(|| "Could not write FORMAT/SCV")?;
+            // record
+            //     .push_format_float(b"SCV2", &[scv2s[idx - 1] as f32])
+            //     .chain_err(|| "Could not write FORMAT/SCV2")?;
+
             record
                 .push_format_float(b"SGP", &[p_value])
                 .chain_err(|| "Could not write FORMAT/SGP")?;

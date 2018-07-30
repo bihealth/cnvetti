@@ -2,6 +2,8 @@
 use std::path::Path;
 
 use bio::io::fasta;
+use rust_htslib::tbx::{self, Read as TbxRead};
+use slog::Logger;
 
 mod errors {
     // Create the Error, ErrorKind, ResultExt, and Result types
@@ -95,4 +97,39 @@ impl GenomeRegions {
                 .collect::<Vec<(String, usize, usize)>>(),
         }
     }
+}
+
+/// Load genome regions from tabix-indexed BED file.
+///
+/// This can be used for loading blacklists or target regions.
+pub fn load_bed_regions_from_tabix(
+    logger: &mut Logger,
+    tbx_reader: &mut tbx::Reader,
+    chrom: &str,
+    len: usize,
+) -> Result<GenomeRegions> {
+    let tid = match tbx_reader.tid(&chrom) {
+        Ok(tid) => tid,
+        Err(e) => {
+            debug!(logger, "Could not map contig to ID: {}: {}", &chrom, e);
+            return Ok(GenomeRegions::new());
+        }
+    };
+    tbx_reader
+        .fetch(tid, 0, len as u32)
+        .chain_err(|| format!("Could not fetch region {}:1-{}", &chrom, len))?;
+    let mut result = GenomeRegions::new();
+
+    for buf in tbx_reader.records() {
+        let s = String::from_utf8(buf.unwrap()).unwrap();
+        let arr: Vec<&str> = s.split('\t').collect();
+        if arr.len() < 3 {
+            bail!("BED file line had too few columns! {} (<3)");
+        }
+        let begin = arr[1].parse::<usize>().unwrap();
+        let end = arr[2].parse::<usize>().unwrap();
+        result.regions.push((chrom.to_string(), begin, end));
+    }
+
+    Ok(result)
 }

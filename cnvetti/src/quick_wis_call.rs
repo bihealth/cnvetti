@@ -37,6 +37,10 @@ pub struct QuickWisCallOptions {
     pub output_igv_cov2: Option<String>,
     /// Path to IGV file with CVZ information.
     pub output_igv_covz: Option<String>,
+    /// Path to IGV file with CV information.
+    pub output_igv_scov: Option<String>,
+    /// Path to IGV file with CV2 information.
+    pub output_igv_scov2: Option<String>,
     /// Path to IGV file with SG information.
     pub output_igv_seg: Option<String>,
     /// Path to IGV file with SG2 information.
@@ -165,6 +169,8 @@ impl QuickWisCallOptions {
             output_igv_cov: self.output_igv_cov.clone(),
             output_igv_cov2: self.output_igv_cov2.clone(),
             output_igv_covz: self.output_igv_covz.clone(),
+            output_igv_scov: self.output_igv_scov.clone(),
+            output_igv_scov2: self.output_igv_scov2.clone(),
             output_igv_seg: self.output_igv_seg.clone(),
             output_igv_seg2: self.output_igv_seg2.clone(),
             io_threads: 0,
@@ -210,6 +216,8 @@ impl QuickWisCallOptions {
             output_igv_cov: matches.value_of("output_igv_cov").map(|s| s.to_string()),
             output_igv_cov2: matches.value_of("output_igv_cov2").map(|s| s.to_string()),
             output_igv_covz: matches.value_of("output_igv_covz").map(|s| s.to_string()),
+            output_igv_scov: matches.value_of("output_igv_scov").map(|s| s.to_string()),
+            output_igv_scov2: matches.value_of("output_igv_scov2").map(|s| s.to_string()),
             output_igv_seg: matches.value_of("output_igv_seg").map(|s| s.to_string()),
             output_igv_seg2: matches.value_of("output_igv_seg2").map(|s| s.to_string()),
 
@@ -363,7 +371,10 @@ pub fn run(logger: &mut Logger, options: &QuickWisCallOptions) -> Result<()> {
     ).chain_err(|| "Problem genotyping file")?;
     info!(logger, " => done");
 
-    warn!(logger, "Generating visualization for genotype not implemented yet!");
+    warn!(
+        logger,
+        "Generating visualization for genotype not implemented yet!"
+    );
 
     info!(logger, "All done. Have a nice day!");
     Ok(())
