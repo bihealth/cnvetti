@@ -4,15 +4,15 @@ version = "0.1.0"
 authors = ["Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>"]
 
 [dependencies]
-bio = { path = "../../rust-bio" }
+bio = { git = "https://github.com/holtgrewe/rust-bio", rev = "9217791" }
 chrono = "*"
 error-chain = "*"
 clap = {version = "*", features = ["yaml", "color", "suggestions"]}
 ndarray = "*"
 ordered-float = "*"
 quantiles = "*"
-rust-htslib = { path = "../../rust-htslib" }
-rust-segment = { path = "../../rust-segment" }
+rust-htslib = { git = "https://github.com/rust-bio/rust-htslib.git", rev = "903e500" }
+rust-segment = { git = "https://github.com/holtgrewe/rust-segment", rev = "04147c9" }
 separator = "*"
 shlex = "*"
 slog = {version = "*", features = ["max_level_trace", "release_max_level_debug"] }
