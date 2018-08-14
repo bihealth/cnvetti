@@ -142,6 +142,7 @@ impl QuickWisCallOptions {
         SegmentOptions {
             input: input.clone(),
             output: output.clone(),
+            output_segments: None,
             segmentation: self.segmentation,
 
             io_threads: 0,

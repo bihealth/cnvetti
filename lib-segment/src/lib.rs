@@ -30,6 +30,7 @@ use lib_shared::bcf_utils;
 mod seg_haar;
 mod seg_wisexome;
 pub mod seg_xhmm;
+mod shared;
 
 mod options;
 pub use options::*;
@@ -59,6 +60,11 @@ pub fn run(logger: &mut Logger, options: &SegmentOptions) -> Result<()> {
     info!(logger, "Building index for output file...");
     bcf_utils::build_index(logger, &options.output).chain_err(|| "Could not build index")?;
     info!(logger, "All done. Have a nice day!");
+    if let Some(output) = &options.output_segments {
+        info!(logger, "Building index for output segments file...");
+        bcf_utils::build_index(logger, output).chain_err(|| "Could not build index")?;
+        info!(logger, "All done. Have a nice day!");
+    }
 
     Ok(())
 }

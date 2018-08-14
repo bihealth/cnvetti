@@ -510,7 +510,6 @@ fn process_region(
     info!(logger, "Constructing aggregator...");
     let mut aggregator: Box<BamRecordAggregator> =
         match (options.count_kind, options.considered_regions) {
-            // TODO: next step is to integrate the target fragment counting here
             (CountKind::Fragments, ConsideredRegions::GenomeWide) => Box::new(
                 FragmentsGenomeWideAggregator::new(piles_tree, options.clone(), *end),
             ),

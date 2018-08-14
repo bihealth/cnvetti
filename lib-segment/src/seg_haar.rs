@@ -10,6 +10,7 @@ use slog::Logger;
 
 use super::errors::*;
 use options::*;
+use shared::*;
 
 use lib_shared::bcf_utils;
 
@@ -110,6 +111,15 @@ pub fn run_segmentation(logger: &mut Logger, options: &SegmentOptions) -> Result
             .chain_err(|| "Could not set I/O thread count")?;
     }
 
+    let mut segment_writer = if let Some(path) = &options.output_segments {
+        debug!(logger, "Opening output segments file...");
+        Some(open_segment_file(&path, &reader.header())
+            .chain_err(|| "Could not open output segment BCF file.")?)
+    } else {
+        debug!(logger, "Not writing output segments file...");
+        None
+    };
+
     debug!(logger, "Performing the actual work.");
     let chroms = bcf_utils::extract_chroms(&reader.header());
     for (chrom, _, chrom_len) in &chroms.regions {
@@ -128,6 +138,7 @@ pub fn run_segmentation(logger: &mut Logger, options: &SegmentOptions) -> Result
         let mut cvs: Vec<f64> = Vec::new();
         let mut cv2s: Vec<f64> = Vec::new();
         let mut record = reader.empty_record();
+        let mut borders: Vec<usize> = vec![0];
         loop {
             match reader.read(&mut record) {
                 Ok(_) => (),
@@ -147,6 +158,7 @@ pub fn run_segmentation(logger: &mut Logger, options: &SegmentOptions) -> Result
 
                 cvs.push(cv);
                 cv2s.push(cv2);
+                borders.push(record.info(b"END").integer().unwrap().unwrap()[0] as usize);
             }
         }
 
@@ -203,13 +215,21 @@ pub fn run_segmentation(logger: &mut Logger, options: &SegmentOptions) -> Result
         );
         trace!(
             logger,
-            "segments: {:?}\n{:?}\n{:?}",
+            "segments[0..10]: {:?}\n{:?}\n{:?}",
             &segmentation.segments,
             &segmentation.values[0..10],
             &segmentation.values_log2[0..10],
         );
 
-        trace!(logger, "Write out segmentation");
+        if let Some(ref mut segment_writer) = segment_writer.as_mut() {
+            trace!(logger, "Write out segmentation");
+            for segment in &segmentation.segments {
+                write_segment(segment_writer, &chrom, &segment, &borders)
+                    .chain_err(|| "Could not write segment BCF record")?;
+            }
+        }
+
+        trace!(logger, "Write out target-wise segmentation");
         let mut idx = 0; // current index into ncov
         let mut prev_val: Option<(f32, f32, f32)> = None; // (val, log2(val), p_value)
         reader

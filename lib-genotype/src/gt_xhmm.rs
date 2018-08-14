@@ -7,7 +7,7 @@ use std::env;
 use std::ops::Range;
 
 use bio::stats::hmm::{backward, forward, Model, State};
-use bio::stats::probs::{LogProb, PHREDProb};
+use bio::stats::probs::{LogProb, PHREDProb, Prob};
 use chrono;
 use ndarray::prelude::*;
 use rust_htslib::bcf::{self, Read};
@@ -103,26 +103,44 @@ fn write_result(
         record
             .push_format_integer(b"CN", &[cs_to_idx(cnv_info.quals.copy_state) as i32 + 1])
             .chain_err(|| "Could not write FORMAT/CN")?;
+
         record
-            .push_format_float(b"EQ", &[*cnv_info.quals.q_exact_cnv as f32])
-            .chain_err(|| "Could not write FORMAT/EQ")?;
+            .push_format_float(b"EQ1", &[*cnv_info.quals.q_exact_del as f32])
+            .chain_err(|| "Could not write FORMAT/EQ1")?;
         record
-            .push_format_float(b"SQ", &[*cnv_info.quals.q_some_cnv as f32])
-            .chain_err(|| "Could not write FORMAT/SQ")?;
+            .push_format_float(b"SQ1", &[*cnv_info.quals.q_some_del as f32])
+            .chain_err(|| "Could not write FORMAT/SQ1")?;
         record
-            .push_format_float(b"NQ", &[*cnv_info.quals.q_no_cnv as f32])
-            .chain_err(|| "Could not write FORMAT/NQ")?;
+            .push_format_float(b"NQ1", &[*cnv_info.quals.q_no_del as f32])
+            .chain_err(|| "Could not write FORMAT/NQ1")?;
         record
-            .push_format_float(b"LQ", &[*cnv_info.quals.q_left_cnv_bp as f32])
-            .chain_err(|| "Could not write FORMAT/LQ")?;
+            .push_format_float(b"LQ1", &[*cnv_info.quals.q_left_del_bp as f32])
+            .chain_err(|| "Could not write FORMAT/LQ1")?;
         record
-            .push_format_float(b"RQ", &[*cnv_info.quals.q_right_cnv_bp as f32])
-            .chain_err(|| "Could not write FORMAT/RQ")?;
+            .push_format_float(b"RQ1", &[*cnv_info.quals.q_right_del_bp as f32])
+            .chain_err(|| "Could not write FORMAT/RQ1")?;
+
         record
-            .push_format_float(b"NDQ", &[*cnv_info.quals.q_right_cnv_bp as f32])
+            .push_format_float(b"EQ3", &[*cnv_info.quals.q_exact_dup as f32])
+            .chain_err(|| "Could not write FORMAT/EQ3")?;
+        record
+            .push_format_float(b"SQ3", &[*cnv_info.quals.q_some_dup as f32])
+            .chain_err(|| "Could not write FORMAT/SQ3")?;
+        record
+            .push_format_float(b"NQ3", &[*cnv_info.quals.q_no_dup as f32])
+            .chain_err(|| "Could not write FORMAT/NQ3")?;
+        record
+            .push_format_float(b"LQ3", &[*cnv_info.quals.q_left_dup_bp as f32])
+            .chain_err(|| "Could not write FORMAT/LQ3")?;
+        record
+            .push_format_float(b"RQ3", &[*cnv_info.quals.q_right_dup_bp as f32])
+            .chain_err(|| "Could not write FORMAT/RQ3")?;
+
+        record
+            .push_format_float(b"NDQ", &[*cnv_info.quals.q_not_diploid as f32])
             .chain_err(|| "Could not write FORMAT/NDQ")?;
         record
-            .push_format_float(b"DQ", &[*cnv_info.quals.q_right_cnv_bp as f32])
+            .push_format_float(b"DQ", &[*cnv_info.quals.q_diploid as f32])
             .chain_err(|| "Could not write FORMAT/DQ")?;
 
         record
@@ -162,16 +180,27 @@ struct XhmmCnvQuals {
     // The copy state assumed below for "CNV/Cnv".
     copy_state: CopyState,
 
-    /// Probability for "exact CNV".
-    q_exact_cnv: PHREDProb,
-    /// Probability for "some CNV".
-    q_some_cnv: PHREDProb,
-    /// Probability for "no CNV".
-    q_no_cnv: PHREDProb,
-    /// Probability for "left CNV breakpoint".
-    q_left_cnv_bp: PHREDProb,
-    /// Probability for "right CNV breakpoint".
-    q_right_cnv_bp: PHREDProb,
+    /// Probability for "exact DEL".
+    q_exact_del: PHREDProb,
+    /// Probability for "some DEL".
+    q_some_del: PHREDProb,
+    /// Probability for "no DEL".
+    q_no_del: PHREDProb,
+    /// Probability for "left DEL breakpoint".
+    q_left_del_bp: PHREDProb,
+    /// Probability for "right DEL breakpoint".
+    q_right_del_bp: PHREDProb,
+
+    /// Probability for "exact DUP".
+    q_exact_dup: PHREDProb,
+    /// Probability for "some DUP".
+    q_some_dup: PHREDProb,
+    /// Probability for "no DUP".
+    q_no_dup: PHREDProb,
+    /// Probability for "left DUP breakpoint".
+    q_left_dup_bp: PHREDProb,
+    /// Probability for "right DUP breakpoint".
+    q_right_dup_bp: PHREDProb,
 
     /// Probability for "is not".
     q_not_diploid: PHREDProb,
@@ -327,15 +356,15 @@ fn compute_seg_metrics(
         pos,
     );
 
-    // Compute f/b from XHMM paper.
+    // Compute f and b from XHMM paper.
     let (f, _) = forward(&model, &covzs);
     let (b, _) = backward(&model, &covzs);
 
     // Compute data likelihood ``Pr(y_{1:E})`.
     let data_likelihood = LogProb::ln_sum_exp(&[
-        f[[0, 0]] + b[[0, 0]],
-        f[[0, 1]] + b[[0, 1]],
-        f[[0, 2]] + b[[0, 2]],
+        f[[0, 0]] + b[[1, 0]],
+        f[[0, 1]] + b[[1, 1]],
+        f[[0, 2]] + b[[1, 2]],
     ]);
 
     // Probability that copy state is equal to a given value within the given range.
@@ -372,7 +401,7 @@ fn compute_seg_metrics(
     };
 
     for (i, ref segment) in segmentation.segments.iter().enumerate() {
-        trace!(
+        debug!(
             logger,
             "Segment {} of {}: {:?}",
             i + 1,
@@ -429,8 +458,11 @@ fn compute_seg_metrics(
             vals
         };
 
-        let q_exact_cnv = PHREDProb::from(pr_cs_equals(segment.range.clone(), copy_state));
-        let (q_some_cnv, q_no_cnv) = if state == State(0) {
+        let q_exact_del = PHREDProb::from(pr_cs_equals(segment.range.clone(), CopyState::Deletion));
+        let q_exact_dup =
+            PHREDProb::from(pr_cs_equals(segment.range.clone(), CopyState::Duplication));
+
+        let q_some_del = {
             // State is deletion, "some/no CNV" = "some/no DEL"
             let q_some_del_a = pr_cs_one_of(
                 segment.range.clone(),
@@ -440,18 +472,21 @@ fn compute_seg_metrics(
                 CopyState::Neutral,
             );
             let q_some_del_b = pr_cs_equals(segment.range.clone(), CopyState::Neutral);
-            let q_no_del = PHREDProb::from(pr_cs_one_of(
-                segment.range.clone(),
-                &b_restr23,
-                &f_restr23,
-                CopyState::Neutral,
-                CopyState::Duplication,
-            ));
-            (
-                PHREDProb::from(q_some_del_a.ln_sub_exp(q_some_del_b)),
-                q_no_del,
-            )
-        } else {
+            if *q_some_del_a < *q_some_del_b && (*q_some_del_b - *q_some_del_a) < 1e-10 {
+                PHREDProb::from(LogProb::ln_zero())
+            } else {
+                PHREDProb::from(q_some_del_a.ln_sub_exp(q_some_del_b))
+            }
+        };
+        let q_no_del = PHREDProb::from(pr_cs_one_of(
+            segment.range.clone(),
+            &b_restr23,
+            &f_restr23,
+            CopyState::Neutral,
+            CopyState::Duplication,
+        ));
+
+        let q_some_dup = {
             // State is duplication, "some/no CNV" = "some/no DUP"
             let q_some_dup_a = pr_cs_one_of(
                 segment.range.clone(),
@@ -461,25 +496,38 @@ fn compute_seg_metrics(
                 CopyState::Duplication,
             );
             let q_some_dup_b = pr_cs_equals(segment.range.clone(), CopyState::Neutral);
-            let q_no_dup = PHREDProb::from(pr_cs_one_of(
-                segment.range.clone(),
-                &b_restr12,
-                &f_restr12,
-                CopyState::Deletion,
-                CopyState::Neutral,
-            ));
-            (
-                PHREDProb::from(q_some_dup_a.ln_sub_exp(q_some_dup_b)),
-                q_no_dup,
-            )
+            if *q_some_dup_a < *q_some_dup_b && (*q_some_dup_b - *q_some_dup_a) < 1e-10 {
+                PHREDProb::from(LogProb::ln_zero())
+            } else {
+                PHREDProb::from(q_some_dup_a.ln_sub_exp(q_some_dup_b))
+            }
         };
+        let q_no_dup = PHREDProb::from(pr_cs_one_of(
+            segment.range.clone(),
+            &b_restr12,
+            &f_restr12,
+            CopyState::Deletion,
+            CopyState::Neutral,
+        ));
 
-        let q_left_cnv_bp = PHREDProb::from(
+        let q_left_del_bp = PHREDProb::from(
             f[[segment.range.start - 1, cs_to_idx(CopyState::Neutral)]]
-                + b[[segment.range.end, cs_to_idx(copy_state)]] - data_likelihood,
+                + b[[segment.range.end, cs_to_idx(CopyState::Deletion)]]
+                - data_likelihood,
         );
-        let q_right_cnv_bp = PHREDProb::from(
-            f[[segment.range.end - 1, cs_to_idx(copy_state)]]
+        let q_left_dup_bp = PHREDProb::from(
+            f[[segment.range.start - 1, cs_to_idx(CopyState::Neutral)]]
+                + b[[segment.range.end, cs_to_idx(CopyState::Duplication)]]
+                - data_likelihood,
+        );
+
+        let q_right_del_bp = PHREDProb::from(
+            f[[segment.range.end - 1, cs_to_idx(CopyState::Deletion)]]
+                + b[[segment.range.end, cs_to_idx(CopyState::Neutral)]]
+                - data_likelihood,
+        );
+        let q_right_dup_bp = PHREDProb::from(
+            f[[segment.range.end - 1, cs_to_idx(CopyState::Duplication)]]
                 + b[[segment.range.end, cs_to_idx(CopyState::Neutral)]]
                 - data_likelihood,
         );
@@ -487,6 +535,20 @@ fn compute_seg_metrics(
         let pr_diploid = pr_cs_equals(segment.range.clone(), CopyState::Neutral);
         let q_diploid = PHREDProb::from(pr_diploid);
         let q_not_diploid = PHREDProb::from(pr_diploid.ln_one_minus_exp());
+        info!(
+            logger,
+            "pr_diploid = {:?}, pr_not_diploid = {:?}",
+            Prob::from(pr_diploid),
+            Prob::from(q_not_diploid)
+        );
+        info!(
+            logger,
+            "pr_diploid = {:?}, pr_not_diploid = {:?}", pr_diploid, q_not_diploid
+        );
+        info!(
+            logger,
+            "q_diploid = {:?}, q_not_diploid = {:?}", q_diploid, q_not_diploid
+        );
 
         let mean_cov = segmentation.values[segment.range.clone()].mean();
         let mean_z_score = covzs[segment.range.clone()].mean();
@@ -495,13 +557,22 @@ fn compute_seg_metrics(
         let segment = segment.clone();
         let quals = XhmmCnvQuals {
             copy_state,
-            q_exact_cnv,
-            q_some_cnv,
-            q_no_cnv,
-            q_left_cnv_bp,
-            q_right_cnv_bp,
+
+            q_exact_del,
+            q_some_del,
+            q_no_del,
+            q_left_del_bp,
+            q_right_del_bp,
+
+            q_exact_dup,
+            q_some_dup,
+            q_no_dup,
+            q_left_dup_bp,
+            q_right_dup_bp,
+
             q_not_diploid,
             q_diploid,
+
             mean_cov,
             mean_z_score,
             num_target_regions,
@@ -734,15 +805,25 @@ fn build_header(samples: &Vec<String>, contigs: &GenomeRegions) -> bcf::Header {
         // Coverage- and quality-related FORMAT fields.
         "##FORMAT=<ID=CN,Number=1,Type=Integer,Description=\"Predicted copy number;
          0=no-call, 1=del, 2=diploid, 3=duplication\">",
-        "##FORMAT=<ID=EQ,Number=1,Type=Float,Description=\"Phred-scaled probability for \
+        "##FORMAT=<ID=EQ1,Number=1,Type=Float,Description=\"Phred-scaled probability for \
          'exact del/dup'\">",
-        "##FORMAT=<ID=SQ,Number=1,Type=Float,Description=\"Phred-scaled probability for \
+        "##FORMAT=<ID=SQ1,Number=1,Type=Float,Description=\"Phred-scaled probability for \
          'some del/dup'\">",
-        "##FORMAT=<ID=NQ,Number=1,Type=Float,Description=\"Phred-scaled probability for \
+        "##FORMAT=<ID=NQ1,Number=1,Type=Float,Description=\"Phred-scaled probability for \
          'no del/dup'\">",
-        "##FORMAT=<ID=LQ,Number=1,Type=Float,Description=\"Phred-scaled probability for \
+        "##FORMAT=<ID=LQ1,Number=1,Type=Float,Description=\"Phred-scaled probability for \
          'left del/dup breakpoint'\">",
-        "##FORMAT=<ID=RQ,Number=1,Type=Float,Description=\"Phred-scaled probability for \
+        "##FORMAT=<ID=RQ1,Number=1,Type=Float,Description=\"Phred-scaled probability for \
+         'right del/dup breakpoint'\">",
+        "##FORMAT=<ID=EQ3,Number=1,Type=Float,Description=\"Phred-scaled probability for \
+         'exact del/dup'\">",
+        "##FORMAT=<ID=SQ3,Number=1,Type=Float,Description=\"Phred-scaled probability for \
+         'some del/dup'\">",
+        "##FORMAT=<ID=NQ3,Number=1,Type=Float,Description=\"Phred-scaled probability for \
+         'no del/dup'\">",
+        "##FORMAT=<ID=LQ3,Number=1,Type=Float,Description=\"Phred-scaled probability for \
+         'left del/dup breakpoint'\">",
+        "##FORMAT=<ID=RQ3,Number=1,Type=Float,Description=\"Phred-scaled probability for \
          'right del/dup breakpoint'\">",
         "##FORMAT=<ID=NDQ,Number=1,Type=Float,Description=\"Phred-scaled probability for \
          'not diploid'\">",

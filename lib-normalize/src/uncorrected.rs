@@ -81,6 +81,9 @@ where
         record
             .push_format_float(b"CV", &[(lcv / lcv_sum) as f32])
             .chain_err(|| "Problem writing CV to BCF record")?;
+        record
+            .push_format_float(b"CV2", &[(lcv / lcv_sum).log2() as f32])
+            .chain_err(|| "Problem writing CV to BCF record")?;
 
         // Write normalized CV standard deviation.
         let is_ok = record.format(b"LCVSD").float().is_ok();

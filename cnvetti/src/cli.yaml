@@ -303,6 +303,12 @@ subcommands:
             required: true
             value_name: OUT.bcf
             help: Path to output BCF file (will also write .csi file)
+        - output_segments:
+            long: output-segments
+            takes_value: true
+            required: false
+            value_name: SEGS.bcf
+            help: Path to output BCF file with the segment information (only).
         # Algorithm-Related Arguments -------------------------------------------------------------
         - segmentation:
             long: segmentation
@@ -646,14 +652,12 @@ subcommands:
             long: input-wis-model
             multiple: false
             takes_value: true
-            required: true
             value_name: MODEL.bcf
             help: Path to BCF file with the within-sample model.
         - input_pool_model:
             long: input-pool-model
             multiple: false
             takes_value: true
-            required: true
             value_name: MODEL.bcf
             help: Path to BCF file with the pool-of-reference model.
         - output:

@@ -24,8 +24,10 @@ pub enum Segmentation {
 pub struct SegmentOptions {
     /// Path to input BCF file.
     pub input: String,
-    /// Path to output BCF file.
+    /// Path to output BCF file (per-target with segment information).
     pub output: String,
+    /// Path to output BCF file (segments only).
+    pub output_segments: Option<String>,
     /// Number of additional threads to use for (de-)compression in I/O.
     pub io_threads: u32,
 
@@ -71,6 +73,7 @@ impl SegmentOptions {
         Self {
             input: matches.value_of("input").unwrap().to_string(),
             output: matches.value_of("output").unwrap().to_string(),
+            output_segments: matches.value_of("output_segments").map(|s| s.to_string()),
             io_threads: matches
                 .value_of("io_threads")
                 .unwrap()

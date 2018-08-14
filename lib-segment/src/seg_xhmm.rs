@@ -210,7 +210,7 @@ fn xhmm_seg(
     for ref seg in &segments {
         let old_len = cvs.len();
         cvs.resize(old_len + seg.range.len(), seg.mean);
-        cv2s.resize(old_len + seg.range.len(), seg.mean);
+        cv2s.resize(old_len + seg.range.len(), seg.mean_log2);
     }
 
     Segmentation {
