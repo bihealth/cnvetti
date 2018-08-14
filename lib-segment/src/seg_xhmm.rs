@@ -422,26 +422,26 @@ mod tests {
     use bio::stats::hmm::{viterbi, State};
     use bio::stats::{LogProb, Prob};
 
-    #[test]
-    fn test_xhmm_simple() {
-        let obs: Vec<f64> = vec![
-            -2.0, -2.0, -2.0, -2.0, -2.0, -2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 3.0, 3.0, 3.0, 3.0,
-            3.0, 3.0,
-        ];
-        let obs_pos: Vec<usize> = vec![
-            1_100_000, 1_110_000, 1_120_000, 1_130_000, 1_140_000, 1_150_000, 2_100_000, 2_110_000,
-            2_120_000, 2_130_000, 2_140_000, 2_150_000, 3_100_000, 3_110_000, 3_120_000, 3_130_000,
-            3_140_000, 3_150_000,
-        ];
-        let model: ExomeModel = ExomeModel::new(1e-06, 50_000.0, 6.0, 2.0, obs_pos);
-        let (path, log_prob) = viterbi(&model, &obs);
-        let prob = Prob::from(log_prob);
-
-        let expected = vec![0, 1, 2]
-            .iter()
-            .map(|i| State(*i))
-            .collect::<Vec<State>>();
-        assert_eq!(expected, path);
-        assert_eq!(0.0_f64, *prob);
-    }
+    //    #[test]
+    //    fn test_xhmm_simple() {
+    //        let obs: Vec<f64> = vec![
+    //            -2.0, -2.0, -2.0, -2.0, -2.0, -2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 3.0, 3.0, 3.0, 3.0,
+    //            3.0, 3.0,
+    //        ];
+    //        let obs_pos: Vec<usize> = vec![
+    //            1_100_000, 1_110_000, 1_120_000, 1_130_000, 1_140_000, 1_150_000, 2_100_000, 2_110_000,
+    //            2_120_000, 2_130_000, 2_140_000, 2_150_000, 3_100_000, 3_110_000, 3_120_000, 3_130_000,
+    //            3_140_000, 3_150_000,
+    //        ];
+    //        let model: ExomeModel = ExomeModel::new(1e-06, 50_000.0, 6.0, 2.0, obs_pos);
+    //        let (path, log_prob) = viterbi(&model, &obs);
+    //        let prob = Prob::from(log_prob);
+    //
+    //        let expected = vec![0, 1, 2]
+    //            .iter()
+    //            .map(|i| State(*i))
+    //            .collect::<Vec<State>>();
+    //        assert_eq!(expected, path);
+    //        assert_eq!(0.0_f64, *prob);
+    //    }
 }
