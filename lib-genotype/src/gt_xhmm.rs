@@ -253,7 +253,8 @@ pub fn restricted_forward<O, M: Model<O>>(
                 if j == *impossible_state {
                     vals[[i, *j]] = LogProb::ln_zero();
                 } else {
-                    let xs = hmm.states()
+                    let xs = hmm
+                        .states()
                         .map(|k| {
                             vals[[i - 1, *k]]
                                 + hmm.transition_prob_idx(k, j, i)
@@ -311,7 +312,8 @@ pub fn restricted_backward<O, M: Model<O>>(
                     } else {
                         LogProb::ln_one()
                     };
-                    let xs = hmm.states()
+                    let xs = hmm
+                        .states()
                         .map(|k| {
                             vals[[i - 1, *k]]
                                 + hmm.transition_prob_idx(j, k, n - i)

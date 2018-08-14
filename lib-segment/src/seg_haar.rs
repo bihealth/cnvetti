@@ -113,8 +113,10 @@ pub fn run_segmentation(logger: &mut Logger, options: &SegmentOptions) -> Result
 
     let mut segment_writer = if let Some(path) = &options.output_segments {
         debug!(logger, "Opening output segments file...");
-        Some(open_segment_file(&path, &reader.header())
-            .chain_err(|| "Could not open output segment BCF file.")?)
+        Some(
+            open_segment_file(&path, &reader.header())
+                .chain_err(|| "Could not open output segment BCF file.")?,
+        )
     } else {
         debug!(logger, "Not writing output segments file...");
         None
