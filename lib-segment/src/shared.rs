@@ -1,15 +1,14 @@
 //! Shared code for lib-segment.
 
 use chrono;
-use rust_htslib::bcf::{self, header};
+use rust_htslib::bcf;
 use shlex;
-use slog::Logger;
 use std::env;
 
 use lib_shared::bcf_utils;
 
 use super::errors::*;
-use rust_segment::shared::{CopyState, Segment, Segmentation};
+use rust_segment::shared::Segment;
 
 /// Create BCF file with segment.
 pub fn open_segment_file(

@@ -129,11 +129,13 @@ pub mod xhmm {
 }
 
 /// Perfor XHMM-based segmentation.
+///
+/// TODO: remove _cv2s?
 fn xhmm_seg(
     logger: &mut Logger,
     pos: Vec<usize>,
     cvs: &Vec<f64>,
-    cv2s: &Vec<f64>,
+    _cv2s: &Vec<f64>,
     cvzs: &Vec<f64>,
     options: &SegmentOptions,
 ) -> Segmentation {

@@ -8,7 +8,7 @@ bio = { git = "https://github.com/holtgrewe/rust-bio", rev = "9217791" }
 chrono = "*"
 error-chain = "*"
 clap = {version = "*", features = ["yaml", "color", "suggestions"]}
-ndarray = "*"
+ndarray = "0.11"
 ordered-float = "*"
 quantiles = "*"
 rust-htslib = { git = "https://github.com/rust-bio/rust-htslib.git", rev = "903e500" }

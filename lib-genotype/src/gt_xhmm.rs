@@ -224,8 +224,6 @@ pub struct CnvGenotypeInfo {
     quals: XhmmCnvQuals,
 }
 
-use std::fmt::Debug;
-
 /// Restricted version of the forward algorithm, sets probability to `0.0` for `impossible_state`,
 /// states in `impossible_range`.
 pub fn restricted_forward<O, M: Model<O>>(
@@ -432,9 +430,9 @@ fn compute_seg_metrics(
             }
         };
 
-        let state = State(cs_to_idx(copy_state));
-        let start = segment.range.start;
-        let end = segment.range.end;
+        let _state = State(cs_to_idx(copy_state));
+        let _start = segment.range.start;
+        let _end = segment.range.end;
 
         // Compute restricted forward and backward probability (\in {1,2})
         let b_restr12 = {
@@ -614,7 +612,7 @@ fn skip_record(record: &mut bcf::Record) -> bool {
 fn read_seg_and_cov(
     logger: &mut Logger,
     reader: &mut bcf::IndexedReader,
-    reader_calls: Option<&mut bcf::IndexedReader>,
+    _reader_calls: Option<&mut bcf::IndexedReader>,
     options: &GenotypeOptions,
 ) -> Result<(Segmentation, Vec<Range<usize>>, Vec<f64>)> {
     let mut ranges = Vec::new();

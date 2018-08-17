@@ -45,7 +45,7 @@ struct EmrcTuple {
 }
 
 /// Load the raw metrics tuples of EMRC values.
-fn load_emrc_tuples(logger: &mut Logger, input: &String) -> Result<Vec<EmrcTuple>> {
+fn load_emrc_tuples(_logger: &mut Logger, input: &String) -> Result<Vec<EmrcTuple>> {
     let mut result = Vec::new();
     let mut reader = bcf::Reader::from_path(&input)
         .chain_err(|| format!("Could not open input BCF file {}", input))?;
@@ -156,10 +156,11 @@ fn write_corrected(
             .unwrap()[0];
         let exon_size = end - pos;
 
-        let lcv = record
-            .format(b"LCV")
-            .float()
-            .expect("Could not access INFO/LCV")[0][0] as f64;
+        // TOOD: look into LCV/EMCR here!
+        // let lcv = record
+        //     .format(b"LCV")
+        //     .float()
+        //     .expect("Could not access INFO/LCV")[0][0] as f64;
         let gc = (record
             .info(b"GC")
             .float()

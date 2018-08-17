@@ -31,7 +31,9 @@ fn gaussian_kernel(sigma: f64, n: isize) -> Vec<f64> {
 }
 
 /// Perform gaussian smoothing.
-fn perform_smoothing(cvs: &[f64], cv2s: &[f64], sigma: f64, n: isize) -> (Vec<f64>, Vec<f64>) {
+///
+/// TODO: remve _cv2s or whole function?
+fn perform_smoothing(cvs: &[f64], _cv2s: &[f64], sigma: f64, n: isize) -> (Vec<f64>, Vec<f64>) {
     let mut res = vec![0.0; cvs.len()];
     let kernel = gaussian_kernel(sigma, n);
     let m = cvs.len() as isize;
@@ -174,9 +176,9 @@ pub fn run_segmentation(logger: &mut Logger, options: &SegmentOptions) -> Result
                 SMOOTH_SIGMA,
                 SMOOTH_N
             );
-            let (scvs, scv2s) = perform_smoothing(&cvs, &cv2s, SMOOTH_SIGMA, SMOOTH_N);
+            let (_scvs, _scv2s) = perform_smoothing(&cvs, &cv2s, SMOOTH_SIGMA, SMOOTH_N);
         }
-        let scvs = cvs.clone();
+        let _scvs = cvs.clone();
         let scv2s = cv2s.clone();
 
         trace!(logger, "Perform segmentation, yield breakpoints");
