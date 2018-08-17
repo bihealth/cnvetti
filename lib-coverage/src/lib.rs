@@ -697,6 +697,12 @@ pub fn run(logger: &mut Logger, options: &CoverageOptions) -> Result<()> {
         );
     }
 
+    // Bail out on genome-wide coverage with targets bed.
+    if options.considered_regions == ConsideredRegions::GenomeWide && options.targets_bed.is_some()
+    {
+        bail!("Cannot provide targets BED file with genome-wide considered coverage");
+    }
+
     // Get list of regions to process.
     let ref regions = match &options.genome_region {
         Some(regions) => GenomeRegions::from_string_list(&vec![regions.clone()])
