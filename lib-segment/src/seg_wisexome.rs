@@ -185,92 +185,92 @@ fn seg_wisexome(
     return probe_infos.clone();
 }
 
-    // TODO: remove code/segmentation?
-    // // Perform fine-tuning on all windows.
-    // //
-    // // First, compute window ranges.
-    // info!(logger, "-> fine-tuning");
-    // let mut windows: Vec<(usize, usize, CallState)> = Vec::new();
-    // let mut curr_window: Option<(usize, usize, CallState)> = None;
-    // for i in 0..probe_infos.len() {
-    //     let info = probe_infos[i].clone();
-    //     curr_window = match (&info.call_state, &curr_window) {
-    //         (CallState::Ref, None) => None,
-    //         (_, None) => Some((i, i + 1, info.call_state)),
-    //         (CallState::Ref, Some(triple)) => {
-    //             windows.push(*triple);
-    //             None
-    //         }
-    //         (_, Some((start, end, call_state))) => {
-    //             if info.call_state == *call_state {
-    //                 windows.push((*start, *end, *call_state));
-    //                 Some((*start, i + 1, *call_state))
-    //             } else {
-    //                 Some((i, i + 1, info.call_state))
-    //             }
-    //         }
-    //     }
-    // }
-    // if let Some(triple) = curr_window {
-    //     windows.push(triple);
-    // }
-    // // Then, perform the actual fine-tuning.
-    // const DELTA: usize = 8;
-    // for (start, end, call_state) in windows {
-    //     let start = if start > DELTA { start - DELTA } else { 0 };
-    //     let end = if end + DELTA > probe_infos.len() {
-    //         probe_infos.len()
-    //     } else {
-    //         end + DELTA
-    //     };
+// TODO: remove code/segmentation?
+// // Perform fine-tuning on all windows.
+// //
+// // First, compute window ranges.
+// info!(logger, "-> fine-tuning");
+// let mut windows: Vec<(usize, usize, CallState)> = Vec::new();
+// let mut curr_window: Option<(usize, usize, CallState)> = None;
+// for i in 0..probe_infos.len() {
+//     let info = probe_infos[i].clone();
+//     curr_window = match (&info.call_state, &curr_window) {
+//         (CallState::Ref, None) => None,
+//         (_, None) => Some((i, i + 1, info.call_state)),
+//         (CallState::Ref, Some(triple)) => {
+//             windows.push(*triple);
+//             None
+//         }
+//         (_, Some((start, end, call_state))) => {
+//             if info.call_state == *call_state {
+//                 windows.push((*start, *end, *call_state));
+//                 Some((*start, i + 1, *call_state))
+//             } else {
+//                 Some((i, i + 1, info.call_state))
+//             }
+//         }
+//     }
+// }
+// if let Some(triple) = curr_window {
+//     windows.push(triple);
+// }
+// // Then, perform the actual fine-tuning.
+// const DELTA: usize = 8;
+// for (start, end, call_state) in windows {
+//     let start = if start > DELTA { start - DELTA } else { 0 };
+//     let end = if end + DELTA > probe_infos.len() {
+//         probe_infos.len()
+//     } else {
+//         end + DELTA
+//     };
 
-    //     let mut best: Option<(usize, usize, CallState, f64)> = None;
-    //     for i in start..end {
-    //         for j in i..end {
-    //             if i < j {
-    //                 // For determining the window, we are using the *mean* and not the *median*.
-    //                 let window_rel = probe_infos[i..j]
-    //                     .iter()
-    //                     .map(|info| info.cov_rel)
-    //                     .collect::<Vec<f64>>()
-    //                     .as_slice()
-    //                     .mean();
+//     let mut best: Option<(usize, usize, CallState, f64)> = None;
+//     for i in start..end {
+//         for j in i..end {
+//             if i < j {
+//                 // For determining the window, we are using the *mean* and not the *median*.
+//                 let window_rel = probe_infos[i..j]
+//                     .iter()
+//                     .map(|info| info.cov_rel)
+//                     .collect::<Vec<f64>>()
+//                     .as_slice()
+//                     .mean();
 
-    //                 if (1.0 - window_rel).abs() < options.wisexome_thresh_rel_cov {
-    //                     continue; // below threshold, ignore
-    //                 }
+//                 if (1.0 - window_rel).abs() < options.wisexome_thresh_rel_cov {
+//                     continue; // below threshold, ignore
+//                 }
 
-    //                 best = match best {
-    //                     None => Some((start, end, call_state, window_rel)),
-    //                     Some((s, e, c, r)) => {
-    //                         if window_rel > r {
-    //                             Some((start, end, call_state, window_rel))
-    //                         } else {
-    //                             Some((s, e, c, r))
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
+//                 best = match best {
+//                     None => Some((start, end, call_state, window_rel)),
+//                     Some((s, e, c, r)) => {
+//                         if window_rel > r {
+//                             Some((start, end, call_state, window_rel))
+//                         } else {
+//                             Some((s, e, c, r))
+//                         }
+//                     }
+//                 }
+//             }
+//         }
+//     }
 
-    //     if let Some((start, end, call_state, _)) = best {
-    //         // Compute true window_rel with median.
-    //         let window_rel = probe_infos[start..end]
-    //             .iter()
-    //             .map(|info| info.cov_rel)
-    //             .collect::<Vec<f64>>()
-    //             .as_slice()
-    //             .median();
-    //         for info in &mut probe_infos[start..end] {
-    //             info.window_rel = window_rel;
-    //             info.call_state = call_state;
-    //             info.update_call_state_window(options.wisexome_thresh_rel_cov);
-    //         }
-    //     }
-    // }
+//     if let Some((start, end, call_state, _)) = best {
+//         // Compute true window_rel with median.
+//         let window_rel = probe_infos[start..end]
+//             .iter()
+//             .map(|info| info.cov_rel)
+//             .collect::<Vec<f64>>()
+//             .as_slice()
+//             .median();
+//         for info in &mut probe_infos[start..end] {
+//             info.window_rel = window_rel;
+//             info.call_state = call_state;
+//             info.update_call_state_window(options.wisexome_thresh_rel_cov);
+//         }
+//     }
+// }
 
-    // probe_infos.clone()
+// probe_infos.clone()
 // }
 
 /// Perform segmentation using the algorithm from the WISExome paper.
