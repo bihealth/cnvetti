@@ -130,7 +130,7 @@ pub fn write_segment(
         .push_format_float(b"CV2SD", &[segment.std_dev_log2 as f32])
         .chain_err(|| "Could not write FORMAT/CV2SD: {}")?;
     record
-        .push_format_integer(b"CN", &[2_f64.powf(segment.mean_log2) as i32])
+        .push_format_integer(b"CN", &[2_f64.powf(segment.mean_log2).round() as i32])
         .chain_err(|| "Could not write FORMAT/CN: {}")?;
 
     writer
