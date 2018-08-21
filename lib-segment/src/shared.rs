@@ -59,6 +59,7 @@ pub fn open_segment_file(
         "##FORMAT=<ID=CVSD,Number=1,Type=Float,Description=\"Normalized std dev coverage value\">",
         "##FORMAT=<ID=CV2SD,Number=1,Type=Float,Description=\"Log2-scaled std dev coverage
          value\">",
+        "##FORMAT=<ID=CN,Number=1,Type=Integer,Description=\"Derived integer copy number\">",
     ];
     for line in lines {
         header.push_record(line.as_bytes());
@@ -128,6 +129,9 @@ pub fn write_segment(
     record
         .push_format_float(b"CV2SD", &[segment.std_dev_log2 as f32])
         .chain_err(|| "Could not write FORMAT/CV2SD: {}")?;
+    record
+        .push_format_integer(b"CN", &[2_f64.powf(segment.mean_log2) as i32])
+        .chain_err(|| "Could not write FORMAT/CN: {}")?;
 
     writer
         .write(&record)

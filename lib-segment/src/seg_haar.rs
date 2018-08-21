@@ -233,7 +233,7 @@ pub fn run_segmentation(logger: &mut Logger, options: &SegmentOptions) -> Result
             }
         }
 
-        trace!(logger, "Write out target-wise segmentation");
+        trace!(logger, "Write out target/window-wise segmentation");
         let mut idx = 0; // current index into ncov
         let mut prev_val: Option<(f32, f32, f32)> = None; // (val, log2(val), p_value)
         reader
