@@ -9,7 +9,7 @@ use slog::Logger;
 use tempdir::TempDir;
 
 use lib_coverage::{self, CoverageOptions};
-use lib_genotype::{self, GenotypeOptions, GenotypingMethod};
+use lib_genotype::{self, GenotypeOptions, GenotypingMethod, SegmentationMethod};
 use lib_mod_cov::{self, ModelBasedCoverageOptions};
 use lib_normalize::{self, NormalizeOptions};
 use lib_segment::{self, SegmentOptions, Segmentation};
@@ -190,6 +190,15 @@ impl QuickPoolCallOptions {
             xhmm_cnv_rate: self.xhmm_cnv_rate,
             xhmm_mean_target_count: self.xhmm_mean_target_count,
             xhmm_mean_target_dist: self.xhmm_mean_target_dist,
+
+            haar_seg_fdr: self.haar_seg_fdr,
+            haar_seg_l_max: self.haar_seg_l_max,
+            haar_seg_l_min: self.haar_seg_l_min,
+            thresh_p_value: self.thresh_p_value,
+
+            // These are dummy values.
+            overlap: -1.0,
+            segmentation: SegmentationMethod::HaarSeg,
         }
     }
 }

@@ -9,6 +9,15 @@ use clap::ArgMatches;
 pub enum GenotypingMethod {
     /// Genotyping using the exome HMM algorithm.
     ExomeHiddenMarkovModel,
+    /// Genotyping by segment overlap.
+    SegmentOverlap,
+}
+
+/// Define the method for segmentation when using `SegmentOverlap` genotyping.
+#[derive(Clone, Copy, EnumString, Debug, PartialEq)]
+pub enum SegmentationMethod {
+    /// HaarSeg-based segmentation.
+    HaarSeg,
 }
 
 /// Options for "cnvetti cmd genotype".
@@ -26,6 +35,14 @@ pub struct GenotypeOptions {
     /// The genotyping method to employ.
     pub genotyping: GenotypingMethod,
 
+    /// The segmentation method to employ.
+    pub segmentation: SegmentationMethod,
+
+    /// Parameters for p-value thresholding.
+    pub thresh_p_value: f64,
+    /// Minimal overlap to call a segment.
+    pub overlap: f64,
+
     // Parameters from XHMM.
     /// Z-score threshold to use.
     pub xhmm_z_score_threshold: f64,
@@ -35,14 +52,27 @@ pub struct GenotypeOptions {
     pub xhmm_mean_target_count: f64,
     /// Expected mean target distance in a CNV.
     pub xhmm_mean_target_dist: f64,
+
+    // Parameters from Haar-Seg.
+    /// Value for l_min.
+    pub haar_seg_l_min: u32,
+    /// Value for l_max.
+    pub haar_seg_l_max: u32,
+    /// Value for FDR.
+    pub haar_seg_fdr: f64,
 }
 
 impl GenotypeOptions {
     /// Build options from ArgMatches.
     pub fn new(matches: &ArgMatches) -> Self {
         println!("{:?}", matches);
+
         let genotyping = matches.value_of("genotyping").unwrap();
         let genotyping = GenotypingMethod::from_str(&genotyping).expect("Unknown genotyping");
+
+        let segmentation = matches.value_of("segmentation").unwrap();
+        let segmentation =
+            SegmentationMethod::from_str(&segmentation).expect("Unknown segmentation");
 
         Self {
             input: matches.value_of("input").unwrap().to_string(),
@@ -55,6 +85,13 @@ impl GenotypeOptions {
                 .unwrap(),
 
             genotyping: genotyping,
+            segmentation: segmentation,
+            overlap: matches.value_of("overlap").unwrap().parse::<f64>().unwrap(),
+            thresh_p_value: matches
+                .value_of("thresh_p_value")
+                .unwrap()
+                .parse::<f64>()
+                .unwrap(),
 
             xhmm_z_score_threshold: matches
                 .value_of("xhmm_z_score_threshold")
@@ -73,6 +110,22 @@ impl GenotypeOptions {
                 .unwrap(),
             xhmm_mean_target_dist: matches
                 .value_of("xhmm_mean_target_dist")
+                .unwrap()
+                .parse::<f64>()
+                .unwrap(),
+
+            haar_seg_l_min: matches
+                .value_of("haar_seg_l_min")
+                .unwrap()
+                .parse::<u32>()
+                .unwrap(),
+            haar_seg_l_max: matches
+                .value_of("haar_seg_l_max")
+                .unwrap()
+                .parse::<u32>()
+                .unwrap(),
+            haar_seg_fdr: matches
+                .value_of("haar_seg_fdr")
                 .unwrap()
                 .parse::<f64>()
                 .unwrap(),

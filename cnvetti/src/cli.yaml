@@ -472,7 +472,26 @@ subcommands:
             value_name: TYPE
             possible_values:
             - ExomeHiddenMarkovModel
+            - SegmentOverlap
             help: The method to use for the genotyping.
+        - segmentation:
+            long: segmentation
+            takes_value: true
+            required: true
+            value_name: TYPE
+            possible_values:
+            - HaarSeg
+            default_value: HaarSeg
+            help: The method to use for the segmentation when using SegmentOverlap genotyping.
+        - overlap:
+            long: overlap
+            default_value: '0.8'
+            takes_value: true
+            required: false
+            value_name: overlap
+            help: >
+                Overlap to require for calling a segment as called when using SegmentOverlap
+                genotyping.
         # Algorithm Parameters for Exome HMM Segmentation -----------------------------------------
         - xhmm_z_score_threshold:
             long: xhmm-z-score-threshold
@@ -498,6 +517,31 @@ subcommands:
             value_name: DIST
             default_value: '70000'
             help: Mean distance of targets in a CNV for exome HMM segmentation.
+        # Algorithm Parameters for HaarSeg --------------------------------------------------------
+        - haar_seg_l_min:
+            long: haar-seg-l-min
+            takes_value: true
+            required: false
+            value_name: VALUE
+            default_value: '1'
+        - haar_seg_l_max:
+            long: haar-seg-l-max
+            takes_value: true
+            required: false
+            value_name: VALUE
+            default_value: '5'
+        - haar_seg_fdr:
+            long: haar-seg-fdr
+            takes_value: true
+            required: false
+            value_name: VALUE
+            default_value: '0.001'
+        - thresh_p_value:
+            long: thresh-p-value
+            takes_value: true
+            required: false
+            value_name: P-VALUE
+            default_value: '0.05'
     # Sub command: cmd filter ---------------------------------------------------------------------
     - filter:
         about: Filter coverage information

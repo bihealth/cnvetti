@@ -27,7 +27,7 @@ extern crate shlex;
 extern crate lib_shared;
 use lib_shared::bcf_utils;
 
-mod seg_haar;
+pub mod seg_haar;
 mod seg_wisexome;
 pub mod seg_xhmm;
 mod shared;

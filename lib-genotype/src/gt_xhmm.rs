@@ -43,7 +43,7 @@ fn write_result(
 
         // Columns: CHROM, POS, ID, REF, ALT, (FILTER)
         let pos = ranges[cnv_info.segment.range.start].start;
-        let end = ranges[cnv_info.segment.range.end].end;
+        let end = ranges[cnv_info.segment.range.end - 1].end;
         let alleles_v = vec![
             Vec::from("N"),
             if cnv_info.quals.copy_state == CopyState::Deletion {
@@ -609,7 +609,7 @@ fn skip_record(record: &mut bcf::Record) -> bool {
 }
 
 /// Read segmentation and region-wise coverage from input file(s).
-fn read_seg_and_cov(
+pub fn read_seg_and_cov(
     logger: &mut Logger,
     reader: &mut bcf::IndexedReader,
     _reader_calls: Option<&mut bcf::IndexedReader>,
@@ -888,6 +888,7 @@ pub fn run_genotyping(logger: &mut Logger, options: &GenotypeOptions) -> Result<
 
     debug!(logger, "Performing the actual work.");
     let chroms = bcf_utils::extract_chroms(&reader.header());
+    // TODO: check compatibility between BCF contig headers
     for (chrom, _, chrom_len) in &chroms.regions {
         debug!(logger, "Processing chrom {}", &chrom);
 
