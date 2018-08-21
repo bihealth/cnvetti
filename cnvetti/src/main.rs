@@ -37,6 +37,7 @@ pub use errors::*;
 extern crate lib_coverage;
 extern crate lib_genotype;
 extern crate lib_merge_cov;
+extern crate lib_merge_seg;
 extern crate lib_mod_cov;
 extern crate lib_model_pool;
 extern crate lib_model_wis;
@@ -125,6 +126,10 @@ fn run(matches: ArgMatches) -> Result<()> {
             ("merge-cov", Some(m)) => {
                 lib_merge_cov::run(&mut logger, &lib_merge_cov::MergeCovOptions::new(&m))
                     .chain_err(|| "Could not execute 'cmd merge-cov'")?
+            }
+            ("merge-seg", Some(m)) => {
+                lib_merge_seg::run(&mut logger, &lib_merge_seg::MergeSegOptions::new(&m))
+                    .chain_err(|| "Could not execute 'cmd merge-seg'")?
             }
             ("ratio", Some(m)) => lib_ratio::run(&mut logger, &lib_ratio::RatioOptions::new(&m))
                 .chain_err(|| "Could not execute 'cmd ratio'")?,

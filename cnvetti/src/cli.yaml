@@ -393,6 +393,41 @@ subcommands:
             value_name: DIST
             default_value: '70000'
             help: Mean distance of targets in a CNV for exome HMM segmentation.
+    # Sub command: cmd merge-seg ------------------------------------------------------------------
+    - merge-seg:
+        about: Merge segmentation result files.
+        settings:
+        - DeriveDisplayOrder
+        - GlobalVersion
+        - UnifiedHelpMessage
+        - ColorAuto
+        after_help: >
+          This command takes one or more segment BCF files with segmentation results, merges
+          the segments based on reciprocal overlap and then writes out a BCF file that contains
+          the segments as site list (only).
+        args:
+        # Input/Output File Arguments -------------------------------------------------------------
+        - input:
+            multiple: true
+            takes_value: true
+            required: true
+            value_name: INPUT.bcf
+            help: Path to indexed input BCF or VCF segment file from `cnvetti cmd segment` output.
+        - output:
+            long: output
+            short: o
+            takes_value: true
+            required: true
+            value_name: OUT.bcf
+            help: Path to BCF file with merged segments (will also write .csi file)
+        # Algorithm Parameters --------------------------------------------------------------------
+        - reciprocal_overlap:
+            long: reciprocal-overlap
+            default_value: '0.8'
+            takes_value: true
+            required: false
+            value_name: overlap
+            help: Reciprocal overlap to require for merging segments
     # Sub command: cmd genotype -------------------------------------------------------------------
     - genotype:
         about: Genotype calls from segmentation or calls and coverage BCF files.

@@ -11,7 +11,7 @@ clap = {version = "*", features = ["yaml", "color", "suggestions"]}
 ndarray = "0.11"
 ordered-float = "*"
 quantiles = "*"
-rust-htslib = { git = "https://github.com/rust-bio/rust-htslib.git", rev = "903e500" }
+rust-htslib = { path = "../../rust-htslib" }
 rust-segment = { git = "https://github.com/holtgrewe/rust-segment", rev = "04147c9" }
 separator = "*"
 shlex = "*"
