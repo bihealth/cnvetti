@@ -30,6 +30,7 @@ extern crate lib_shared;
 use lib_shared::bcf_utils;
 
 mod gt_xhmm;
+mod gt_seg_ovl;
 
 mod options;
 pub use options::*;
@@ -49,6 +50,7 @@ pub fn run(logger: &mut Logger, options: &GenotypeOptions) -> Result<()> {
 
     match options.genotyping {
         GenotypingMethod::ExomeHiddenMarkovModel => gt_xhmm::run_genotyping(logger, options)?,
+        GenotypingMethod::SegmentOverlap => gt_seg_ovl::run_genotyping(logger, options)?,
     }
 
     // Finally, create index on created output file.
