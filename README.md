@@ -9,8 +9,8 @@ It provides this functionality for various types of data and experimental design
 
 - Supported OS: Linux
 - License: GPL v3
-- Status: Alpha
+- Status: Alpha (use at your own risk!)
 
-## Upcoming Features
+## Limitations
 
-- Installation via Bioconda
+- Genotyping is currently very crude and limited in functionality
