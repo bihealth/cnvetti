@@ -15,6 +15,7 @@ use super::errors::*;
 use lib_shared::regions;
 
 /// Some statistics on the reference.
+#[derive(Debug, Clone)]
 pub struct ReferenceStats {
     /// GC content of windows.
     pub gc_content: Vec<f32>,

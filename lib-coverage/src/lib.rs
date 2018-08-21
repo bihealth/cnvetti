@@ -737,6 +737,7 @@ pub fn run(logger: &mut Logger, options: &CoverageOptions) -> Result<()> {
     // Create output file writer and kick off processing.  This is done in its own block such
     // that the file is definitely closed when building the index below.
     {
+        // TODO: check consistency between FASTA and BAM contigs!
         let contigs = {
             let bam_reader = bam::IndexedReader::from_path(&options.input)
                 .chain_err(|| "Could not open BAI-indexed BAM file")?;
