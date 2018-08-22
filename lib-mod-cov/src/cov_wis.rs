@@ -159,7 +159,7 @@ pub fn write_mod_cov(
 
     // Build output header.
     let mut header = bcf::Header::from_template(reader.header());
-    header.push_record(format!("##cnvetti_cmdModCoverageVersion={}", "0.1.0").as_bytes());
+    header.push_record(format!("##cnvetti_cmdModCoverageVersion={}", "0.2.0").as_bytes());
     header.push_record(
         format!(
             "##cnvetti_cmdModCoverageCommand={}",

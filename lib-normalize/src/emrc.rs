@@ -120,7 +120,7 @@ fn write_corrected(
         // Construct extended header.
         let mut header = bcf::Header::from_template(reader.header());
         // TODO: version should come from one central place
-        header.push_record(format!("##cnvetti_cmdNormalizeVersion={}", "0.1.0").as_bytes());
+        header.push_record(format!("##cnvetti_cmdNormalizeVersion={}", "0.2.0").as_bytes());
         header.push_record(
             format!(
                 "##cnvetti_wiseNormalizeCommand={}",

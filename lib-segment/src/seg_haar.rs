@@ -89,7 +89,7 @@ pub fn run_segmentation(logger: &mut Logger, options: &SegmentOptions) -> Result
         // for line in lines {
         //     header.push_record(line.as_bytes());
         // }
-        header.push_record(format!("##cnvetti_segmentVersion={}", "0.1.0").as_bytes());
+        header.push_record(format!("##cnvetti_segmentVersion={}", "0.2.0").as_bytes());
         header.push_record(
             format!(
                 "##cnvetti_segmentCommand={}",

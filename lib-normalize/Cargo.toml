@@ -1,6 +1,6 @@
 [package]
 name = "lib-normalize"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>"]
 
 [dependencies]
@@ -8,7 +8,7 @@ chrono = "*"
 error-chain = "*"
 clap = {version = "*", features = ["yaml", "color", "suggestions"]}
 quantiles = "*"
-rust-htslib = { path = "../../rust-htslib" }
+rust-htslib = { git = "https://github.com/rust-bio/rust-htslib.git", rev = "9cf1c52" }
 shlex = "*"
 slog = {version = "*", features = ["max_level_trace", "release_max_level_debug"] }
 slog-term = "*"

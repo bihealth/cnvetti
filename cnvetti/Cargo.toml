@@ -1,6 +1,6 @@
 [package]
 name = "cnvetti"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>"]
 license = "GPL-3.0+"
 readme = "README.md"

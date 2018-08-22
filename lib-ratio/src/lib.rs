@@ -64,7 +64,7 @@ pub fn run(logger: &mut Logger, options: &RatioOptions) -> Result<()> {
             let mut header = bcf::Header::from_template_subset(reader.header(), &samples)
                 .chain_err(|| "Could not create output header")?;
             // TODO: version should come from one central place
-            header.push_record(format!("##cnvetti_cmdRatioVersion={}", "0.1.0").as_bytes());
+            header.push_record(format!("##cnvetti_cmdRatioVersion={}", "0.2.0").as_bytes());
             header.push_record(
                 format!(
                     "##cnvetti_wiseRatioCommand={}",

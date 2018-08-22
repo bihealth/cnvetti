@@ -22,7 +22,7 @@ pub fn open_segment_file(
     header.push_record(format!("##fileDate={}", now.format("%Y%m%d").to_string()).as_bytes());
 
     // Put creating tool version and call into file.
-    header.push_record(format!("##cnvetti_cmdSegmentVersion={}", "0.1.0").as_bytes());
+    header.push_record(format!("##cnvetti_cmdSegmentVersion={}", "0.2.0").as_bytes());
     header.push_record(
         format!(
             "##cnvetti_cmdSegmentCommand={}",

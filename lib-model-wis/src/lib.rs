@@ -292,7 +292,7 @@ fn build_header(contigs: &GenomeRegions) -> bcf::Header {
     header.push_record(format!("##fileDate={}", now.format("%Y%m%d").to_string()).as_bytes());
 
     // Put creating tool version and call into file.
-    header.push_record(format!("##cnvetti_cmdBuildModelWisVersion={}", "0.1.0").as_bytes());
+    header.push_record(format!("##cnvetti_cmdBuildModelWisVersion={}", "0.2.0").as_bytes());
     header.push_record(
         format!(
             "##cnvetti_cmdBuildModelWisCommand={}",

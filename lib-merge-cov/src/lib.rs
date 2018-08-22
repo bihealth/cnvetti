@@ -73,7 +73,7 @@ fn build_writer(
     let mut header = bcf::Header::from_template_subset(header, &[])
         .chain_err(|| "Problem constructing header from template and no samples")?;
     // TODO: version should come from one central place
-    header.push_record(format!("##cnvetti_cmdMergeCovVersion={}", "0.1.0").as_bytes());
+    header.push_record(format!("##cnvetti_cmdMergeCovVersion={}", "0.2.0").as_bytes());
     header.push_record(
         format!(
             "##cnvetti_cmdMergeCovCommand={}",

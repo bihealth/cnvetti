@@ -1,6 +1,6 @@
 # CNVetti CHANGELOG
 
-## HEAD (unreleased yet)
+## v0.2.0
 
 - Adding `cmd merge-seg`.
 - Also writing out `FORMAT/CN` in segmentation BCF file for `cmd segment`.
