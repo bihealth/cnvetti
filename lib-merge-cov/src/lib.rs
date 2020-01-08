@@ -166,7 +166,7 @@ pub fn merge_files(
                     }
                 }
             }
-            let mut values: Vec<&[u8]> = values_v
+            let values: Vec<&[u8]> = values_v
                 .iter()
                 .map(|v| v.as_slice())
                 .collect::<Vec<&[u8]>>();

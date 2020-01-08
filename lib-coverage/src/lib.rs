@@ -507,7 +507,7 @@ fn process_region(
 
     // Construct aggregator for the records.
     info!(logger, "Constructing aggregator...");
-    let mut aggregator: Box<BamRecordAggregator> =
+    let mut aggregator: Box<dyn BamRecordAggregator> =
         match (options.count_kind, options.considered_regions) {
             // TODO: next step is to integrate the target fragment counting here
             (CountKind::Fragments, ConsideredRegions::GenomeWide) => Box::new(
@@ -795,7 +795,14 @@ mod tests {
 
     #[test]
     fn test_compute_threshold() {
+        let decorator = slog_term::TermDecorator::new().build();
+        let _drain = slog_term::FullFormat::new(decorator).build();
+        let mut logger = slog::Logger::root(slog::Discard, o!());
+
         let y = vec![0, 10, 8, 7, 6, 5, 3];
-        assert_eq!(7, compute_threshold(&y, 0.001).expect("No threshold!"));
+        assert_eq!(
+            7,
+            compute_threshold(&mut logger, &y, 0.001).expect("No threshold!")
+        );
     }
 }

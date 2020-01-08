@@ -16,7 +16,7 @@ pub fn process_bcf(
     input: &String,
     output: &String,
     io_threads: u32,
-    f: &Fn(&mut bcf::Record) -> Result<()>,
+    f: &dyn Fn(&mut bcf::Record) -> Result<()>,
 ) -> Result<()> {
     debug!(logger, "Opening input file...");
     let mut reader = bcf::Reader::from_path(&input)
