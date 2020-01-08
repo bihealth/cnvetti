@@ -133,7 +133,8 @@ impl<'a> FragmentsGenomeWideAggregator<'a> {
             } as u32;
 
             let pos = fragment_center..(fragment_center + 1);
-            let window_length = self.base
+            let window_length = self
+                .base
                 .options
                 .window_length
                 .expect("Window length must be set here") as usize;
@@ -204,7 +205,8 @@ impl<'a> FragmentsGenomeWideAggregator<'a> {
             end: ((window_id + 1) * window_length) as u32,
         };
         match self.tree {
-            Some(ref tree) => tree.find(window.clone())
+            Some(ref tree) => tree
+                .find(window.clone())
                 .map(|entry| {
                     let end = min(window.end, entry.interval().end) as i32;
                     let start = max(window.start, entry.interval().start) as i32;
@@ -561,9 +563,11 @@ impl BamRecordAggregator for CoverageAggregator {
 
         if let Some(window_id) = self.window_id {
             match prev_window_id {
-                Some(prev_window_id) => if prev_window_id != window_id {
-                    self.push_window(window_id);
-                },
+                Some(prev_window_id) => {
+                    if prev_window_id != window_id {
+                        self.push_window(window_id);
+                    }
+                }
                 None => self.push_window(window_id),
             }
         }

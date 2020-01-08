@@ -5,7 +5,7 @@ use bio::io::fasta;
 
 mod errors {
     // Create the Error, ErrorKind, ResultExt, and Result types
-    error_chain!{}
+    error_chain! {}
 }
 
 pub use self::errors::*;

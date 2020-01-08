@@ -163,7 +163,8 @@ pub fn run(logger: &mut Logger, options: &QuickWisBuildModelOptions) -> Result<(
             lib_coverage::run(
                 &mut logger,
                 &options.into_coverage_options(&input, &cov_out),
-            ).chain_err(|| format!("Problem computing coverage on {}", &input))?;
+            )
+            .chain_err(|| format!("Problem computing coverage on {}", &input))?;
 
             let norm_out = tmp_dir
                 .path()
@@ -174,7 +175,8 @@ pub fn run(logger: &mut Logger, options: &QuickWisBuildModelOptions) -> Result<(
             lib_normalize::run(
                 &mut logger,
                 &options.into_normalize_options(&cov_out, &norm_out),
-            ).chain_err(|| format!("Problem normalizing on {}", &cov_out))?;
+            )
+            .chain_err(|| format!("Problem normalizing on {}", &cov_out))?;
 
             Ok(norm_out)
         })
@@ -196,14 +198,16 @@ pub fn run(logger: &mut Logger, options: &QuickWisBuildModelOptions) -> Result<(
     lib_merge_cov::run(
         &mut logger.new(o!("step" => "merge-cov")),
         &options.into_merge_cov_options(&norm_out, &merge_out),
-    ).chain_err(|| "Problem with merging coverage file")?;
+    )
+    .chain_err(|| "Problem with merging coverage file")?;
 
     // Build within-sample model.
     info!(logger, "Build model and write out");
     lib_model_wis::run(
         &mut logger.new(o!("step" => "build-wis-model")),
         &options.into_build_model_wis_options(&merge_out, &options.output),
-    ).chain_err(|| "Problem building the model")?;
+    )
+    .chain_err(|| "Problem building the model")?;
 
     info!(logger, "All done. Have a nice day!");
     Ok(())

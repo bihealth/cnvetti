@@ -142,7 +142,8 @@ pub fn run(logger: &mut Logger, options: &QuickWisCallOptions) -> Result<()> {
     lib_coverage::run(
         &mut logger.new(o!("step" => "coverage")),
         &options.into_coverage_options(&options.input, &cov_out),
-    ).chain_err(|| format!("Problem computing coverage on {}", &options.input))?;
+    )
+    .chain_err(|| format!("Problem computing coverage on {}", &options.input))?;
     info!(logger, " => done");
 
     let norm_out = tmp_dir
@@ -174,7 +175,8 @@ pub fn run(logger: &mut Logger, options: &QuickWisCallOptions) -> Result<()> {
             &options.input_model,
             &output_targets,
         ),
-    ).chain_err(|| "Problem with merging coverage file")?;
+    )
+    .chain_err(|| "Problem with merging coverage file")?;
     info!(logger, " => done");
 
     // Generate IGV output files for coverage.
@@ -182,7 +184,8 @@ pub fn run(logger: &mut Logger, options: &QuickWisCallOptions) -> Result<()> {
     lib_visualize::cov_to_igv::run(
         &mut logger.new(o!("step" => "visualize:cov-to-igv")),
         &options.into_cov_to_igv_options(&output_targets),
-    ).chain_err(|| "Problem with merging coverage file")?;
+    )
+    .chain_err(|| "Problem with merging coverage file")?;
     info!(logger, " => done");
 
     warn!(logger, "Actual calling step has not been implemented yet!");

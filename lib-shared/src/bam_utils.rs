@@ -8,7 +8,7 @@ use rust_htslib::bam::{self, Read};
 
 mod errors {
     // Create the Error, ErrorKind, ResultExt, and Result types
-    error_chain!{}
+    error_chain! {}
 }
 
 pub use self::errors::*;
@@ -90,8 +90,8 @@ fn samples_from_header(header: &Vec<u8>) -> Vec<String> {
 /// Construct sample list from BAM file.
 pub fn samples_from_file<P: AsRef<Path>>(path: P) -> Result<Vec<String>> {
     let path = path.as_ref().to_str().unwrap();
-    let reader =
-        bam::Reader::from_path(path).chain_err(|| format!("Could not open BAM file for reading"))?;
+    let reader = bam::Reader::from_path(path)
+        .chain_err(|| format!("Could not open BAM file for reading"))?;
 
     Ok(samples_from_header(&Vec::from(reader.header().as_bytes())))
 }

@@ -19,8 +19,8 @@ pub fn process_bcf(
     f: &Fn(&mut bcf::Record) -> Result<()>,
 ) -> Result<()> {
     debug!(logger, "Opening input file...");
-    let mut reader =
-        bcf::Reader::from_path(&input).chain_err(|| format!("Could not open BCF file: {}", input))?;
+    let mut reader = bcf::Reader::from_path(&input)
+        .chain_err(|| format!("Could not open BCF file: {}", input))?;
     if io_threads > 0 {
         reader
             .set_threads(io_threads as usize)
@@ -40,7 +40,8 @@ pub fn process_bcf(
                     .map(|s| shlex::quote(&s).to_string())
                     .collect::<Vec<String>>()
                     .join(" ")
-            ).as_bytes(),
+            )
+            .as_bytes(),
         );
 
         let uncompressed = !output.ends_with(".bcf") && !output.ends_with(".vcf.gz");

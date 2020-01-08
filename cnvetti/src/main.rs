@@ -29,7 +29,7 @@ use clap::{App, ArgMatches};
 
 mod errors {
     // Create the Error, ErrorKind, ResultExt, and Result types
-    error_chain!{}
+    error_chain! {}
 }
 
 pub use errors::*;
@@ -88,7 +88,8 @@ fn run(matches: ArgMatches) -> Result<()> {
     let drain = RuntimeLevelFilter {
         drain: drain,
         log_level: log_level.clone(),
-    }.fuse();
+    }
+    .fuse();
     let drain = slog_async::Async::new(drain).build().fuse();
 
     let mut logger = slog::Logger::root(drain, o!());
@@ -129,19 +130,19 @@ fn run(matches: ArgMatches) -> Result<()> {
             ("mod-coverage", Some(m)) => lib_mod_cov::run(
                 &mut logger,
                 &lib_mod_cov::ModelBasedCoverageOptions::new(&m),
-            ).chain_err(|| "Could not execute 'cmd mod-coverage'")?,
+            )
+            .chain_err(|| "Could not execute 'cmd mod-coverage'")?,
             ("discover", Some(_m)) => bail!("cmd discover not implemented!"),
             ("genotype", Some(_m)) => bail!("cmd genotype not implemented!"),
             _ => bail!("Invalid command: {}", m.subcommand().0),
         },
         // cnvetti quick <wis-build-model|wis-call>
         ("quick", Some(m)) => match m.subcommand() {
-            ("wis-build-model", Some(m)) => {
-                quick_wis_build_model::run(
-                    &mut logger,
-                    &quick_wis_build_model::QuickWisBuildModelOptions::new(&m),
-                ).chain_err(|| "Could not execute 'cmd quick wis-build-models")?
-            }
+            ("wis-build-model", Some(m)) => quick_wis_build_model::run(
+                &mut logger,
+                &quick_wis_build_model::QuickWisBuildModelOptions::new(&m),
+            )
+            .chain_err(|| "Could not execute 'cmd quick wis-build-models")?,
             ("wis-call", Some(m)) => {
                 quick_wis_call::run(&mut logger, &quick_wis_call::QuickWisCallOptions::new(&m))
                     .chain_err(|| "Could not execute 'cmd quick wis-call")?
@@ -153,7 +154,8 @@ fn run(matches: ArgMatches) -> Result<()> {
             ("cov-to-igv", Some(m)) => lib_visualize::cov_to_igv::run(
                 &mut logger,
                 &lib_visualize::CovToIgvOptions::new(&m),
-            ).chain_err(|| "Could not execute 'visualize cov-to-igv'")?,
+            )
+            .chain_err(|| "Could not execute 'visualize cov-to-igv'")?,
             _ => bail!("Invalid command: {}", m.subcommand().0),
         },
         _ => bail!("Invalid command: {}", matches.subcommand().0),
